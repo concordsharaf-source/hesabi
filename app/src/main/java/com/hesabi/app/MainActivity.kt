@@ -20,6 +20,16 @@ import com.hesabi.app.ui.home.HomeScreen
 import com.hesabi.app.ui.inventory.InventoryScreen
 import com.hesabi.app.ui.invoices.InvoicesScreen
 import com.hesabi.app.ui.onboarding.OnboardingScreen
+import com.hesabi.app.ui.purchases.PurchaseDetailScreen
+import com.hesabi.app.ui.purchases.PurchaseFormScreen
+import com.hesabi.app.ui.purchases.PurchaseReturnScreen
+import com.hesabi.app.ui.purchases.PurchasesScreen
+import com.hesabi.app.ui.reports.ReportsScreen
+import com.hesabi.app.ui.sales.SaleReturnScreen
+import com.hesabi.app.ui.suppliers.SupplierFormScreen
+import com.hesabi.app.ui.suppliers.SuppliersScreen
+import com.hesabi.app.ui.expenses.ExpensesListScreen
+import com.hesabi.app.ui.expenses.ExpensesScreen
 import com.hesabi.app.ui.products.ProductsScreen
 import com.hesabi.app.ui.sales.SalesScreen
 import com.hesabi.app.ui.theme.HesabiTheme
@@ -61,6 +71,19 @@ object Routes {
     const val INVOICES = "invoices"
     const val BARCODE = "barcode/{target}"
 
+    // المرحلة الثانية
+    const val SUPPLIERS = "suppliers"
+    const val SUPPLIER_ADD = "suppliers/add"
+    const val SUPPLIER_EDIT = "suppliers/edit/{supplierId}"
+    const val PURCHASES = "purchases"
+    const val PURCHASE_ADD = "purchases/add"
+    const val PURCHASE_DETAIL = "purchases/{purchaseId}"
+    const val PURCHASE_RETURN = "purchases/{purchaseId}/return"
+    const val SALE_RETURN = "sales/{saleId}/return"
+    const val EXPENSES = "expenses"
+    const val EXPENSE_ADD = "expenses/add"
+    const val REPORTS = "reports"
+
     const val TARGET_PRODUCTS = "products"
     const val TARGET_SALES = "sales"
     const val TARGET_PRODUCT_ADD = "product_add"
@@ -88,7 +111,11 @@ private fun HesabiNavHost(startRoute: String) {
                 onNavigateToSales = { navController.navigate(Routes.SALES) },
                 onNavigateToProducts = { navController.navigate(Routes.PRODUCTS) },
                 onNavigateToInventory = { navController.navigate(Routes.INVENTORY) },
-                onNavigateToInvoices = { navController.navigate(Routes.INVOICES) }
+                onNavigateToInvoices = { navController.navigate(Routes.INVOICES) },
+                onNavigateToSuppliers = { navController.navigate(Routes.SUPPLIERS) },
+                onNavigateToPurchases = { navController.navigate(Routes.PURCHASES) },
+                onNavigateToExpenses = { navController.navigate(Routes.EXPENSES) },
+                onNavigateToReports = { navController.navigate(Routes.REPORTS) }
             )
         }
 
@@ -166,6 +193,111 @@ private fun HesabiNavHost(startRoute: String) {
 
         composable(Routes.INVOICES) {
             InvoicesScreen(
+                onBack = { navController.popBackStack() },
+                onSaleReturn = { saleId ->
+                    navController.navigate("sales/$saleId/return")
+                }
+            )
+        }
+
+        composable(Routes.SUPPLIERS) {
+            SuppliersScreen(
+                onAddSupplier = { navController.navigate(Routes.SUPPLIER_ADD) },
+                onEditSupplier = { id -> navController.navigate("suppliers/edit/$id") },
+                onSupplierClick = { id ->
+                    PreselectedState.setSupplierId(id)
+                    navController.navigate(Routes.PURCHASE_ADD)
+                },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.SUPPLIER_ADD) {
+            SupplierFormScreen(
+                supplierId = null,
+                onSaved = { navController.popBackStack() },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.SUPPLIER_EDIT,
+            arguments = listOf(navArgument("supplierId") { type = NavType.LongType })
+        ) { entry ->
+            val supplierId = entry.arguments?.getLong("supplierId") ?: 0L
+            SupplierFormScreen(
+                supplierId = supplierId,
+                onSaved = { navController.popBackStack() },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.PURCHASES) {
+            PurchasesScreen(
+                onAddPurchase = { navController.navigate(Routes.PURCHASE_ADD) },
+                onPurchaseClick = { id -> navController.navigate("purchases/$id") },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.PURCHASE_ADD) {
+            PurchaseFormScreen(
+                onSaved = { navController.popBackStack() },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.PURCHASE_DETAIL,
+            arguments = listOf(navArgument("purchaseId") { type = NavType.LongType })
+        ) { entry ->
+            val purchaseId = entry.arguments?.getLong("purchaseId") ?: 0
+            PurchaseDetailScreen(
+                purchaseId = purchaseId,
+                onReturnClick = { navController.navigate("purchases/$purchaseId/return") },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.PURCHASE_RETURN,
+            arguments = listOf(navArgument("purchaseId") { type = NavType.LongType })
+        ) { entry ->
+            val purchaseId = entry.arguments?.getLong("purchaseId") ?: 0
+            PurchaseReturnScreen(
+                purchaseId = purchaseId,
+                onSaved = { navController.popBackStack() },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.SALE_RETURN,
+            arguments = listOf(navArgument("saleId") { type = NavType.LongType })
+        ) { entry ->
+            val saleId = entry.arguments?.getLong("saleId") ?: 0
+            SaleReturnScreen(
+                saleId = saleId,
+                onSaved = { navController.popBackStack() },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.EXPENSES) {
+            ExpensesListScreen(
+                onAddExpense = { navController.navigate(Routes.EXPENSE_ADD) },
+                onBack = { navController.popBackStack() }
+            )
+        }
+        composable(Routes.EXPENSE_ADD) {
+            ExpensesScreen(
+                onSaved = { navController.popBackStack() },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.REPORTS) {
+            ReportsScreen(
                 onBack = { navController.popBackStack() }
             )
         }

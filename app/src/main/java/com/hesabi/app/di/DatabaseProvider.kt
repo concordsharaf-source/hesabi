@@ -3,6 +3,7 @@ package com.hesabi.app.di
 import android.content.Context
 import androidx.room.Room
 import com.hesabi.app.data.db.AppDatabase
+import com.hesabi.app.data.db.MIGRATION_1_2
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -22,7 +23,7 @@ object DatabaseProvider {
                 AppDatabase::class.java,
                 "hesabi_database"
             )
-                .fallbackToDestructiveMigration()
+                .addMigrations(MIGRATION_1_2)
                 .build()
             instanceRef.set(db)
             return db

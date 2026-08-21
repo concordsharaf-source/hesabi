@@ -82,5 +82,7 @@ data class SaleItem(
     val quantity: Double = 0.0,
     val unit: String = "حبة",
     /** الإجمالي لهذا العنصر بوحدة العملة الصغرى */
-    val itemTotal: Long = 0L
+    val itemTotal: Long = 0L,
+    /** تكلفة الوحدة وقت البيع بوحدة العملة الصغرى — لا تتغير بتعديل المنتج لاحقًا */
+    val costPrice: Long = 0L
 )

@@ -2,13 +2,21 @@ package com.hesabi.app
 
 import android.app.Application
 import com.hesabi.app.data.repository.ProductRepository
+import com.hesabi.app.data.repository.PurchaseRepository
 import com.hesabi.app.data.repository.SaleRepository
 import com.hesabi.app.data.repository.StoreRepository
 import com.hesabi.app.di.DatabaseProvider
+import com.hesabi.app.data.dao.ExpenseDao
+import com.hesabi.app.data.dao.SaleDao
 import com.hesabi.app.data.dao.StockMovementDao
 import com.hesabi.app.domain.CheckoutUseCase
+import com.hesabi.app.domain.ExpenseUseCase
 import com.hesabi.app.domain.InventoryUseCase
 import com.hesabi.app.domain.ProductUseCase
+import com.hesabi.app.domain.ProfitUseCase
+import com.hesabi.app.domain.PurchaseReturnUseCase
+import com.hesabi.app.domain.PurchaseUseCase
+import com.hesabi.app.domain.SaleReturnUseCase
 import com.hesabi.app.domain.SettingsUseCase
 
 /**
@@ -34,6 +42,24 @@ class HesabiApp : Application() {
         private set
     lateinit var movementDao: StockMovementDao
         private set
+    lateinit var saleDao: SaleDao
+        private set
+    lateinit var expenseDao: ExpenseDao
+        private set
+
+    // المرحلة الثانية: الموردون، المشتريات، المرتجعات، المصروفات، الأرباح
+    lateinit var purchaseRepository: PurchaseRepository
+        private set
+    lateinit var purchaseUseCase: PurchaseUseCase
+        private set
+    lateinit var purchaseReturnUseCase: PurchaseReturnUseCase
+        private set
+    lateinit var saleReturnUseCase: SaleReturnUseCase
+        private set
+    lateinit var expenseUseCase: ExpenseUseCase
+        private set
+    lateinit var profitUseCase: ProfitUseCase
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -47,5 +73,30 @@ class HesabiApp : Application() {
         inventoryUseCase = InventoryUseCase(db.productDao(), db.stockMovementDao())
         checkoutUseCase = CheckoutUseCase(db.productDao(), db.saleDao(), db.stockMovementDao())
         movementDao = db.stockMovementDao()
+        saleDao = db.saleDao()
+        expenseDao = db.expenseDao()
+
+        purchaseRepository = PurchaseRepository(
+            db.supplierDao(),
+            db.purchaseDao(),
+            db.purchaseReturnDao(),
+            db.saleReturnDao(),
+            db.expenseDao()
+        )
+        purchaseUseCase = PurchaseUseCase(db.productDao(), db.purchaseDao(), db.stockMovementDao())
+        purchaseReturnUseCase = PurchaseReturnUseCase(
+            db.purchaseDao(), db.purchaseReturnDao(), db.productDao(), db.stockMovementDao()
+        )
+        saleReturnUseCase = SaleReturnUseCase(
+            db.saleDao(), db.saleReturnDao(), db.productDao(), db.stockMovementDao()
+        )
+        expenseUseCase = ExpenseUseCase(db.expenseDao())
+        profitUseCase = ProfitUseCase(
+            db.saleDao(),
+            db.saleReturnDao(),
+            db.purchaseDao(),
+            db.purchaseReturnDao(),
+            db.expenseDao()
+        )
     }
 }

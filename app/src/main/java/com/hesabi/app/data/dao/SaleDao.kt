@@ -56,6 +56,26 @@ interface SaleDao {
     @Query("SELECT * FROM sale_items WHERE saleId = :saleId")
     suspend fun getItemsForSale(saleId: Long): List<SaleItem>
 
+    /** بند فاتورة بيع واحد بالـ id — للمرتجعات */
+    @Query("SELECT * FROM sale_items WHERE id = :id")
+    suspend fun getItemById(id: Long): SaleItem?
+
+    /** بنود فواتير البيع في فترة (لحساب تكلفة البضاعة المباعة) */
+    @Query("""
+        SELECT si.* FROM sale_items si
+        INNER JOIN sales s ON s.id = si.saleId
+        WHERE s.isDeleted = 0
+        AND s.date >= :dayStart AND s.date < :dayEnd
+    """)
+    suspend fun getItemsInRange(dayStart: Long, dayEnd: Long): List<SaleItem>
+
+    /** إجمالي فواتير البيع في فترة بوحدة العملة الصغرى */
+    @Query("""
+        SELECT COALESCE(SUM(total), 0) FROM sales WHERE isDeleted = 0
+        AND date >= :dayStart AND date < :dayEnd
+    """)
+    suspend fun sumTotalsInRange(dayStart: Long, dayEnd: Long): Long
+
     /**
      * آخر رقم تسلسلي للفواتير لإنشاء رقم جديد متسلسل.
      * يضمن عدم تكرار أرقام الفواتير حتى مع الحذف.

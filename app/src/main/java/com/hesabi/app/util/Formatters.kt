@@ -49,3 +49,50 @@ fun todayStart(): Long = startOfDay(System.currentTimeMillis())
 
 /** نهاية اليوم الحالي */
 fun todayEnd(): Long = endOfDay(System.currentTimeMillis())
+
+/** بداية الأسبوع الحالي (السبت أول يوم) */
+fun startOfWeek(millis: Long = System.currentTimeMillis()): Long {
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = millis }
+    val dayOfWeek = cal.get(java.util.Calendar.DAY_OF_WEEK)
+    val diff = (dayOfWeek - java.util.Calendar.SATURDAY + 7) % 7
+    cal.add(java.util.Calendar.DAY_OF_MONTH, -diff)
+    cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+    cal.set(java.util.Calendar.MINUTE, 0)
+    cal.set(java.util.Calendar.SECOND, 0)
+    cal.set(java.util.Calendar.MILLISECOND, 0)
+    return cal.timeInMillis
+}
+
+fun endOfWeek(millis: Long = System.currentTimeMillis()): Long =
+    startOfDay(startOfWeek(millis)) + 7 * 24 * 60 * 60 * 1000L - 1
+
+/** بداية الشهر الحالي */
+fun startOfMonth(millis: Long = System.currentTimeMillis()): Long {
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = millis }
+    cal.set(java.util.Calendar.DAY_OF_MONTH, 1)
+    cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+    cal.set(java.util.Calendar.MINUTE, 0)
+    cal.set(java.util.Calendar.SECOND, 0)
+    cal.set(java.util.Calendar.MILLISECOND, 0)
+    return cal.timeInMillis
+}
+
+/** نهاية الشهر الحالي */
+fun endOfMonth(millis: Long = System.currentTimeMillis()): Long {
+    val cal = java.util.Calendar.getInstance().apply { timeInMillis = millis }
+    cal.set(java.util.Calendar.DAY_OF_MONTH, cal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH))
+    return endOfDay(cal.timeInMillis)
+}
+
+/** بداية اليوم المخصص من نص yyyy/MM/dd (يُرجع 0 إذا فشل) */
+fun startOfDayFromText(text: String): Long =
+    try {
+        val parts = text.split("/")
+        val cal = java.util.Calendar.getInstance()
+        cal.set(java.util.Calendar.YEAR, parts[0].toInt())
+        cal.set(java.util.Calendar.MONTH, parts[1].toInt() - 1)
+        cal.set(java.util.Calendar.DAY_OF_MONTH, parts[2].toInt())
+        startOfDay(cal.timeInMillis)
+    } catch (_: Exception) {
+        0L
+    }

@@ -33,6 +33,9 @@ class SaleRepository(
     suspend fun getItemsForSale(saleId: Long) =
         saleDao.getItemsForSale(saleId)
 
+    suspend fun getItemsInRange(dayStart: Long, dayEnd: Long) =
+        saleDao.getItemsInRange(dayStart, dayEnd)
+
     /**
      * إنشاء رقم فاتورة تسلسلي جديد: INV-000001, INV-000002 ...
      * لا يتكرر الرقم أبدًا لأنه يعتمد على أقصى رقم تسلسلي موجود.

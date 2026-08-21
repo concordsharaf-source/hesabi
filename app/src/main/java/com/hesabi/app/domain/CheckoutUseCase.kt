@@ -126,7 +126,8 @@ class CheckoutUseCase(
                                 unitPrice = item.unitPrice,
                                 quantity = item.quantity,
                                 unit = currentProduct.unit,
-                                itemTotal = item.itemTotal()
+                                itemTotal = item.itemTotal(),
+                                costPrice = currentProduct.purchasePrice
                             )
                         )
                     )
@@ -146,6 +147,8 @@ class CheckoutUseCase(
                             quantity = -delta,
                             previousQuantity = previousQuantity,
                             newQuantity = newQuantity,
+                            cost = currentProduct.purchasePrice,
+                            referenceId = saleId,
                             date = now,
                             note = "فاتورة $invoiceNumber"
                         )

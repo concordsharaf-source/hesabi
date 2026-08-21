@@ -17,6 +17,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -44,7 +45,7 @@ import com.hesabi.app.ui.invoices.InvoicesViewModelFactory
 @Composable
 fun InvoicesScreen(
     onBack: () -> Unit,
-    
+    onSaleReturn: (Long) -> Unit = {}
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
     val viewModel: InvoicesViewModel = viewModel(factory = InvoicesViewModelFactory(app))
@@ -81,7 +82,8 @@ fun InvoicesScreen(
                 items(invoices, key = { it.id }) { saleItem ->
                     InvoiceCard(
                         sale = saleItem,
-                        onClick = { viewModel.loadInvoiceDetails(saleItem.id) }
+                        onClick = { viewModel.loadInvoiceDetails(saleItem.id) },
+                        onReturn = { onSaleReturn(saleItem.id) }
                     )
                 }
                 item { Spacer(Modifier.height(24.dp)) }
@@ -96,13 +98,14 @@ fun InvoicesScreen(
             items = items,
             onDismiss = {
                 viewModel.clearDetails()
-            }
+            },
+            onReturn = { onSaleReturn(sale!!.id) }
         )
     }
 }
 
 @Composable
-private fun InvoiceCard(sale: Sale, onClick: () -> Unit) {
+private fun InvoiceCard(sale: Sale, onClick: () -> Unit, onReturn: () -> Unit = {}) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -148,7 +151,8 @@ private fun InvoiceCard(sale: Sale, onClick: () -> Unit) {
 private fun InvoiceDetailDialog(
     sale: Sale,
     items: List<SaleItem>,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onReturn: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -191,6 +195,9 @@ private fun InvoiceDetailDialog(
             }
         },
         confirmButton = {
+            androidx.compose.material3.OutlinedButton(onClick = onReturn) {
+                Text("مرتجع", color = MaterialTheme.colorScheme.error)
+            }
             androidx.compose.material3.TextButton(onClick = onDismiss) {
                 Text("إغلاق")
             }
