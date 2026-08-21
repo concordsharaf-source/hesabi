@@ -97,8 +97,10 @@ function metricCard(label, value, iconName, helper) {
   return `<article class="metric-card"><div class="metric-card__icon">${icon(iconName, 19)}</div><div><small>${label}</small><strong>${value}</strong><span>${helper}</span></div></article>`;
 }
 
-function emptyState(title, text, destination = "products") {
-  return `<div class="empty-state"><img src="${emptyImage}" alt="" /><div><h3>${title}</h3><p>${text}</p><button class="button button--secondary" data-action="navigate" data-view="${destination}">${icon("plus", 16)} ابدأ الآن</button></div></div>`;
+function emptyState(title, text, destination = "new-product") {
+  const action = destination === "new-product" ? `data-action="new-product"` : `data-action="navigate" data-view="${destination}"`;
+  const label = destination === "new-product" ? "إضافة منتج" : "ابدأ الآن";
+  return `<div class="empty-state"><img src="${emptyImage}" alt="" /><div><h3>${title}</h3><p>${text}</p><button class="button button--secondary" ${action}>${icon("plus", 16)} ${label}</button></div></div>`;
 }
 
 function productsMarkup() {
