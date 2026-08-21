@@ -1,8 +1,8 @@
 package com.hesabi.app.ui.onboarding
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,19 +10,23 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material.icons.rounded.Storefront
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,22 +45,27 @@ import com.hesabi.app.domain.model.Currencies
 
 /**
  * شاشة إعداد المتجر عند أول تشغيل.
+ * ملاحظة: الحقول والقوائم هنا مكونات بسيطة ومستقرة (TextField + AlertDialog)
+ * لضمان عمل الإدخال والاختيار على جميع الأجهزة.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
     onSetupComplete: () -> Unit,
-    
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
-    val viewModel = OnboardingViewModel(app)
+    val viewModel: OnboardingViewModel = viewModel(factory = OnboardingViewModelFactory(app))
 
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    // حالة الإعداد محفوظة دائمًا في Room.
     if (state.isCompleted) {
         onSetupComplete()
         return
     }
+
+    var showCurrencyPicker by remember { mutableStateOf(false) }
+    var showActivityPicker by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -82,7 +91,7 @@ fun OnboardingScreen(
             Spacer(Modifier.height(24.dp))
 
             Icon(
-                androidx.compose.material.icons.Icons.Rounded.Storefront,
+                Icons.Rounded.Storefront,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.padding(8.dp)
@@ -101,6 +110,7 @@ fun OnboardingScreen(
                 modifier = Modifier.padding(bottom = 24.dp)
             )
 
+            // اسم المتجر — حقل إدخال حر
             OutlinedTextField(
                 value = state.storeName,
                 onValueChange = {
@@ -116,23 +126,20 @@ fun OnboardingScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            CurrencyDropdown(
-                selectedCode = state.currencyCode,
-                selectedSymbol = state.currencySymbol,
-                onCurrencySelected = { code, symbol ->
-                    viewModel.updateCurrency(code, symbol)
-                    viewModel.clearError()
-                }
+            // العملة — اختيار عبر نافذة AlertDialog بسيطة ومستقرة
+            SelectionField(
+                label = "العملة",
+                displayValue = state.currencySymbol,
+                onClick = { showCurrencyPicker = true }
             )
 
             Spacer(Modifier.height(12.dp))
 
-            ActivityTypeDropdown(
-                selected = state.activityType,
-                onTypeSelected = {
-                    viewModel.updateActivityType(it)
-                    viewModel.clearError()
-                }
+            // نوع النشاط — اختيار عبر نافذة AlertDialog بسيطة ومستقرة
+            SelectionField(
+                label = "نوع النشاط",
+                displayValue = state.activityType.ifEmpty { "اختر نوع النشاط" },
+                onClick = { showActivityPicker = true }
             )
 
             if (state.errorMessage != null) {
@@ -149,15 +156,13 @@ fun OnboardingScreen(
 
             Button(
                 onClick = { viewModel.save() },
-                enabled = !state.isSaving &&
-                    state.storeName.isNotBlank() &&
-                    state.activityType.isNotBlank(),
+                enabled = !state.isSaving && state.storeName.isNotBlank(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
                 if (state.isSaving) {
-                    androidx.compose.material3.CircularProgressIndicator(
+                    CircularProgressIndicator(
                         modifier = Modifier.height(24.dp),
                         color = MaterialTheme.colorScheme.onPrimary
                     )
@@ -169,88 +174,145 @@ fun OnboardingScreen(
             Spacer(Modifier.height(32.dp))
         }
     }
+
+    // نافذة اختيار العملة
+    if (showCurrencyPicker) {
+        ChoiceDialog(
+            title = "اختر العملة",
+            options = Currencies.ALL.map { it },
+            selected = Currencies.ALL.firstOrNull { it.code == state.currencyCode },
+            labelFor = { "${it.symbol} (${it.code})" },
+            onConfirm = {
+                viewModel.updateCurrency(it.code, it.symbol)
+                viewModel.clearError()
+                showCurrencyPicker = false
+            },
+            onDismiss = { showCurrencyPicker = false }
+        )
+    }
+
+    // نافذة اختيار نوع النشاط
+    if (showActivityPicker) {
+        ChoiceDialog(
+            title = "اختر نوع النشاط",
+            options = BusinessTypes.ALL,
+            selected = state.activityType.takeIf { it.isNotBlank() },
+            labelFor = { it },
+            onConfirm = {
+                viewModel.updateActivityType(it)
+                viewModel.clearError()
+                showActivityPicker = false
+            },
+            onDismiss = { showActivityPicker = false }
+        )
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * حقل اختيار يعرض القيمة الحالية مع سهم سفلي ويفتح نافذة عند الضغط.
+ */
 @Composable
-private fun CurrencyDropdown(
-    selectedCode: String,
-    selectedSymbol: String,
-    onCurrencySelected: (String, String) -> Unit
+private fun SelectionField(
+    label: String,
+    displayValue: String,
+    onClick: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded }
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small
     ) {
-        OutlinedTextField(
-            value = "$selectedSymbol ($selectedCode)",
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("العملة") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth()
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Currencies.ALL.forEach { currency ->
-                DropdownMenuItem(
-                    text = { Text("${currency.symbol} (${currency.code})") },
-                    onClick = {
-                        onCurrencySelected(currency.code, currency.symbol)
-                        expanded = false
-                    },
-                    leadingIcon = if (currency.code == selectedCode) {
-                        { Icon(androidx.compose.material.icons.Icons.Rounded.Check, contentDescription = null) }
-                    } else null
+            Column {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    displayValue,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = if (displayValue.isBlank()) FontWeight.Normal else FontWeight.Medium
                 )
             }
+            Icon(
+                Icons.Rounded.KeyboardArrowDown,
+                contentDescription = null
+            )
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * نافذة اختيار بسيطة تعمل على جميع الأجهزة.
+ */
 @Composable
-private fun ActivityTypeDropdown(
-    selected: String,
-    onTypeSelected: (String) -> Unit
+private fun <T> ChoiceDialog(
+    title: String,
+    options: List<T>,
+    selected: T?,
+    labelFor: (T) -> String,
+    onConfirm: (T) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded }
-    ) {
-        OutlinedTextField(
-            value = selected,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("نوع النشاط") },
-            placeholder = { Text("اختر نوع النشاط") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth()
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
-        ) {
-            BusinessTypes.ALL.forEach { type ->
-                DropdownMenuItem(
-                    text = { Text(type) },
-                    onClick = {
-                        onTypeSelected(type)
-                        expanded = false
-                    },
-                    leadingIcon = if (type == selected) {
-                        { Icon(androidx.compose.material.icons.Icons.Rounded.Check, contentDescription = null) }
-                    } else null
-                )
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                title,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                options.forEach { option ->
+                    val isSelected = option == selected
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = if (isSelected) {
+                            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                        } else {
+                            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        },
+                        onClick = { onConfirm(option) }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                labelFor(option),
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                            if (isSelected) {
+                                Icon(
+                                    Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
             }
+        },
+        confirmButton = {
+            androidx.compose.material3.TextButton(onClick = onDismiss) { Text("إلغاء") }
         }
-    }
+    )
 }

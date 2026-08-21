@@ -3,8 +3,8 @@ package com.hesabi.app.ui.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.hesabi.app.HesabiApp
-import com.hesabi.app.domain.ProductOperationResult
 import com.hesabi.app.domain.StoreSetupInput
+import com.hesabi.app.domain.model.BusinessTypes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 
 data class OnboardingUiState(
     val storeName: String = "",
-    val activityType: String = "",
+    val activityType: String = BusinessTypes.ALL.first(),
     val currencyCode: String = "YER",
     val currencySymbol: String = "ر.ي",
     val errorMessage: String? = null,
