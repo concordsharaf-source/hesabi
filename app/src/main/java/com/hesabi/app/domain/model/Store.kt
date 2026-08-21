@@ -36,6 +36,7 @@ object Currencies {
     data class Currency(val code: String, val symbol: String)
 
     val ALL: List<Currency> = listOf(
+        Currency("YER", "ر.ي"),
         Currency("SAR", "ر.س"),
         Currency("AED", "د.إ"),
         Currency("KWD", "د.ك"),

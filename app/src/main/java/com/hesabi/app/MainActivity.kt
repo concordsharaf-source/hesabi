@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import kotlinx.coroutines.runBlocking
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -63,9 +64,12 @@ object Routes {
 @Composable
 private fun HesabiNavHost() {
     val navController = rememberNavController()
+    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
+    // القرار دائم ومحفوظ في Room: إذا اكتمل الإعداد تُفتح Dashboard مباشرة
+    val startRoute = kotlinx.coroutines.runBlocking { app.settingsUseCase.isSetupComplete() }
     NavHost(
         navController = navController,
-        startDestination = Routes.ONBOARDING,
+        startDestination = if (startRoute) Routes.HOME else Routes.ONBOARDING,
         modifier = Modifier
     ) {
         composable(Routes.ONBOARDING) {
@@ -80,7 +84,8 @@ private fun HesabiNavHost() {
             HomeScreen(
                 onNavigateToSales = { navController.navigate(Routes.SALES) },
                 onNavigateToProducts = { navController.navigate(Routes.PRODUCTS) },
-                onNavigateToInventory = { navController.navigate(Routes.INVENTORY) }
+                onNavigateToInventory = { navController.navigate(Routes.INVENTORY) },
+                onNavigateToInvoices = { navController.navigate(Routes.INVOICES) }
             )
         }
 

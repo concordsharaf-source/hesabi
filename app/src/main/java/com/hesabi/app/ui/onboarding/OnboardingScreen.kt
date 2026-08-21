@@ -162,7 +162,7 @@ fun OnboardingScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("حفظ وبدء الاستخدام", style = MaterialTheme.typography.titleMedium)
+                    Text("دخول", style = MaterialTheme.typography.titleMedium)
                 }
             }
 

@@ -14,8 +14,8 @@ import kotlinx.coroutines.launch
 data class OnboardingUiState(
     val storeName: String = "",
     val activityType: String = "",
-    val currencyCode: String = "SAR",
-    val currencySymbol: String = "ر.س",
+    val currencyCode: String = "YER",
+    val currencySymbol: String = "ر.ي",
     val errorMessage: String? = null,
     val isCompleted: Boolean = false,
     val isSaving: Boolean = false
@@ -27,6 +27,27 @@ class OnboardingViewModel(
 
     private val _state = MutableStateFlow(OnboardingUiState())
     val state: StateFlow<OnboardingUiState> = _state.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            // قراءة الإعداد المحفوظ دائمًا من Room عند أول فتح الشاشة.
+            // إذا وُجد متجر محفوظ فإن setupCompleted = true ولا تُعرض شاشة الإعداد.
+            runCatching {
+                app.settingsUseCase.getStore()
+            }.onSuccess { store ->
+                if (store != null) {
+                    _state.update {
+                        it.copy(
+                            isCompleted = true,
+                            storeName = store.name,
+                            activityType = store.activityType,
+                            currencySymbol = store.currencySymbol
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     fun updateName(name: String) {
         _state.update { it.copy(storeName = name) }
@@ -48,6 +69,19 @@ class OnboardingViewModel(
         val current = _state.value
         if (current.isSaving) return
         _state.update { it.copy(isSaving = true, errorMessage = null) }
+
+        if (current.storeName.isBlank()) {
+            _state.update {
+                it.copy(errorMessage = "يرجى إدخال اسم المتجر", isSaving = false)
+            }
+            return
+        }
+        if (current.activityType.isBlank()) {
+            _state.update {
+                it.copy(errorMessage = "يرجى اختيار نوع النشاط", isSaving = false)
+            }
+            return
+        }
 
         viewModelScope.launch {
             val input = StoreSetupInput(
