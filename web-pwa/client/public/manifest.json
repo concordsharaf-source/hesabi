@@ -1,0 +1,15 @@
+{
+  "name": "حسابي | إدارة المتجر",
+  "short_name": "حسابي",
+  "description": "إدارة المنتجات والمخزون والمبيعات والفواتير محليًا دون اتصال.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F4F3EC",
+  "theme_color": "#1F6B59",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    { "src": "/manus-storage/hesabi-mark_5cb0429a.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/manus-storage/hesabi-mark_5cb0429a.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
