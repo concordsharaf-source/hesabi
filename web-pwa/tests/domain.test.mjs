@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { adjustmentDelta, calculateSaleTotals, canSell, invoiceNumber, stockStatus } from "../client/src/js/domain.js";
+import { CURRENCIES, DEFAULT_CURRENCY_CODE } from "../client/src/js/constants.js";
 
 test("ينشئ تسلسل أرقام فواتير ثابتًا وغير مكرر", () => {
   assert.equal(invoiceNumber(1), "INV-000001");
@@ -27,4 +28,9 @@ test("يحدد حالات المخزون كما في قواعد المرحلة �
 test("يحسب الإجمالي والخصم دون تجاوز الإجمالي", () => {
   assert.deepEqual(calculateSaleTotals([{ unitPrice: 150, quantity: 2 }], 30), { subtotal: 300, discount: 30, total: 270 });
   assert.deepEqual(calculateSaleTotals([{ unitPrice: 10, quantity: 1 }], 100), { subtotal: 10, discount: 10, total: 0 });
+});
+
+test("يضبط الريال اليمني كعملة افتراضية للمحل الجديد", () => {
+  assert.equal(DEFAULT_CURRENCY_CODE, "YER");
+  assert.deepEqual(CURRENCIES[0], { code: "YER", label: "ريال يمني (ر.ي)", symbol: "ر.ي" });
 });
