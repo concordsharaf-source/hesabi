@@ -33,9 +33,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // قراءة حالة الإعداد مرة واحدة قبل بناء الواجهة — runBlocking هنا آمن
+        // لأنه يُنفَّذ قبل setContent ولا يجمّد خيط الواجهة.
+        val isSetupDone = kotlinx.coroutines.runBlocking {
+            (application as HesabiApp).settingsUseCase.isSetupComplete()
+        }
         setContent {
             HesabiTheme {
-                HesabiNavHost()
+                HesabiNavHost(startRoute = if (isSetupDone) Routes.HOME else Routes.ONBOARDING)
             }
         }
     }
@@ -62,11 +67,9 @@ object Routes {
 }
 
 @Composable
-private fun HesabiNavHost() {
+private fun HesabiNavHost(startRoute: String) {
     val navController = rememberNavController()
-    val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
-    // القرار دائم ومحفوظ في Room: إذا اكتمل الإعداد تُفتح Dashboard مباشرة
-    val startRoute = kotlinx.coroutines.runBlocking { app.settingsUseCase.isSetupComplete() }
+    // startRoute يُقرأ مرة واحدة في onCreate() قبل بناء الواجهة (لا runBlocking داخل composable)
     NavHost(
         navController = navController,
         startDestination = if (startRoute) Routes.HOME else Routes.ONBOARDING,

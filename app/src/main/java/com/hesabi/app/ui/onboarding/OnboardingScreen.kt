@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -58,10 +59,12 @@ fun OnboardingScreen(
 
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    // حالة الإعداد محفوظة دائمًا في Room.
-    if (state.isCompleted) {
-        onSetupComplete()
-        return
+    // حالة الإعداد محفوظة دائمًا في Room — التنقل يتم ضمن LaunchedEffect
+    // وليس أثناء التركيب (تفادي التجميد واستثناءات التنقل).
+    LaunchedEffect(state.isCompleted) {
+        if (state.isCompleted) {
+            onSetupComplete()
+        }
     }
 
     var showCurrencyPicker by remember { mutableStateOf(false) }

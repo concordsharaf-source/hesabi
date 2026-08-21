@@ -36,17 +36,26 @@ class HomeViewModel(app: HesabiApp) : ViewModel() {
 
     private val trigger = MutableStateFlow(System.currentTimeMillis())
 
+    // قراءة بيانات المتجر مرة واحدة عند إنشاء الـ ViewModel (بدون runBlocking)
+    private val storeHolder = MutableStateFlow<Store?>(null)
+
+    init {
+        viewModelScope.launch {
+            storeHolder.value = runCatching { settingsUseCase.getStore() }.getOrNull()
+        }
+    }
+
     val state: StateFlow<HomeUiState> = combine(
         productRepository.observeAll(),
         saleRepository.observeAll(),
-        trigger
-    ) { products, sales, _ ->
+        trigger,
+        storeHolder
+    ) { products, sales, _, store ->
         val now = trigger.value
         val dayStart = startOfDay(now)
         val dayEnd = endOfDay(now)
         val todaySales = sales.filter { it.date in dayStart..dayEnd }
         val todayTotal = todaySales.sumOf { it.total }
-        val store = kotlinx.coroutines.runBlocking { settingsUseCase.getStore() }
         HomeUiState(
             store = store,
             todaySalesTotal = todayTotal,
