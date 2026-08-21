@@ -72,7 +72,7 @@ private fun HesabiNavHost(startRoute: String) {
     // startRoute يُقرأ مرة واحدة في onCreate() قبل بناء الواجهة (لا runBlocking داخل composable)
     NavHost(
         navController = navController,
-        startDestination = if (startRoute) Routes.HOME else Routes.ONBOARDING,
+        startDestination = startRoute,
         modifier = Modifier
     ) {
         composable(Routes.ONBOARDING) {
