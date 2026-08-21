@@ -1,5 +1,6 @@
 import { adjustmentDelta, calculateSaleTotals, canSell, invoiceNumber, nowIso, toNumber } from "./domain.js";
 
+/* اتجاه التصميم: دفتر التاجر الهادئ — قواعد حفظ محلية تحمي تفرد الباركود وسجل العمليات. */
 const DB_NAME = "hesabi-pwa";
 const DB_VERSION = 1;
 let databasePromise;
@@ -80,11 +81,13 @@ export const db = {
       .sort((first, second) => first.name.localeCompare(second.name, "ar"));
   },
 
-  async findProductByBarcode(barcode) {
+  async findProductByBarcode(barcode, excludeProductId = null) {
+    const normalizedBarcode = barcode?.trim();
+    if (!normalizedBarcode) return null;
     const database = await this.open();
     const transaction = database.transaction("products", "readonly");
-    const product = await requestAsPromise(transaction.objectStore("products").index("barcode").get(barcode.trim()));
-    return product && !product.isDeleted ? product : null;
+    const products = await requestAsPromise(transaction.objectStore("products").index("barcode").getAll(normalizedBarcode));
+    return products.find((product) => !product.isDeleted && product.id !== excludeProductId) || null;
   },
 
   async getProduct(productId) {
@@ -98,11 +101,16 @@ export const db = {
     const transaction = database.transaction(["products", "stockMovements"], "readwrite");
     const createdAt = nowIso();
     const quantity = Math.max(0, toNumber(values.quantity));
+    const products = transaction.objectStore("products");
+    const barcode = values.barcode.trim();
+    const barcodeMatches = barcode ? await requestAsPromise(products.index("barcode").getAll(barcode)) : [];
+    const duplicate = barcodeMatches.find((existing) => !existing.isDeleted);
+    if (duplicate) throw new Error(`هذا الباركود مستخدم بالفعل للمنتج: ${duplicate.name}`);
     const product = {
       id: uid("product"),
       name: values.name.trim(),
       nameLower: values.name.trim().toLocaleLowerCase("ar"),
-      barcode: values.barcode.trim(),
+      barcode,
       internalCode: values.internalCode.trim(),
       purchasePrice: Math.max(0, toNumber(values.purchasePrice)),
       salePrice: Math.max(0, toNumber(values.salePrice)),
@@ -113,7 +121,7 @@ export const db = {
       updatedAt: createdAt,
       isDeleted: false,
     };
-    transaction.objectStore("products").add(product);
+    products.add(product);
     if (quantity > 0) {
       transaction.objectStore("stockMovements").add({
         id: uid("movement"), productId: product.id, type: "INITIAL", quantity,
@@ -130,10 +138,14 @@ export const db = {
     const store = transaction.objectStore("products");
     const current = await requestAsPromise(store.get(productId));
     if (!current || current.isDeleted) throw new Error("المنتج غير متاح للتعديل.");
+    const barcode = values.barcode.trim();
+    const barcodeMatches = barcode ? await requestAsPromise(store.index("barcode").getAll(barcode)) : [];
+    const duplicate = barcodeMatches.find((existing) => !existing.isDeleted && existing.id !== productId);
+    if (duplicate) throw new Error(`هذا الباركود مستخدم بالفعل للمنتج: ${duplicate.name}`);
     const updated = {
       ...current,
       name: values.name.trim(), nameLower: values.name.trim().toLocaleLowerCase("ar"),
-      barcode: values.barcode.trim(), internalCode: values.internalCode.trim(),
+      barcode, internalCode: values.internalCode.trim(),
       purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)),
       minimumStock: Math.max(0, toNumber(values.minimumStock)), unit: values.unit, updatedAt: nowIso(),
     };

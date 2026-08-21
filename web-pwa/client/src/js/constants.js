@@ -10,13 +10,16 @@ export const BUSINESS_TYPES = [
   "متجر عام",
 ];
 
+export const DEFAULT_CURRENCY_CODE = "YER";
+
 export const CURRENCIES = [
-  { code: "SAR", label: "ريال سعودي (ر.س)" },
-  { code: "AED", label: "درهم إماراتي (د.إ)" },
-  { code: "KWD", label: "دينار كويتي (د.ك)" },
-  { code: "QAR", label: "ريال قطري (ر.ق)" },
-  { code: "EGP", label: "جنيه مصري (ج.م)" },
-  { code: "USD", label: "دولار أمريكي ($)" },
+  { code: "YER", label: "ريال يمني (ر.ي)", symbol: "ر.ي" },
+  { code: "SAR", label: "ريال سعودي (ر.س)", symbol: "ر.س" },
+  { code: "AED", label: "درهم إماراتي (د.إ)", symbol: "د.إ" },
+  { code: "KWD", label: "دينار كويتي (د.ك)", symbol: "د.ك" },
+  { code: "QAR", label: "ريال قطري (ر.ق)", symbol: "ر.ق" },
+  { code: "EGP", label: "جنيه مصري (ج.م)", symbol: "ج.م" },
+  { code: "USD", label: "دولار أمريكي ($)", symbol: "$" },
 ];
 
 export const UNITS = ["حبة", "علبة", "كرتون", "كيلو", "جرام", "لتر", "متر"];
