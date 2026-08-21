@@ -42,6 +42,7 @@ import com.hesabi.app.ui.common.HesabiTopBar
 import com.hesabi.app.util.formatDateTime
 import com.hesabi.app.util.formatMoney
 import com.hesabi.app.util.formatQuantity
+import com.hesabi.app.ui.details.ProductDetailViewModelFactory
 
 /**
  * شاشة تفاصيل المنتج: المعلومات + حركات المخزون + زر تعديل المخزون.
@@ -54,7 +55,7 @@ fun ProductDetailScreen(
     
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
-    val viewModel = ProductDetailViewModel(app, productId)
+    val viewModel: ProductDetailViewModel = viewModel(factory = ProductDetailViewModelFactory(app, productId))
 
     val product by viewModel.product.collectAsStateWithLifecycle()
     val movements by viewModel.movements.collectAsStateWithLifecycle()

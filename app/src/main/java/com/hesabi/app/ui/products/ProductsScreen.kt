@@ -49,6 +49,7 @@ import com.hesabi.app.domain.model.Product
 import com.hesabi.app.ui.common.HesabiTopBar
 import com.hesabi.app.util.formatMoney
 import com.hesabi.app.util.formatQuantity
+import com.hesabi.app.ui.products.ProductsViewModelFactory
 
 /**
  * شاشة قائمة المنتجات مع بحث فوري.
@@ -62,7 +63,7 @@ fun ProductsScreen(
     
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
-    val viewModel = ProductsViewModel(app)
+    val viewModel: ProductsViewModel = viewModel(factory = ProductsViewModelFactory(app))
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val products by viewModel.productsList.collectAsStateWithLifecycle()

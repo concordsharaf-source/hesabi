@@ -36,6 +36,7 @@ import com.hesabi.app.ui.common.HesabiTopBar
 import com.hesabi.app.util.formatDateTime
 import com.hesabi.app.util.formatMoney
 import com.hesabi.app.util.formatQuantity
+import com.hesabi.app.ui.invoices.InvoicesViewModelFactory
 
 /**
  * شاشة فواتير البيع — قائمة الفواتير مع عرض تفاصيل كل فاتورة.
@@ -46,7 +47,7 @@ fun InvoicesScreen(
     
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
-    val viewModel = InvoicesViewModel(app)
+    val viewModel: InvoicesViewModel = viewModel(factory = InvoicesViewModelFactory(app))
 
     val invoices by viewModel.invoices.collectAsStateWithLifecycle()
     val sale by viewModel.sale.collectAsStateWithLifecycle()

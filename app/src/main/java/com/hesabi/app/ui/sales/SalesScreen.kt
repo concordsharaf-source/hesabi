@@ -56,6 +56,7 @@ import com.hesabi.app.domain.model.Product
 import com.hesabi.app.ui.common.HesabiTopBar
 import com.hesabi.app.util.formatMoney
 import com.hesabi.app.util.formatQuantity
+import com.hesabi.app.ui.sales.SalesViewModelFactory
 
 /**
  * شاشة المبيعات — نقطة بيع سريعة للكاشير:
@@ -68,7 +69,7 @@ fun SalesScreen(
     
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
-    val viewModel = SalesViewModel(app)
+    val viewModel: SalesViewModel = viewModel(factory = SalesViewModelFactory(app))
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }

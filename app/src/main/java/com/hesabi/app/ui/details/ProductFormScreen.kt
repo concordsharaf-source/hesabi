@@ -17,13 +17,13 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -34,8 +34,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -58,10 +60,14 @@ fun ProductFormScreen(
     
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
-    val viewModel = ProductFormViewModel(app, editProductId)
+    // استخدام viewModel(factory) يضمن الاحتفاظ بنفس النسخة عبر كل إعادة تركيب —
+    // بدونها يُعاد إنشاء الـ ViewModel مع كل حرف مكتوب فتتجمد الشاشة.
+    val viewModel: ProductFormViewModel = viewModel(factory = ProductFormViewModelFactory(app, editProductId))
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val title = if (state.isEditMode) "تعديل المنتج" else "إضافة منتج"
+
+    var showUnitPicker by remember { mutableStateOf(false) }
 
     // عند نجاح الحفظ
     LaunchedEffect(state.isSaved) {
@@ -173,10 +179,11 @@ fun ProductFormScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // الوحدة
-            UnitDropdown(
-                selected = state.unit,
-                onUnitSelected = { viewModel.updateField(ProductField.UNIT, it) }
+            // الوحدة — اختيار عبر نافذة AlertDialog مستقرة
+            SelectionField(
+                label = "الوحدة",
+                displayValue = state.unit,
+                onClick = { showUnitPicker = true }
             )
 
             // رسالة الخطأ
@@ -221,42 +228,113 @@ fun ProductFormScreen(
             Spacer(Modifier.height(24.dp))
         }
     }
+
+    // نافذة اختيار الوحدة
+    if (showUnitPicker) {
+        UnitChoiceDialog(
+            selected = state.unit,
+            onUnitSelected = {
+                viewModel.updateField(ProductField.UNIT, it)
+                showUnitPicker = false
+            },
+            onDismiss = { showUnitPicker = false }
+        )
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * حقل اختيار يعرض القيمة الحالية مع سهم سفلي ويفتح نافذة عند الضغط.
+ */
 @Composable
-private fun UnitDropdown(selected: String, onUnitSelected: (String) -> Unit) {
-    var expanded by remember { mutableStateOf(false) }
-    ExposedDropdownMenuBox(
-        expanded = expanded,
-        onExpandedChange = { expanded = !expanded }
+private fun SelectionField(
+    label: String,
+    displayValue: String,
+    onClick: () -> Unit
+) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.small
     ) {
-        OutlinedTextField(
-            value = selected,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("الوحدة") },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
-            modifier = Modifier
-                .menuAnchor()
-                .fillMaxWidth()
-        )
-        ExposedDropdownMenu(
-            expanded = expanded,
-            onDismissRequest = { expanded = false }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Units.ALL.forEach { unit ->
-                DropdownMenuItem(
-                    text = { Text(unit) },
-                    onClick = {
-                        onUnitSelected(unit)
-                        expanded = false
-                    },
-                    leadingIcon = if (unit == selected) {
-                        { Icon(Icons.Rounded.Check, contentDescription = null) }
-                    } else null
+            Column {
+                Text(
+                    label,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    displayValue,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
+            Icon(
+                Icons.Rounded.Check,
+                contentDescription = null
+            )
         }
     }
+}
+
+/**
+ * نافذة اختيار الوحدة — تعمل على جميع الأجهزة.
+ */
+@Composable
+private fun UnitChoiceDialog(
+    selected: String,
+    onUnitSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                "اختر الوحدة",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Units.ALL.forEach { unit ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        colors = if (unit == selected) {
+                            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                        } else {
+                            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        },
+                        onClick = { onUnitSelected(unit) }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(unit, style = MaterialTheme.typography.bodyLarge)
+                            if (unit == selected) {
+                                Icon(
+                                    Icons.Rounded.Check,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("إلغاء") }
+        }
+    )
 }

@@ -31,6 +31,7 @@ import com.hesabi.app.domain.model.Product
 import com.hesabi.app.ui.common.HesabiTopBar
 import com.hesabi.app.util.formatMoney
 import com.hesabi.app.util.formatQuantity
+import com.hesabi.app.ui.inventory.InventoryViewModelFactory
 
 /**
  * شاشة المخزون — تعرض لكل منتج:
@@ -42,7 +43,7 @@ fun InventoryScreen(
     
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
-    val viewModel = InventoryViewModel(app)
+    val viewModel: InventoryViewModel = viewModel(factory = InventoryViewModelFactory(app))
 
     val products by viewModel.products.collectAsStateWithLifecycle()
 

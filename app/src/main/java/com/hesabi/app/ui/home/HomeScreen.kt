@@ -40,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hesabi.app.HesabiApp
 import com.hesabi.app.util.formatMoney
 import com.hesabi.app.util.formatQuantity
+import com.hesabi.app.ui.home.HomeViewModelFactory
 
 /**
  * الصفحة الرئيسية — Dashboard.
@@ -53,7 +54,7 @@ fun HomeScreen(
     onNavigateToInvoices: () -> Unit
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
-    val viewModel = HomeViewModel(app)
+    val viewModel: HomeViewModel = viewModel(factory = HomeViewModelFactory(app))
 
     val state by viewModel.state.collectAsStateWithLifecycle()
     val storeName = state.store?.name ?: ""
