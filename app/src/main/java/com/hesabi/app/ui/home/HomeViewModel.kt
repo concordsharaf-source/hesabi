@@ -119,7 +119,8 @@ class HomeViewModel(app: HesabiApp) : ViewModel() {
             currencySymbol = store?.currencySymbol ?: "",
             todayNetPurchases = todayNetPurchases,
             todayExpenses = todayExpenseTotal,
-            todayNetProfit = todayNetProfit
+            todayNetProfit = todayNetProfit,
+            userRole = UserRole.ADMIN // تأكيد الصلاحيات كأدمن حالياً
         )
     }.stateIn(
         scope = viewModelScope,

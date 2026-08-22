@@ -31,6 +31,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -77,10 +78,13 @@ fun ProductFormScreen(
     // مراقبة نتيجة مسح الباركود
     val barcodeResult = navController.currentBackStackEntry
         ?.savedStateHandle
-        ?.get<String>("barcode")
-    LaunchedEffect(barcodeResult) {
-        if (barcodeResult != null) {
-            viewModel.updateField(ProductField.BARCODE, barcodeResult)
+        ?.getLiveData<String>("barcode")
+        ?.observeAsState()
+
+    LaunchedEffect(barcodeResult?.value) {
+        val barcode = barcodeResult?.value
+        if (!barcode.isNullOrBlank()) {
+            viewModel.updateField(ProductField.BARCODE, barcode)
             // مسح القيمة من savedStateHandle لمنع التكرار
             navController.currentBackStackEntry?.savedStateHandle?.remove<String>("barcode")
         }

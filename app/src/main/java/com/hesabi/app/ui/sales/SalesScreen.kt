@@ -40,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -98,10 +99,13 @@ fun SalesScreen(
     // مراقبة نتيجة مسح الباركود من savedStateHandle
     val barcodeResult = navController.currentBackStackEntry
         ?.savedStateHandle
-        ?.get<String>("barcode")
-    LaunchedEffect(barcodeResult) {
-        barcodeResult?.let {
-            viewModel.onBarcodeScanned(it)
+        ?.getLiveData<String>("barcode")
+        ?.observeAsState()
+
+    LaunchedEffect(barcodeResult?.value) {
+        val code = barcodeResult?.value
+        if (!code.isNullOrBlank()) {
+            viewModel.onBarcodeScanned(code)
             navController.currentBackStackEntry?.savedStateHandle?.remove<String>("barcode")
         }
     }

@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -101,9 +102,12 @@ fun PurchaseFormScreen(
     // مراقبة نتيجة مسح الباركود
     val barcodeResult = navController.currentBackStackEntry
         ?.savedStateHandle
-        ?.get<String>("barcode")
-    LaunchedEffect(barcodeResult) {
-        barcodeResult?.let { code ->
+        ?.getLiveData<String>("barcode")
+        ?.observeAsState()
+
+    LaunchedEffect(barcodeResult?.value) {
+        val code = barcodeResult?.value
+        if (!code.isNullOrBlank()) {
             // البحث عن المنتج وإضافته تلقائياً
             val found = products.find { p -> p.barcode == code }
             if (found != null) {
@@ -117,8 +121,6 @@ fun PurchaseFormScreen(
                         unitPrice = found.purchasePrice
                     )
                 )
-            } else {
-                // إذا لم يوجد، يمكن مستقبلاً فتح نافذة إضافة منتج جديد أو عرض تنبيه
             }
             navController.currentBackStackEntry?.savedStateHandle?.remove<String>("barcode")
         }

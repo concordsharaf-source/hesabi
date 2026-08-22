@@ -269,7 +269,7 @@ private fun ScannerSurface(
                             errorMessage = e.message ?: "فشل فتح الكاميرا"
                         }
                     }
-                }, context.mainExecutor)
+                }, ContextCompat.getMainExecutor(context))
             }
         )
 
