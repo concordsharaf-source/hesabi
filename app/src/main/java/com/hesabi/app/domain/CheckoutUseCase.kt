@@ -89,8 +89,11 @@ class CheckoutUseCase(
             // 7. حساب إجمالي الفاتورة
             val subtotal = SaleCalculator.calculateSubtotal(input.items)
             val totals = SaleCalculator.calculateFinal(subtotal, input.discountMinorUnits)
-            val paid = input.paidMinorUnits
-            val remaining = SaleCalculator.calculateRemaining(totals.final, paid)
+            
+            // تصحيح: في حالة البيع النقدي، يعتبر المبلغ المدفوع هو إجمالي الفاتورة كاملاً
+            // إلا إذا كان هناك إدخال محدد (للمستقبل)، ولكن حالياً نفرضه كإجمالي للنقدي.
+            val paid = if (paymentType == SalePaymentType.CASH) totals.final else input.paidMinorUnits
+            val remaining = if (paymentType == SalePaymentType.CASH) 0L else SaleCalculator.calculateRemaining(totals.final, paid)
 
             if (totals.final <= 0L) {
                 return@withLock CheckoutResult.Failure("الإجمالي النهائي يجب أن يكون أكبر من صفر")

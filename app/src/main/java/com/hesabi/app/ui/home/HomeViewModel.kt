@@ -38,10 +38,10 @@ data class HomeUiState(
  * تعرض: مبيعات اليوم، عدد فواتير اليوم، عدد المنتجات، قيمة المخزون، المنتجات منخفضة المخزون.
  */
 class HomeViewModel(app: HesabiApp) : ViewModel() {
-
     private val settingsUseCase = app.settingsUseCase
     private val productRepository = app.productRepository
     private val saleRepository = app.saleRepository
+    private val authUseCase = app.authUseCase
 
     private val trigger = MutableStateFlow(System.currentTimeMillis())
 
@@ -77,7 +77,8 @@ class HomeViewModel(app: HesabiApp) : ViewModel() {
         expenses,
         trigger,
         storeHolder,
-        itemsInRange
+        itemsInRange,
+        authUseCase.currentUser
     ) { values: Array<Any?> ->
         @Suppress("UNCHECKED_CAST")
         val products = values[0] as List<com.hesabi.app.domain.model.Product>
@@ -93,6 +94,7 @@ class HomeViewModel(app: HesabiApp) : ViewModel() {
         val store = values[6] as Store?
         @Suppress("UNCHECKED_CAST")
         val todayItems = values[7] as List<com.hesabi.app.domain.model.SaleItem>
+        val currentUser = values[8] as com.hesabi.app.domain.model.User?
         val dayStart = startOfDay(now)
         val dayEnd = endOfDay(now)
         val todaySales = sales.filter { it.date in dayStart..dayEnd }
@@ -120,7 +122,7 @@ class HomeViewModel(app: HesabiApp) : ViewModel() {
             todayNetPurchases = todayNetPurchases,
             todayExpenses = todayExpenseTotal,
             todayNetProfit = todayNetProfit,
-            userRole = UserRole.ADMIN // تأكيد الصلاحيات كأدمن حالياً
+            userRole = currentUser?.role ?: UserRole.CASHIER
         )
     }.stateIn(
         scope = viewModelScope,

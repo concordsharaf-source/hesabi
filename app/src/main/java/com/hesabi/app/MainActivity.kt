@@ -5,8 +5,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
-import kotlinx.coroutines.runBlocking
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -43,14 +45,24 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        // قراءة حالة الإعداد مرة واحدة قبل بناء الواجهة — runBlocking هنا آمن
-        // لأنه يُنفَّذ قبل setContent ولا يجمّد خيط الواجهة.
+        
+        val app = application as HesabiApp
+        
         val isSetupDone = kotlinx.coroutines.runBlocking {
-            (application as HesabiApp).settingsUseCase.isSetupComplete()
+            app.settingsUseCase.isSetupComplete()
         }
+        
         setContent {
             HesabiTheme {
-                HesabiNavHost(startRoute = if (isSetupDone) Routes.HOME else Routes.ONBOARDING)
+                val isLoggedIn by app.authUseCase.currentUser.collectAsStateWithLifecycle()
+                
+                val startRoute = when {
+                    !isSetupDone -> Routes.ONBOARDING
+                    isLoggedIn == null -> Routes.LOGIN
+                    else -> Routes.HOME
+                }
+                
+                HesabiNavHost(startRoute = startRoute)
             }
         }
     }
@@ -83,10 +95,14 @@ object Routes {
     const val EXPENSES = "expenses"
     const val EXPENSE_ADD = "expenses/add"
     const val REPORTS = "reports"
+    const val CUSTOMERS = "customers"
+    const val USERS = "users"
+    const val LOGIN = "login"
 
     const val TARGET_PRODUCTS = "products"
     const val TARGET_SALES = "sales"
     const val TARGET_PRODUCT_ADD = "product_add"
+    const val TARGET_PURCHASE_ADD = "purchase_add"
 }
 
 @Composable
@@ -106,6 +122,16 @@ private fun HesabiNavHost(startRoute: String) {
             })
         }
 
+        composable(Routes.LOGIN) {
+            com.hesabi.app.ui.auth.LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate(Routes.HOME) {
+                        popUpTo(Routes.LOGIN) { inclusive = true }
+                    }
+                }
+            )
+        }
+
         composable(Routes.HOME) {
             HomeScreen(
                 onNavigateToSales = { navController.navigate(Routes.SALES) },
@@ -115,14 +141,34 @@ private fun HesabiNavHost(startRoute: String) {
                 onNavigateToSuppliers = { navController.navigate(Routes.SUPPLIERS) },
                 onNavigateToPurchases = { navController.navigate(Routes.PURCHASES) },
                 onNavigateToExpenses = { navController.navigate(Routes.EXPENSES) },
-                onNavigateToReports = { navController.navigate(Routes.REPORTS) }
+                onNavigateToReports = { navController.navigate(Routes.REPORTS) },
+                onNavigateToCustomers = { navController.navigate(Routes.CUSTOMERS) },
+                onNavigateToUsers = { navController.navigate(Routes.USERS) },
+                onLogout = {
+                    (navController.context.applicationContext as HesabiApp).authUseCase.logout()
+                    navController.navigate(Routes.LOGIN) {
+                        popUpTo(Routes.HOME) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Routes.CUSTOMERS) {
+            com.hesabi.app.ui.customers.CustomerManagementScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Routes.USERS) {
+            com.hesabi.app.ui.users.UserManagementScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 
         composable(Routes.SALES) {
             SalesScreen(
                 onBarcodeScan = {
-                    navController.navigate("${Routes.BARCODE}/${Routes.TARGET_SALES}")
+                    navController.navigate(Routes.BARCODE.replace("{target}", Routes.TARGET_SALES))
                 },
                 onBack = { navController.popBackStack() },
                 navController = navController
@@ -139,7 +185,7 @@ private fun HesabiNavHost(startRoute: String) {
                     navController.navigate("product/$id")
                 },
                 onBarcodeScan = {
-                    navController.navigate("${Routes.BARCODE}/${Routes.TARGET_PRODUCTS}")
+                    navController.navigate(Routes.BARCODE.replace("{target}", Routes.TARGET_PRODUCTS))
                 }
             )
         }
@@ -148,7 +194,7 @@ private fun HesabiNavHost(startRoute: String) {
             ProductFormScreen(
                 editProductId = null,
                 onBarcodeScan = {
-                    navController.navigate("${Routes.BARCODE}/${Routes.TARGET_PRODUCT_ADD}")
+                    navController.navigate(Routes.BARCODE.replace("{target}", Routes.TARGET_PRODUCT_ADD))
                 },
                 onSaved = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
@@ -164,7 +210,7 @@ private fun HesabiNavHost(startRoute: String) {
             ProductFormScreen(
                 editProductId = productId,
                 onBarcodeScan = {
-                    navController.navigate("${Routes.BARCODE}/${Routes.TARGET_PRODUCT_ADD}")
+                    navController.navigate(Routes.BARCODE.replace("{target}", Routes.TARGET_PRODUCT_ADD))
                 },
                 onSaved = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
@@ -245,7 +291,7 @@ private fun HesabiNavHost(startRoute: String) {
 
         composable(Routes.PURCHASE_ADD) {
             PurchaseFormScreen(
-                onBarcodeScan = { navController.navigate(Routes.BARCODE.replace("{target}", Routes.PURCHASE_ADD)) },
+                onBarcodeScan = { navController.navigate(Routes.BARCODE.replace("{target}", Routes.TARGET_PURCHASE_ADD)) },
                 onSaved = { navController.popBackStack() },
                 onBack = { navController.popBackStack() },
                 navController = navController

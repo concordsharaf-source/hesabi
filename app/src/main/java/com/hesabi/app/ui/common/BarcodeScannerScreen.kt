@@ -256,13 +256,19 @@ private fun ScannerSurface(
                             }
                         }
 
-                        cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            preview,
-                            imageAnalysis
-                        )
+                        try {
+                            cameraProvider.unbindAll()
+                            cameraProvider.bindToLifecycle(
+                                lifecycleOwner,
+                                CameraSelector.DEFAULT_BACK_CAMERA,
+                                preview,
+                                imageAnalysis
+                            )
+                        } catch (e: Exception) {
+                            previewView.post {
+                                errorMessage = "تعذر ربط الكاميرا: ${e.localizedMessage}"
+                            }
+                        }
                     } catch (e: Exception) {
                         // فشل داخلي — عرض رسالة داخل التطبيق بدل الخروج
                         previewView.post {

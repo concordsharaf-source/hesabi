@@ -148,7 +148,7 @@ fun PurchaseFormScreen(
                 },
                 onBarcodeScan = {
                     activeDialog = null
-                    navController.navigate("barcode/purchase_add")
+                    onBarcodeScan()
                 },
                 onDismiss = { activeDialog = null }
             )

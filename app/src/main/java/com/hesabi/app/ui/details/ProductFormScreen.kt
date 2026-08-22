@@ -84,7 +84,7 @@ fun ProductFormScreen(
     LaunchedEffect(barcodeResult?.value) {
         val barcode = barcodeResult?.value
         if (!barcode.isNullOrBlank()) {
-            viewModel.updateField(ProductField.BARCODE, barcode)
+            viewModel.onBarcodeScanned(barcode)
             // مسح القيمة من savedStateHandle لمنع التكرار
             navController.currentBackStackEntry?.savedStateHandle?.remove<String>("barcode")
         }

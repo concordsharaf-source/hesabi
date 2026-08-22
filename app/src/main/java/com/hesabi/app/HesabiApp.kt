@@ -18,6 +18,10 @@ import com.hesabi.app.domain.PurchaseReturnUseCase
 import com.hesabi.app.domain.PurchaseUseCase
 import com.hesabi.app.domain.SaleReturnUseCase
 import com.hesabi.app.domain.SettingsUseCase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /**
  * فئة التطبيق — تنشيء المكونات الأساسية (Repositories + UseCases)
@@ -65,6 +69,10 @@ class HesabiApp : Application() {
     lateinit var expenseUseCase: ExpenseUseCase
         private set
     lateinit var profitUseCase: ProfitUseCase
+        private set
+    lateinit var userRepository: com.hesabi.app.data.repository.UserRepository
+        private set
+    lateinit var authUseCase: com.hesabi.app.domain.AuthUseCase
         private set
 
     override fun onCreate() {
@@ -119,5 +127,12 @@ class HesabiApp : Application() {
             db.purchaseReturnDao(),
             db.expenseDao()
         )
+        userRepository = com.hesabi.app.data.repository.UserRepository(db.userDao())
+        authUseCase = com.hesabi.app.domain.AuthUseCase(userRepository)
+
+        // إنشاء أول مدير تلقائياً إذا كان النظام فارغاً
+        CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {
+            userRepository.createFirstAdminIfNeeded()
+        }
     }
 }

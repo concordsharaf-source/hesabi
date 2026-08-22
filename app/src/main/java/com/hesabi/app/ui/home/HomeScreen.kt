@@ -25,10 +25,13 @@ import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.Warning
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.automirrored.rounded.Logout
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -61,7 +64,10 @@ fun HomeScreen(
     onNavigateToSuppliers: () -> Unit = {},
     onNavigateToPurchases: () -> Unit = {},
     onNavigateToExpenses: () -> Unit = {},
-    onNavigateToReports: () -> Unit = {}
+    onNavigateToReports: () -> Unit = {},
+    onNavigateToCustomers: () -> Unit = {},
+    onNavigateToUsers: () -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
     val viewModel: HomeViewModel = viewModel(factory = HomeViewModelFactory(app))
@@ -76,9 +82,14 @@ fun HomeScreen(
                     Text(
                         storeName.ifEmpty { "حسابي" },
                         modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center,
+                        textAlign = TextAlign.Start,
                         style = MaterialTheme.typography.titleMedium
                     )
+                },
+                actions = {
+                    IconButton(onClick = onLogout) {
+                        Icon(Icons.AutoMirrored.Rounded.Logout, contentDescription = "تسجيل خروج")
+                    }
                 }
             )
         }
@@ -231,14 +242,21 @@ fun HomeScreen(
             Spacer(Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.Center
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 QuickAction(
-                    modifier = Modifier.width(120.dp),
+                    modifier = Modifier.weight(1f),
                     icon = Icons.AutoMirrored.Rounded.ReceiptLong,
                     label = "الفواتير",
                     tint = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToInvoices
+                )
+                QuickAction(
+                    modifier = Modifier.weight(1f),
+                    icon = Icons.Rounded.People,
+                    label = "العملاء",
+                    tint = MaterialTheme.colorScheme.secondary,
+                    onClick = onNavigateToCustomers
                 )
             }
             
@@ -288,6 +306,20 @@ fun HomeScreen(
                         tint = MaterialTheme.colorScheme.primary,
                         onClick = onNavigateToReports
                     )
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    QuickAction(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.Person,
+                        label = "إدارة المستخدمين",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        onClick = onNavigateToUsers
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
                 }
             }
             Spacer(Modifier.height(24.dp))
