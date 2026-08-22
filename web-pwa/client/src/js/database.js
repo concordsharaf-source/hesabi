@@ -1,24 +1,125 @@
-import { adjustmentDelta, calculateSaleTotals, canSell, invoiceNumber, nowIso, toNumber } from "./domain.js";
+/* اتجاه التصميم: دفتر التاجر الهادئ — كل تغيير مالي أو مخزني يُحفظ محليًا ضمن معاملة واضحة. */
+import {
+  adjustmentDelta,
+  canRegisterPayment,
+  calculateProfit,
+  calculateCashBalance,
+  calculatePurchaseTotals,
+  calculateSaleTotals,
+  canReturn,
+  canSell,
+  dateKey,
+  invoiceNumber,
+  isWithinDateRange,
+  nowIso,
+  paymentStatus,
+  purchaseNumber,
+  purchaseReturnNumber,
+  roundMoney,
+  remainingAmount,
+  saleReturnNumber,
+  toNumber,
+} from "./domain.js";
+import { ACTIVE_SESSION_META_ID, toPersistentSessionUser } from "./session.js";
 
-/* اتجاه التصميم: دفتر التاجر الهادئ — قواعد حفظ محلية تحمي تفرد الباركود وسجل العمليات. */
 const DB_NAME = "hesabi-pwa";
-const DB_VERSION = 1;
+const DB_VERSION = 7;
 let databasePromise;
 
-const requestAsPromise = (request) =>
-  new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("تعذر تنفيذ العملية المحلية."));
-  });
-
-const transactionDone = (transaction) =>
-  new Promise((resolve, reject) => {
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error || new Error("تعذر حفظ التغييرات."));
-    transaction.onabort = () => reject(transaction.error || new Error("تم إلغاء العملية لحماية البيانات."));
-  });
-
 const uid = (prefix) => `${prefix}-${crypto.randomUUID()}`;
+const requestAsPromise = (request) => new Promise((resolve, reject) => {
+  request.onsuccess = () => resolve(request.result);
+  request.onerror = () => reject(request.error || new Error("تعذر تنفيذ العملية المحلية."));
+});
+const transactionDone = (transaction) => new Promise((resolve, reject) => {
+  transaction.oncomplete = () => resolve();
+  transaction.onerror = () => reject(transaction.error || new Error("تعذر حفظ التغييرات."));
+  transaction.onabort = () => reject(transaction.error || new Error("تم إلغاء العملية لحماية البيانات."));
+});
+const normalize = (value) => String(value || "").trim();
+const normalizeUsername = (value) => normalize(value).toLocaleLowerCase("ar");
+const validatePin = (value) => /^\d{4,12}$/.test(String(value || ""));
+const makeSalt = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+const hashPin = async (pin, salt) => {
+  const bytes = new TextEncoder().encode(`${salt}:${String(pin)}`);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+const accountRole = (role) => role === "admin" ? "admin" : "cashier";
+const makeIndexedStore = (database, name, indexes = []) => {
+  if (database.objectStoreNames.contains(name)) return database.transaction?.objectStore?.(name);
+  const store = database.createObjectStore(name, { keyPath: "id" });
+  indexes.forEach(([index, keyPath, options]) => store.createIndex(index, keyPath, options));
+  return store;
+};
+const createStockMovement = (store, values) => store.add({ id: uid("movement"), ...values });
+const itemReturnTotal = (item, quantity) => roundMoney(toNumber(item.unitPrice ?? item.unitCost) * toNumber(quantity));
+const dateOrder = (item) => String(item.date || item.createdAt || "");
+
+async function createAccountRecord(values) {
+  const username = normalizeUsername(values.username);
+  const name = normalize(values.name);
+  if (!username || username.length < 3 || username.length > 30) throw new Error("اسم المستخدم يجب أن يتكون من 3 إلى 30 حرفًا أو رقمًا.");
+  if (!name) throw new Error("اسم الحساب مطلوب.");
+  if (!validatePin(values.pin)) throw new Error("رمز الدخول يجب أن يتكون من 4 إلى 12 رقمًا.");
+  const pinSalt = makeSalt();
+  return {
+    id: uid("account"),
+    username,
+    name,
+    role: accountRole(values.role),
+    pinSalt,
+    pinHash: await hashPin(values.pin, pinSalt),
+    mustChangePin: Boolean(values.mustChangePin),
+    isActive: values.isActive !== false,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  };
+}
+
+async function ensureInitialAdmin(database) {
+  const transaction = database.transaction("accounts", "readwrite");
+  const accounts = transaction.objectStore("accounts");
+  const existing = await requestAsPromise(accounts.count());
+  if (!existing) accounts.add(await createAccountRecord({ username: "admin", name: "مدير المتجر", role: "admin", pin: "1234", mustChangePin: true }));
+  await transactionDone(transaction);
+}
+
+async function reconcileCreditInvoices(database) {
+  const names = ["meta", "sales", "purchases", "saleReturns", "purchaseReturns", "customerPayments", "supplierPayments", "customers", "suppliers"];
+  const transaction = database.transaction(names, "readwrite");
+  const meta = transaction.objectStore("meta");
+  const marker = await requestAsPromise(meta.get("credit-reconciliation-v6"));
+  if (marker?.value) { await transactionDone(transaction); return; }
+  const [sales, purchases, saleReturns, purchaseReturns, customerPayments, supplierPayments, customers, suppliers] = await Promise.all(names.slice(1).map((name) => requestAsPromise(transaction.objectStore(name).getAll())));
+  const saleReturnsByInvoice = saleReturns.reduce((map, item) => map.set(item.saleId, roundMoney((map.get(item.saleId) || 0) + toNumber(item.total))), new Map());
+  const purchaseReturnsByInvoice = purchaseReturns.reduce((map, item) => map.set(item.purchaseId, roundMoney((map.get(item.purchaseId) || 0) + toNumber(item.total))), new Map());
+  const salesStore = transaction.objectStore("sales"); const purchasesStore = transaction.objectStore("purchases");
+  const customersStore = transaction.objectStore("customers"); const suppliersStore = transaction.objectStore("suppliers");
+  const reconcileOwnerInvoices = (invoices, payments, returnsByInvoice, ownerId, ownerStore, invoiceStore) => {
+    const byOwner = new Map();
+    invoices.filter((invoice) => invoice.paymentType === "آجل" && invoice[ownerId]).forEach((invoice) => {
+      const returned = Math.max(toNumber(invoice.returnedTotal), toNumber(returnsByInvoice.get(invoice.id)));
+      const effectiveTotal = roundMoney(Math.max(0, toNumber(invoice.total) - returned));
+      const initiallyPaid = roundMoney(Math.min(effectiveTotal, toNumber(invoice.initialPaidAmount ?? invoice.paidAmount)));
+      const entry = { invoice, effectiveTotal, paid: initiallyPaid, remaining: roundMoney(effectiveTotal - initiallyPaid) };
+      const entries = byOwner.get(invoice[ownerId]) || []; entries.push(entry); byOwner.set(invoice[ownerId], entries);
+    });
+    byOwner.forEach((entries, id) => {
+      entries.sort((a, b) => dateOrder(a.invoice).localeCompare(dateOrder(b.invoice)));
+      payments.filter((payment) => payment[ownerId] === id).sort((a, b) => dateOrder(a).localeCompare(dateOrder(b))).forEach((payment) => {
+        let available = toNumber(payment.amount);
+        entries.forEach((entry) => { const applied = Math.min(available, entry.remaining); entry.paid = roundMoney(entry.paid + applied); entry.remaining = roundMoney(entry.remaining - applied); available = roundMoney(available - applied); });
+      });
+      entries.forEach((entry) => invoiceStore.put({ ...entry.invoice, remainingAmount: entry.remaining, paymentStatus: paymentStatus(entry.effectiveTotal, entry.paid) }));
+      const owner = ownerStore.get(id); owner.onsuccess = () => { if (owner.result) ownerStore.put({ ...owner.result, balance: roundMoney(entries.reduce((sum, entry) => sum + entry.remaining, 0)), updatedAt: nowIso() }); };
+    });
+  };
+  reconcileOwnerInvoices(sales, customerPayments, saleReturnsByInvoice, "customerId", customersStore, salesStore);
+  reconcileOwnerInvoices(purchases, supplierPayments, purchaseReturnsByInvoice, "supplierId", suppliersStore, purchasesStore);
+  meta.put({ id: "credit-reconciliation-v6", value: true, updatedAt: nowIso() });
+  await transactionDone(transaction);
+}
 
 export const db = {
   async open() {
@@ -28,235 +129,221 @@ export const db = {
       request.onerror = () => reject(request.error || new Error("تعذر فتح قاعدة البيانات المحلية."));
       request.onupgradeneeded = () => {
         const database = request.result;
-        if (!database.objectStoreNames.contains("settings")) database.createObjectStore("settings", { keyPath: "id" });
-        if (!database.objectStoreNames.contains("products")) {
-          const products = database.createObjectStore("products", { keyPath: "id" });
-          products.createIndex("name", "nameLower");
-          products.createIndex("barcode", "barcode");
-          products.createIndex("internalCode", "internalCode");
-          products.createIndex("active", "isDeleted");
-        }
-        if (!database.objectStoreNames.contains("sales")) {
-          const sales = database.createObjectStore("sales", { keyPath: "id" });
-          sales.createIndex("date", "date");
-          sales.createIndex("invoiceNumber", "invoiceNumber", { unique: true });
-        }
-        if (!database.objectStoreNames.contains("saleItems")) {
-          const saleItems = database.createObjectStore("saleItems", { keyPath: "id" });
-          saleItems.createIndex("saleId", "saleId");
-          saleItems.createIndex("productId", "productId");
-        }
-        if (!database.objectStoreNames.contains("stockMovements")) {
-          const movements = database.createObjectStore("stockMovements", { keyPath: "id" });
-          movements.createIndex("productId", "productId");
-          movements.createIndex("date", "date");
-          movements.createIndex("type", "type");
-        }
-        if (!database.objectStoreNames.contains("meta")) database.createObjectStore("meta", { keyPath: "id" });
+        makeIndexedStore(database, "settings");
+        makeIndexedStore(database, "products", [["name", "nameLower"], ["barcode", "barcode"], ["internalCode", "internalCode"], ["active", "isDeleted"]]);
+        makeIndexedStore(database, "sales", [["date", "date"], ["invoiceNumber", "invoiceNumber", { unique: true }]]);
+        makeIndexedStore(database, "saleItems", [["saleId", "saleId"], ["productId", "productId"]]);
+        makeIndexedStore(database, "stockMovements", [["productId", "productId"], ["date", "date"], ["type", "type"]]);
+        makeIndexedStore(database, "meta");
+        makeIndexedStore(database, "suppliers", [["name", "nameLower"], ["active", "isDeleted"]]);
+        makeIndexedStore(database, "purchases", [["date", "date"], ["invoiceNumber", "invoiceNumber", { unique: true }], ["supplierId", "supplierId"]]);
+        makeIndexedStore(database, "purchaseItems", [["purchaseId", "purchaseId"], ["productId", "productId"]]);
+        makeIndexedStore(database, "purchaseReturns", [["purchaseId", "purchaseId"], ["date", "date"]]);
+        makeIndexedStore(database, "purchaseReturnItems", [["purchaseReturnId", "purchaseReturnId"], ["purchaseItemId", "purchaseItemId"]]);
+        makeIndexedStore(database, "saleReturns", [["saleId", "saleId"], ["date", "date"]]);
+        makeIndexedStore(database, "saleReturnItems", [["saleReturnId", "saleReturnId"], ["saleItemId", "saleItemId"]]);
+        makeIndexedStore(database, "expenses", [["date", "date"], ["category", "category"]]);
+        makeIndexedStore(database, "customers", [["name", "nameLower"], ["active", "isDeleted"], ["balance", "balance"]]);
+        makeIndexedStore(database, "customerPayments", [["customerId", "customerId"], ["date", "date"]]);
+        makeIndexedStore(database, "customerTransactions", [["customerId", "customerId"], ["date", "date"], ["type", "type"]]);
+        makeIndexedStore(database, "supplierPayments", [["supplierId", "supplierId"], ["date", "date"]]);
+        makeIndexedStore(database, "supplierTransactions", [["supplierId", "supplierId"], ["date", "date"], ["type", "type"]]);
+        makeIndexedStore(database, "cashMovements", [["date", "date"], ["type", "type"]]);
+        makeIndexedStore(database, "stockCounts", [["productId", "productId"], ["date", "date"]]);
+        makeIndexedStore(database, "accounts", [["username", "username", { unique: true }], ["role", "role"], ["active", "isActive"]]);
+        const salesStore = request.transaction.objectStore("sales");
+        if (!salesStore.indexNames.contains("customerId")) salesStore.createIndex("customerId", "customerId");
+        const suppliersStore = request.transaction.objectStore("suppliers");
+        suppliersStore.getAll().onsuccess = (event) => event.target.result.forEach((supplier) => {
+          if (typeof supplier.balance !== "number") suppliersStore.put({ ...supplier, balance: 0, updatedAt: supplier.updatedAt || nowIso() });
+        });
+        const purchasesStore = request.transaction.objectStore("purchases");
+        purchasesStore.getAll().onsuccess = (event) => event.target.result.forEach((purchase) => {
+          if (!purchase.paymentType) purchasesStore.put({ ...purchase, paymentType: "نقدي", paymentMethod: "نقدي", paidAmount: toNumber(purchase.total), initialPaidAmount: toNumber(purchase.total), remainingAmount: 0, paymentStatus: "مدفوعة" });
+        });
       };
-      request.onsuccess = () => resolve(request.result);
+      request.onsuccess = async () => { try { await ensureInitialAdmin(request.result); await reconcileCreditInvoices(request.result); resolve(request.result); } catch (error) { reject(error); } };
     });
     return databasePromise;
   },
 
-  async getSettings() {
-    const database = await this.open();
-    const transaction = database.transaction("settings", "readonly");
-    return requestAsPromise(transaction.objectStore("settings").get("app"));
-  },
+  async getSettings() { const database = await this.open(); return requestAsPromise(database.transaction("settings", "readonly").objectStore("settings").get("app")); },
+  async saveSettings(values) { const database = await this.open(); const transaction = database.transaction("settings", "readwrite"); const store = transaction.objectStore("settings"); const current = await requestAsPromise(store.get("app")); store.put({ ...current, id: "app", ...values, setupCompleted: true, updatedAt: nowIso() }); await transactionDone(transaction); },
 
-  async saveSettings(values) {
+  async listAccounts() { const database = await this.open(); const accounts = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").getAll()); return accounts.sort((a, b) => a.role === b.role ? a.name.localeCompare(b.name, "ar") : a.role === "admin" ? -1 : 1); },
+  async getPersistentSession() {
     const database = await this.open();
-    const transaction = database.transaction("settings", "readwrite");
-    transaction.objectStore("settings").put({ id: "app", ...values, setupCompleted: true, updatedAt: nowIso() });
-    await transactionDone(transaction);
+    const marker = await requestAsPromise(database.transaction("meta", "readonly").objectStore("meta").get(ACTIVE_SESSION_META_ID));
+    if (!marker?.accountId) return null;
+    const account = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").get(marker.accountId));
+    const user = toPersistentSessionUser(account);
+    if (!user) await this.clearPersistentSession();
+    return user;
+  },
+  async savePersistentSession(accountId) {
+    const database = await this.open(); const transaction = database.transaction(["accounts", "meta"], "readwrite");
+    const account = await requestAsPromise(transaction.objectStore("accounts").get(accountId));
+    if (!toPersistentSessionUser(account)) throw new Error("الحساب غير متاح لحفظ الجلسة.");
+    transaction.objectStore("meta").put({ id: ACTIVE_SESSION_META_ID, accountId, updatedAt: nowIso() }); await transactionDone(transaction);
+  },
+  async clearPersistentSession() { const database = await this.open(); const transaction = database.transaction("meta", "readwrite"); transaction.objectStore("meta").delete(ACTIVE_SESSION_META_ID); await transactionDone(transaction); },
+  async authenticateAccount({ username, pin }) {
+    const normalized = normalizeUsername(username); const database = await this.open(); const account = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").index("username").get(normalized));
+    if (!account || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("بيانات الدخول غير صحيحة.");
+    return toPersistentSessionUser(account);
+  },
+  async createAccount(values) {
+    const account = await createAccountRecord({ ...values, role: values.role || "cashier" }); const database = await this.open(); const transaction = database.transaction("accounts", "readwrite"); const accounts = transaction.objectStore("accounts");
+    if (await requestAsPromise(accounts.index("username").get(account.username))) throw new Error("اسم المستخدم مستخدم بالفعل.");
+    accounts.add(account); await transactionDone(transaction); return account;
+  },
+  async updateAccount(accountId, values) {
+    const database = await this.open(); const transaction = database.transaction("accounts", "readwrite"); const accounts = transaction.objectStore("accounts"); const current = await requestAsPromise(accounts.get(accountId));
+    if (!current) throw new Error("الحساب غير موجود.");
+    const nextRole = accountRole(values.role ?? current.role); const nextActive = values.isActive ?? current.isActive;
+    if (current.role === "admin" && current.isActive && (nextRole !== "admin" || !nextActive)) {
+      const all = await requestAsPromise(accounts.getAll());
+      if (all.filter((account) => account.role === "admin" && account.isActive).length <= 1) throw new Error("يجب الإبقاء على حساب أدمن نشط واحد على الأقل.");
+    }
+    const name = normalize(values.name ?? current.name); if (!name) throw new Error("اسم الحساب مطلوب.");
+    const updated = { ...current, name, role: nextRole, isActive: nextActive, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
+  },
+  async changeAccountPin(accountId, pin) {
+    if (!validatePin(pin)) throw new Error("رمز الدخول يجب أن يتكون من 4 إلى 12 رقمًا.");
+    const database = await this.open(); const transaction = database.transaction("accounts", "readwrite"); const accounts = transaction.objectStore("accounts"); const current = await requestAsPromise(accounts.get(accountId)); if (!current) throw new Error("الحساب غير موجود.");
+    const pinSalt = makeSalt(); accounts.put({ ...current, pinSalt, pinHash: await hashPin(pin, pinSalt), mustChangePin: false, updatedAt: nowIso() }); await transactionDone(transaction);
   },
 
   async listProducts({ includeDeleted = false } = {}) {
     const database = await this.open();
-    const transaction = database.transaction("products", "readonly");
-    const products = await requestAsPromise(transaction.objectStore("products").getAll());
-    return products
-      .filter((product) => includeDeleted || !product.isDeleted)
-      .sort((first, second) => first.name.localeCompare(second.name, "ar"));
+    const products = await requestAsPromise(database.transaction("products", "readonly").objectStore("products").getAll());
+    return products.filter((product) => includeDeleted || !product.isDeleted).sort((a, b) => a.name.localeCompare(b.name, "ar"));
   },
-
+  async getProduct(productId) { const database = await this.open(); return requestAsPromise(database.transaction("products", "readonly").objectStore("products").get(productId)); },
   async findProductByBarcode(barcode, excludeProductId = null) {
-    const normalizedBarcode = barcode?.trim();
-    if (!normalizedBarcode) return null;
+    const normalized = normalize(barcode); if (!normalized) return null;
     const database = await this.open();
-    const transaction = database.transaction("products", "readonly");
-    const products = await requestAsPromise(transaction.objectStore("products").index("barcode").getAll(normalizedBarcode));
-    return products.find((product) => !product.isDeleted && product.id !== excludeProductId) || null;
+    const matches = await requestAsPromise(database.transaction("products", "readonly").objectStore("products").index("barcode").getAll(normalized));
+    return matches.find((item) => !item.isDeleted && item.id !== excludeProductId) || null;
   },
-
-  async getProduct(productId) {
-    const database = await this.open();
-    const transaction = database.transaction("products", "readonly");
-    return requestAsPromise(transaction.objectStore("products").get(productId));
-  },
-
   async createProduct(values) {
-    const database = await this.open();
-    const transaction = database.transaction(["products", "stockMovements"], "readwrite");
-    const createdAt = nowIso();
-    const quantity = Math.max(0, toNumber(values.quantity));
-    const products = transaction.objectStore("products");
-    const barcode = values.barcode.trim();
-    const barcodeMatches = barcode ? await requestAsPromise(products.index("barcode").getAll(barcode)) : [];
-    const duplicate = barcodeMatches.find((existing) => !existing.isDeleted);
+    const database = await this.open(); const transaction = database.transaction(["products", "stockMovements"], "readwrite");
+    const products = transaction.objectStore("products"); const createdAt = nowIso(); const quantity = Math.max(0, toNumber(values.quantity)); const barcode = normalize(values.barcode);
+    const duplicate = barcode ? (await requestAsPromise(products.index("barcode").getAll(barcode))).find((item) => !item.isDeleted) : null;
     if (duplicate) throw new Error(`هذا الباركود مستخدم بالفعل للمنتج: ${duplicate.name}`);
-    const product = {
-      id: uid("product"),
-      name: values.name.trim(),
-      nameLower: values.name.trim().toLocaleLowerCase("ar"),
-      barcode,
-      internalCode: values.internalCode.trim(),
-      purchasePrice: Math.max(0, toNumber(values.purchasePrice)),
-      salePrice: Math.max(0, toNumber(values.salePrice)),
-      quantity,
-      minimumStock: Math.max(0, toNumber(values.minimumStock)),
-      unit: values.unit,
-      createdAt,
-      updatedAt: createdAt,
-      isDeleted: false,
-    };
+    const product = { id: uid("product"), name: normalize(values.name), nameLower: normalize(values.name).toLocaleLowerCase("ar"), barcode, internalCode: normalize(values.internalCode), category: normalize(values.category || values.unit || "عام"), purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)), quantity, minimumStock: Math.max(0, toNumber(values.minimumStock)), unit: values.unit || "حبة", createdAt, updatedAt: createdAt, isDeleted: false };
+    if (!product.name) throw new Error("اسم المنتج مطلوب.");
     products.add(product);
-    if (quantity > 0) {
-      transaction.objectStore("stockMovements").add({
-        id: uid("movement"), productId: product.id, type: "INITIAL", quantity,
-        previousQuantity: 0, newQuantity: quantity, date: createdAt, note: "كمية افتتاحية",
-      });
-    }
-    await transactionDone(transaction);
-    return product;
+    if (quantity > 0) createStockMovement(transaction.objectStore("stockMovements"), { productId: product.id, type: "INITIAL", quantity, previousQuantity: 0, newQuantity: quantity, date: createdAt, note: "كمية افتتاحية", referenceType: "PRODUCT", referenceId: product.id });
+    await transactionDone(transaction); return product;
   },
-
   async updateProduct(productId, values) {
-    const database = await this.open();
-    const transaction = database.transaction("products", "readwrite");
-    const store = transaction.objectStore("products");
-    const current = await requestAsPromise(store.get(productId));
+    const database = await this.open(); const transaction = database.transaction("products", "readwrite"); const store = transaction.objectStore("products"); const current = await requestAsPromise(store.get(productId));
     if (!current || current.isDeleted) throw new Error("المنتج غير متاح للتعديل.");
-    const barcode = values.barcode.trim();
-    const barcodeMatches = barcode ? await requestAsPromise(store.index("barcode").getAll(barcode)) : [];
-    const duplicate = barcodeMatches.find((existing) => !existing.isDeleted && existing.id !== productId);
+    const barcode = normalize(values.barcode); const duplicate = barcode ? (await requestAsPromise(store.index("barcode").getAll(barcode))).find((item) => !item.isDeleted && item.id !== productId) : null;
     if (duplicate) throw new Error(`هذا الباركود مستخدم بالفعل للمنتج: ${duplicate.name}`);
-    const updated = {
-      ...current,
-      name: values.name.trim(), nameLower: values.name.trim().toLocaleLowerCase("ar"),
-      barcode, internalCode: values.internalCode.trim(),
-      purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)),
-      minimumStock: Math.max(0, toNumber(values.minimumStock)), unit: values.unit, updatedAt: nowIso(),
-    };
-    store.put(updated);
-    await transactionDone(transaction);
-    return updated;
+    const updated = { ...current, name: normalize(values.name), nameLower: normalize(values.name).toLocaleLowerCase("ar"), barcode, internalCode: normalize(values.internalCode), category: normalize(values.category || current.category || values.unit), purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)), minimumStock: Math.max(0, toNumber(values.minimumStock)), unit: values.unit, updatedAt: nowIso() };
+    if (!updated.name) throw new Error("اسم المنتج مطلوب."); store.put(updated); await transactionDone(transaction); return updated;
   },
-
   async softDeleteProduct(productId) {
-    const database = await this.open();
-    const transaction = database.transaction(["products", "saleItems"], "readwrite");
-    const productStore = transaction.objectStore("products");
-    const product = await requestAsPromise(productStore.get(productId));
-    if (!product) throw new Error("المنتج غير موجود.");
-    const linkedSales = await requestAsPromise(transaction.objectStore("saleItems").index("productId").count(productId));
-    product.isDeleted = true;
-    product.deletedAt = nowIso();
-    product.deletionReason = linkedSales > 0 ? "مرتبط بفواتير" : "حذف من الكتالوج";
-    productStore.put(product);
-    await transactionDone(transaction);
-    return { linkedSales };
+    const database = await this.open(); const transaction = database.transaction(["products", "saleItems"], "readwrite"); const productStore = transaction.objectStore("products"); const product = await requestAsPromise(productStore.get(productId));
+    if (!product) throw new Error("المنتج غير موجود."); const linkedSales = await requestAsPromise(transaction.objectStore("saleItems").index("productId").count(productId)); productStore.put({ ...product, isDeleted: true, deletedAt: nowIso(), deletionReason: linkedSales > 0 ? "مرتبط بفواتير" : "حذف من الكتالوج" }); await transactionDone(transaction); return { linkedSales };
   },
-
   async adjustStock(productId, newQuantity, note) {
-    const database = await this.open();
-    const transaction = database.transaction(["products", "stockMovements"], "readwrite");
-    const products = transaction.objectStore("products");
-    const product = await requestAsPromise(products.get(productId));
-    const next = Math.max(0, toNumber(newQuantity));
-    if (!product || product.isDeleted) throw new Error("المنتج غير متاح.");
-    const previous = toNumber(product.quantity);
-    product.quantity = next;
-    product.updatedAt = nowIso();
-    products.put(product);
-    transaction.objectStore("stockMovements").add({
-      id: uid("movement"), productId, type: "ADJUSTMENT", quantity: adjustmentDelta(previous, next),
-      previousQuantity: previous, newQuantity: next, date: nowIso(), note: note.trim(),
-    });
-    await transactionDone(transaction);
-    return product;
+    const database = await this.open(); const transaction = database.transaction(["products", "stockMovements"], "readwrite"); const products = transaction.objectStore("products"); const product = await requestAsPromise(products.get(productId));
+    if (!product || product.isDeleted) throw new Error("المنتج غير متاح."); const previousQuantity = toNumber(product.quantity); const nextQuantity = Math.max(0, toNumber(newQuantity)); const date = nowIso(); products.put({ ...product, quantity: nextQuantity, updatedAt: date }); createStockMovement(transaction.objectStore("stockMovements"), { productId, type: "ADJUSTMENT", quantity: adjustmentDelta(previousQuantity, nextQuantity), previousQuantity, newQuantity: nextQuantity, date, note: normalize(note), referenceType: "ADJUSTMENT", referenceId: productId }); await transactionDone(transaction); return { ...product, quantity: nextQuantity };
   },
 
-  async completeSale({ items, discount, paidAmount, paymentMethod }) {
+  async listSuppliers({ includeDeleted = false } = {}) { const database = await this.open(); const items = await requestAsPromise(database.transaction("suppliers", "readonly").objectStore("suppliers").getAll()); return items.filter((item) => includeDeleted || !item.isDeleted).sort((a, b) => a.name.localeCompare(b.name, "ar")); },
+  async createSupplier(values) { const name = normalize(values.name); if (!name) throw new Error("اسم المورد مطلوب."); const database = await this.open(); const transaction = database.transaction("suppliers", "readwrite"); const date = nowIso(); const supplier = { id: uid("supplier"), name, nameLower: name.toLocaleLowerCase("ar"), phone: normalize(values.phone), address: normalize(values.address), notes: normalize(values.notes), balance: 0, createdAt: date, updatedAt: date, isDeleted: false }; transaction.objectStore("suppliers").add(supplier); await transactionDone(transaction); return supplier; },
+  async getSupplierAccount(supplierId) { const database = await this.open(); const transaction = database.transaction(["suppliers", "purchases", "supplierPayments", "supplierTransactions"], "readonly"); const supplier = await requestAsPromise(transaction.objectStore("suppliers").get(supplierId)); if (!supplier) return null; const [purchases, payments, transactions] = await Promise.all([requestAsPromise(transaction.objectStore("purchases").index("supplierId").getAll(supplierId)), requestAsPromise(transaction.objectStore("supplierPayments").index("supplierId").getAll(supplierId)), requestAsPromise(transaction.objectStore("supplierTransactions").index("supplierId").getAll(supplierId))]); const totalPurchases = roundMoney(purchases.reduce((sum, purchase) => sum + toNumber(purchase.total), 0)); const totalPaid = roundMoney(purchases.reduce((sum, purchase) => sum + toNumber(purchase.initialPaidAmount ?? purchase.paidAmount), 0) + payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0)); return { supplier, purchases, payments, transactions: transactions.sort((a, b) => new Date(b.date) - new Date(a.date)), totalPurchases, totalPaid, balance: roundMoney(toNumber(supplier.balance)) }; },
+  async listSupplierPayments({ from = "", to = "" } = {}) { const database = await this.open(); const items = await requestAsPromise(database.transaction("supplierPayments", "readonly").objectStore("supplierPayments").getAll()); return items.filter((item) => isWithinDateRange(item.date, from, to)).sort((a, b) => new Date(b.date) - new Date(a.date)); },
+  async registerSupplierPayment({ supplierId, amount, date = dateKey(), notes = "", paymentMethod = "نقدي" }) { const paid = roundMoney(toNumber(amount)); const database = await this.open(); const transaction = database.transaction(["suppliers", "supplierPayments", "supplierTransactions", "purchases"], "readwrite"); const suppliers = transaction.objectStore("suppliers"); const supplier = await requestAsPromise(suppliers.get(supplierId)); if (!supplier || supplier.isDeleted) throw new Error("المورد غير متاح."); const beforeBalance = roundMoney(toNumber(supplier.balance)); if (!canRegisterPayment(beforeBalance, paid)) throw new Error("المبلغ المدفوع أكبر من المستحق للمورد."); const afterBalance = roundMoney(beforeBalance - paid); const purchasesStore = transaction.objectStore("purchases"); const unpaid = (await requestAsPromise(purchasesStore.index("supplierId").getAll(supplierId))).filter((purchase) => purchase.paymentType === "آجل" && toNumber(purchase.remainingAmount) > 0).sort((a, b) => dateOrder(a).localeCompare(dateOrder(b))); let available = paid; const allocations = []; unpaid.forEach((purchase) => { const applied = roundMoney(Math.min(available, toNumber(purchase.remainingAmount))); if (applied <= 0) return; const remainingAmount = roundMoney(toNumber(purchase.remainingAmount) - applied); const paidAmount = roundMoney(toNumber(purchase.total) - remainingAmount); purchasesStore.put({ ...purchase, paidAmount, remainingAmount, paymentStatus: remainingAmount === 0 ? "مدفوعة" : "مدفوعة جزئيًا" }); allocations.push({ purchaseId: purchase.id, invoiceNumber: purchase.invoiceNumber, amount: applied }); available = roundMoney(available - applied); }); const createdAt = nowIso(); const payment = { id: uid("supplier-payment"), supplierId, supplierName: supplier.name, amount: paid, date, notes: normalize(notes), paymentMethod, balanceBefore: beforeBalance, balanceAfter: afterBalance, allocations, createdAt }; transaction.objectStore("supplierPayments").add(payment); suppliers.put({ ...supplier, balance: afterBalance, updatedAt: createdAt }); transaction.objectStore("supplierTransactions").add({ id: uid("supplier-transaction"), supplierId, type: "PAYMENT", date, amount: paid, paidAmount: paid, remainingAmount: afterBalance, referenceType: "PAYMENT", referenceId: payment.id, note: normalize(notes), createdAt }); await transactionDone(transaction); return payment; },
+  async updateSupplier(supplierId, values) { const database = await this.open(); const transaction = database.transaction("suppliers", "readwrite"); const store = transaction.objectStore("suppliers"); const current = await requestAsPromise(store.get(supplierId)); const name = normalize(values.name); if (!current || current.isDeleted) throw new Error("المورد غير متاح."); if (!name) throw new Error("اسم المورد مطلوب."); const updated = { ...current, name, nameLower: name.toLocaleLowerCase("ar"), phone: normalize(values.phone), address: normalize(values.address), notes: normalize(values.notes), updatedAt: nowIso() }; store.put(updated); await transactionDone(transaction); return updated; },
+  async softDeleteSupplier(supplierId) { const database = await this.open(); const transaction = database.transaction("suppliers", "readwrite"); const store = transaction.objectStore("suppliers"); const supplier = await requestAsPromise(store.get(supplierId)); if (!supplier) throw new Error("المورد غير موجود."); store.put({ ...supplier, isDeleted: true, deletedAt: nowIso() }); await transactionDone(transaction); },
+
+  async listCustomers({ includeDeleted = false } = {}) { const database = await this.open(); const items = await requestAsPromise(database.transaction("customers", "readonly").objectStore("customers").getAll()); return items.filter((item) => includeDeleted || !item.isDeleted).sort((a, b) => a.name.localeCompare(b.name, "ar")); },
+  async getCustomer(customerId) { const database = await this.open(); return requestAsPromise(database.transaction("customers", "readonly").objectStore("customers").get(customerId)); },
+  async createCustomer(values) { const name = normalize(values.name); if (!name) throw new Error("اسم العميل مطلوب."); const database = await this.open(); const transaction = database.transaction("customers", "readwrite"); const date = nowIso(); const customer = { id: uid("customer"), name, nameLower: name.toLocaleLowerCase("ar"), phone: normalize(values.phone), address: normalize(values.address), notes: normalize(values.notes), balance: 0, createdAt: date, updatedAt: date, isDeleted: false }; transaction.objectStore("customers").add(customer); await transactionDone(transaction); return customer; },
+  async updateCustomer(customerId, values) { const database = await this.open(); const transaction = database.transaction("customers", "readwrite"); const store = transaction.objectStore("customers"); const current = await requestAsPromise(store.get(customerId)); const name = normalize(values.name); if (!current || current.isDeleted) throw new Error("العميل غير متاح."); if (!name) throw new Error("اسم العميل مطلوب."); const updated = { ...current, name, nameLower: name.toLocaleLowerCase("ar"), phone: normalize(values.phone), address: normalize(values.address), notes: normalize(values.notes), updatedAt: nowIso() }; store.put(updated); await transactionDone(transaction); return updated; },
+  async softDeleteCustomer(customerId) { const database = await this.open(); const transaction = database.transaction("customers", "readwrite"); const store = transaction.objectStore("customers"); const customer = await requestAsPromise(store.get(customerId)); if (!customer) throw new Error("العميل غير موجود."); store.put({ ...customer, isDeleted: true, deletedAt: nowIso(), updatedAt: nowIso() }); await transactionDone(transaction); },
+  async getCustomerAccount(customerId) { const database = await this.open(); const transaction = database.transaction(["customers", "sales", "customerPayments", "customerTransactions"], "readonly"); const customer = await requestAsPromise(transaction.objectStore("customers").get(customerId)); if (!customer) return null; const [sales, payments, transactions] = await Promise.all([requestAsPromise(transaction.objectStore("sales").index("customerId").getAll(customerId)), requestAsPromise(transaction.objectStore("customerPayments").index("customerId").getAll(customerId)), requestAsPromise(transaction.objectStore("customerTransactions").index("customerId").getAll(customerId))]); const creditSales = roundMoney(sales.reduce((sum, sale) => sum + toNumber(sale.total), 0)); const paid = roundMoney(sales.reduce((sum, sale) => sum + toNumber(sale.initialPaidAmount ?? sale.paidAmount), 0) + payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0)); return { customer, sales, payments, transactions: transactions.sort((a, b) => new Date(b.date) - new Date(a.date)), totalSales: creditSales, totalPaid: paid, balance: roundMoney(toNumber(customer.balance)) }; },
+  async listCustomerPayments({ from = "", to = "" } = {}) { const database = await this.open(); const items = await requestAsPromise(database.transaction("customerPayments", "readonly").objectStore("customerPayments").getAll()); return items.filter((item) => isWithinDateRange(item.date, from, to)).sort((a, b) => new Date(b.date) - new Date(a.date)); },
+  async registerCustomerPayment({ customerId, amount, date = dateKey(), notes = "" }) { const paid = roundMoney(toNumber(amount)); const database = await this.open(); const transaction = database.transaction(["customers", "customerPayments", "customerTransactions", "sales"], "readwrite"); const customers = transaction.objectStore("customers"); const customer = await requestAsPromise(customers.get(customerId)); if (!customer || customer.isDeleted) throw new Error("العميل غير متاح."); const beforeBalance = roundMoney(toNumber(customer.balance)); if (!canRegisterPayment(beforeBalance, paid)) throw new Error("المبلغ المدفوع أكبر من الرصيد المستحق."); const afterBalance = roundMoney(beforeBalance - paid); const salesStore = transaction.objectStore("sales"); const unpaid = (await requestAsPromise(salesStore.index("customerId").getAll(customerId))).filter((sale) => sale.paymentType === "آجل" && toNumber(sale.remainingAmount) > 0).sort((a, b) => dateOrder(a).localeCompare(dateOrder(b))); let available = paid; const allocations = []; unpaid.forEach((sale) => { const applied = roundMoney(Math.min(available, toNumber(sale.remainingAmount))); if (applied <= 0) return; const remainingAmount = roundMoney(toNumber(sale.remainingAmount) - applied); const paidAmount = roundMoney(toNumber(sale.total) - remainingAmount); salesStore.put({ ...sale, paidAmount, remainingAmount, paymentStatus: remainingAmount === 0 ? "مدفوعة" : "مدفوعة جزئيًا" }); allocations.push({ saleId: sale.id, invoiceNumber: sale.invoiceNumber, amount: applied }); available = roundMoney(available - applied); }); const createdAt = nowIso(); const payment = { id: uid("customer-payment"), customerId, customerName: customer.name, amount: paid, date, notes: normalize(notes), balanceBefore: beforeBalance, balanceAfter: afterBalance, allocations, createdAt }; transaction.objectStore("customerPayments").add(payment); customers.put({ ...customer, balance: afterBalance, updatedAt: createdAt }); transaction.objectStore("customerTransactions").add({ id: uid("customer-transaction"), customerId, type: "PAYMENT", date, amount: paid, paidAmount: paid, remainingAmount: afterBalance, referenceType: "PAYMENT", referenceId: payment.id, note: normalize(notes), createdAt }); await transactionDone(transaction); return payment; },
+
+  async completeSale({ items, discount, paidAmount, paymentMethod, paymentType = "نقدي", customerId = "" }) {
     if (!items.length) throw new Error("أضف منتجًا واحدًا على الأقل إلى السلة.");
-    const database = await this.open();
-    const transaction = database.transaction(["products", "sales", "saleItems", "stockMovements", "meta"], "readwrite");
-    const products = transaction.objectStore("products");
-    const resolvedItems = [];
-    for (const line of items) {
-      const product = await requestAsPromise(products.get(line.productId));
-      if (!product || product.isDeleted) throw new Error("أحد منتجات السلة لم يعد متاحًا.");
-      if (!canSell(product.quantity, line.quantity)) throw new Error(`الكمية المتوفرة غير كافية للمنتج: ${product.name}`);
-      resolvedItems.push({ ...line, product });
-    }
-    const totals = calculateSaleTotals(resolvedItems.map((line) => ({ unitPrice: line.product.salePrice, quantity: line.quantity })), discount);
-    const paid = Math.max(0, toNumber(paidAmount));
-    if (paid < totals.total) throw new Error("المبلغ المدفوع أقل من الإجمالي النهائي.");
-    const meta = transaction.objectStore("meta");
-    const sequenceRecord = await requestAsPromise(meta.get("invoiceSequence"));
-    const sequence = (sequenceRecord?.value || 0) + 1;
-    const date = nowIso();
-    const sale = {
-      id: uid("sale"), invoiceNumber: invoiceNumber(sequence), date, subtotal: totals.subtotal,
-      discount: totals.discount, total: totals.total, paidAmount: paid, paymentMethod,
-    };
+    const database = await this.open(); const transaction = database.transaction(["products", "sales", "saleItems", "stockMovements", "meta", "customers", "customerTransactions"], "readwrite"); const products = transaction.objectStore("products"); const resolved = [];
+    for (const line of items) { const product = await requestAsPromise(products.get(line.productId)); if (!product || product.isDeleted) throw new Error("أحد منتجات السلة لم يعد متاحًا."); if (!canSell(product.quantity, line.quantity)) throw new Error(`الكمية المتوفرة غير كافية للمنتج: ${product.name}`); resolved.push({ line, product }); }
+    const totals = calculateSaleTotals(resolved.map(({ line, product }) => ({ unitPrice: product.salePrice, quantity: line.quantity })), discount); const paid = Math.max(0, toNumber(paidAmount)); if (paid > totals.total) throw new Error("المبلغ المدفوع لا يمكن أن يتجاوز إجمالي الفاتورة."); const isCredit = paymentType === "آجل"; if (!isCredit && paid < totals.total) throw new Error("المبلغ المدفوع أقل من الإجمالي النهائي."); const customer = isCredit ? await requestAsPromise(transaction.objectStore("customers").get(customerId)) : null; if (isCredit && (!customerId || !customer || customer.isDeleted)) throw new Error("اختر عميلًا نشطًا للبيع الآجل.");
+    const remaining = remainingAmount(totals.total, paid); const status = paymentStatus(totals.total, paid); const meta = transaction.objectStore("meta"); const sequence = ((await requestAsPromise(meta.get("invoiceSequence")))?.value || 0) + 1; const date = nowIso(); const sale = { id: uid("sale"), invoiceNumber: invoiceNumber(sequence), date, subtotal: totals.subtotal, discount: totals.discount, total: totals.total, paidAmount: paid, initialPaidAmount: paid, remainingAmount: remaining, paymentStatus: status, paymentType: isCredit ? "آجل" : "نقدي", customerId: customer?.id || "", customerName: customer?.name || "", paymentMethod };
     transaction.objectStore("sales").add(sale);
-    for (const line of resolvedItems) {
-      const { product } = line;
-      const previousQuantity = toNumber(product.quantity);
-      const nextQuantity = previousQuantity - toNumber(line.quantity);
-      products.put({ ...product, quantity: nextQuantity, updatedAt: date });
-      transaction.objectStore("saleItems").add({
-        id: uid("sale-item"), saleId: sale.id, productId: product.id, productName: product.name,
-        unit: product.unit, quantity: toNumber(line.quantity), unitPrice: product.salePrice,
-        total: Math.round(product.salePrice * toNumber(line.quantity) * 100) / 100,
-      });
-      transaction.objectStore("stockMovements").add({
-        id: uid("movement"), productId: product.id, type: "SALE", quantity: -toNumber(line.quantity),
-        previousQuantity, newQuantity: nextQuantity, date, note: `بيع ضمن الفاتورة ${sale.invoiceNumber}`,
-      });
-    }
-    meta.put({ id: "invoiceSequence", value: sequence, updatedAt: date });
-    await transactionDone(transaction);
-    return sale;
+    for (const { line, product } of resolved) { const quantity = toNumber(line.quantity); const previousQuantity = toNumber(product.quantity); const newQuantity = previousQuantity - quantity; const unitCost = toNumber(product.purchasePrice); products.put({ ...product, quantity: newQuantity, updatedAt: date }); transaction.objectStore("saleItems").add({ id: uid("sale-item"), saleId: sale.id, productId: product.id, productName: product.name, unit: product.unit, quantity, unitPrice: toNumber(product.salePrice), unitCost, total: roundMoney(product.salePrice * quantity), costTotal: roundMoney(unitCost * quantity), returnedQuantity: 0 }); createStockMovement(transaction.objectStore("stockMovements"), { productId: product.id, type: "SALE", quantity: -quantity, previousQuantity, newQuantity, date, note: `بيع ضمن الفاتورة ${sale.invoiceNumber}`, referenceType: "SALE", referenceId: sale.id }); }
+    if (isCredit) { const balanceAfter = roundMoney(toNumber(customer.balance) + remaining); transaction.objectStore("customers").put({ ...customer, balance: balanceAfter, updatedAt: date }); transaction.objectStore("customerTransactions").add({ id: uid("customer-transaction"), customerId: customer.id, type: "CREDIT_SALE", date, amount: totals.total, paidAmount: paid, remainingAmount: balanceAfter, referenceType: "SALE", referenceId: sale.id, invoiceNumber: sale.invoiceNumber, note: "بيع آجل", createdAt: date }); }
+    meta.put({ id: "invoiceSequence", value: sequence, updatedAt: date }); await transactionDone(transaction); return sale;
+  },
+  async listSales() { const database = await this.open(); const sales = await requestAsPromise(database.transaction("sales", "readonly").objectStore("sales").getAll()); return sales.sort((a, b) => new Date(b.date) - new Date(a.date)); },
+  async getInvoice(saleId) { const database = await this.open(); const transaction = database.transaction(["sales", "saleItems", "saleReturns"], "readonly"); const sale = await requestAsPromise(transaction.objectStore("sales").get(saleId)); const items = await requestAsPromise(transaction.objectStore("saleItems").index("saleId").getAll(saleId)); const returns = await requestAsPromise(transaction.objectStore("saleReturns").index("saleId").getAll(saleId)); return sale ? { ...sale, items, returns } : null; },
+
+  async createPurchase({ supplierId = "", items, notes = "", paymentType = "نقدي", paidAmount = "", paymentMethod = "نقدي" }) {
+    if (!items.length) throw new Error("أضف منتجًا واحدًا على الأقل إلى فاتورة الشراء.");
+    const database = await this.open(); const transaction = database.transaction(["suppliers", "supplierTransactions", "products", "purchases", "purchaseItems", "stockMovements", "meta"], "readwrite"); const resolvedSupplierId = normalize(supplierId); const supplier = resolvedSupplierId ? await requestAsPromise(transaction.objectStore("suppliers").get(resolvedSupplierId)) : null; if (resolvedSupplierId && (!supplier || supplier.isDeleted)) throw new Error("المورد غير متاح."); const products = transaction.objectStore("products"); const resolved = [];
+    for (const line of items) { const product = await requestAsPromise(products.get(line.productId)); const quantity = toNumber(line.quantity); if (!product || product.isDeleted) throw new Error("أحد المنتجات غير متاح."); if (quantity <= 0 || toNumber(line.unitCost) < 0) throw new Error("أدخل كمية وسعر شراء صالحين."); resolved.push({ product, quantity, unitCost: Math.max(0, toNumber(line.unitCost)) }); }
+    const total = calculatePurchaseTotals(resolved); const isCredit = paymentType === "آجل"; if (isCredit && !supplier) throw new Error("اختر موردًا نشطًا للشراء الآجل."); const paid = roundMoney(paidAmount === "" ? (isCredit ? 0 : total) : toNumber(paidAmount)); if (paid < 0 || paid > total) throw new Error("المبلغ المدفوع لا يمكن أن يتجاوز إجمالي فاتورة الشراء."); if (!isCredit && paid < total) throw new Error("سدد إجمالي الفاتورة أو اختر الشراء الآجل."); const remaining = remainingAmount(total, paid); const status = paymentStatus(total, paid); const meta = transaction.objectStore("meta"); const sequence = ((await requestAsPromise(meta.get("purchaseSequence")))?.value || 0) + 1; const date = nowIso(); const purchase = { id: uid("purchase"), invoiceNumber: purchaseNumber(sequence), supplierId: supplier?.id || "", supplierName: supplier?.name || "بدون مورد", date, notes: normalize(notes), total, paymentType: isCredit ? "آجل" : "نقدي", paymentMethod, paidAmount: paid, initialPaidAmount: paid, remainingAmount: remaining, paymentStatus: status, returnedTotal: 0 };
+    transaction.objectStore("purchases").add(purchase);
+    for (const { product, quantity, unitCost } of resolved) { const previousQuantity = toNumber(product.quantity); const newQuantity = previousQuantity + quantity; products.put({ ...product, quantity: newQuantity, purchasePrice: unitCost, updatedAt: date }); transaction.objectStore("purchaseItems").add({ id: uid("purchase-item"), purchaseId: purchase.id, productId: product.id, productName: product.name, unit: product.unit, quantity, unitCost, total: roundMoney(quantity * unitCost), returnedQuantity: 0 }); createStockMovement(transaction.objectStore("stockMovements"), { productId: product.id, type: "PURCHASE", quantity, previousQuantity, newQuantity, date, note: `شراء ضمن الفاتورة ${purchase.invoiceNumber}`, referenceType: "PURCHASE", referenceId: purchase.id }); }
+    if (supplier) { const balanceAfter = roundMoney(toNumber(supplier.balance) + remaining); transaction.objectStore("suppliers").put({ ...supplier, balance: balanceAfter, updatedAt: date }); transaction.objectStore("supplierTransactions").add({ id: uid("supplier-transaction"), supplierId: supplier.id, type: "PURCHASE", date, amount: total, paidAmount: paid, remainingAmount: balanceAfter, referenceType: "PURCHASE", referenceId: purchase.id, invoiceNumber: purchase.invoiceNumber, note: isCredit ? "شراء آجل" : "شراء نقدي", createdAt: date }); }
+    meta.put({ id: "purchaseSequence", value: sequence, updatedAt: date }); await transactionDone(transaction); return purchase;
+  },
+  async listPurchases() { const database = await this.open(); const purchases = await requestAsPromise(database.transaction("purchases", "readonly").objectStore("purchases").getAll()); return purchases.sort((a, b) => new Date(b.date) - new Date(a.date)); },
+  async getPurchase(purchaseId) { const database = await this.open(); const transaction = database.transaction(["purchases", "purchaseItems", "purchaseReturns"], "readonly"); const purchase = await requestAsPromise(transaction.objectStore("purchases").get(purchaseId)); const items = await requestAsPromise(transaction.objectStore("purchaseItems").index("purchaseId").getAll(purchaseId)); const returns = await requestAsPromise(transaction.objectStore("purchaseReturns").index("purchaseId").getAll(purchaseId)); return purchase ? { ...purchase, items, returns } : null; },
+  async createPurchaseReturn({ purchaseId, items, notes = "" }) {
+    const selected = items.filter((item) => toNumber(item.quantity) > 0); if (!selected.length) throw new Error("حدد كمية مرتجعة واحدة على الأقل."); const database = await this.open(); const transaction = database.transaction(["purchases", "purchaseItems", "purchaseReturns", "purchaseReturnItems", "products", "stockMovements", "meta", "suppliers", "supplierTransactions"], "readwrite"); const purchase = await requestAsPromise(transaction.objectStore("purchases").get(purchaseId)); if (!purchase) throw new Error("فاتورة الشراء غير موجودة."); const purchaseItems = transaction.objectStore("purchaseItems"); const products = transaction.objectStore("products"); const resolved = [];
+    for (const line of selected) { const purchaseItem = await requestAsPromise(purchaseItems.get(line.purchaseItemId)); const product = purchaseItem && await requestAsPromise(products.get(purchaseItem.productId)); if (!purchaseItem || !product || !canReturn(purchaseItem.quantity, purchaseItem.returnedQuantity, line.quantity)) throw new Error("كمية مرتجع الشراء تتجاوز المسموح."); if (toNumber(line.quantity) > toNumber(product.quantity)) throw new Error(`لا يمكن إرجاع كمية أكبر من المخزون الحالي للمنتج: ${product.name}`); resolved.push({ purchaseItem, product, quantity: toNumber(line.quantity) }); }
+    const meta = transaction.objectStore("meta"); const sequence = ((await requestAsPromise(meta.get("purchaseReturnSequence")))?.value || 0) + 1; const date = nowIso(); const total = roundMoney(resolved.reduce((sum, item) => sum + itemReturnTotal(item.purchaseItem, item.quantity), 0)); const returned = { id: uid("purchase-return"), returnNumber: purchaseReturnNumber(sequence), purchaseId, date, notes: normalize(notes), total };
+    transaction.objectStore("purchaseReturns").add(returned);
+    for (const { purchaseItem, product, quantity } of resolved) { const previousQuantity = toNumber(product.quantity); const newQuantity = previousQuantity - quantity; products.put({ ...product, quantity: newQuantity, updatedAt: date }); purchaseItems.put({ ...purchaseItem, returnedQuantity: toNumber(purchaseItem.returnedQuantity) + quantity }); transaction.objectStore("purchaseReturnItems").add({ id: uid("purchase-return-item"), purchaseReturnId: returned.id, purchaseItemId: purchaseItem.id, productId: product.id, productName: product.name, quantity, unitCost: purchaseItem.unitCost, total: itemReturnTotal(purchaseItem, quantity) }); createStockMovement(transaction.objectStore("stockMovements"), { productId: product.id, type: "PURCHASE_RETURN", quantity: -quantity, previousQuantity, newQuantity, date, note: `مرتجع شراء ${returned.returnNumber}`, referenceType: "PURCHASE_RETURN", referenceId: returned.id }); }
+    const reduction = Math.min(total, toNumber(purchase.remainingAmount)); const remainingAmountAfterReturn = roundMoney(Math.max(0, toNumber(purchase.remainingAmount) - reduction)); transaction.objectStore("purchases").put({ ...purchase, returnedTotal: roundMoney(toNumber(purchase.returnedTotal) + total), remainingAmount: remainingAmountAfterReturn, paymentStatus: remainingAmountAfterReturn === 0 ? "مدفوعة" : purchase.paymentStatus }); if (purchase.supplierId) { const suppliers = transaction.objectStore("suppliers"); const supplier = await requestAsPromise(suppliers.get(purchase.supplierId)); if (supplier) { const balanceAfter = roundMoney(Math.max(0, toNumber(supplier.balance) - reduction)); suppliers.put({ ...supplier, balance: balanceAfter, updatedAt: date }); transaction.objectStore("supplierTransactions").add({ id: uid("supplier-transaction"), supplierId: supplier.id, type: "PURCHASE_RETURN", date, amount: -total, paidAmount: 0, remainingAmount: balanceAfter, referenceType: "PURCHASE_RETURN", referenceId: returned.id, invoiceNumber: purchase.invoiceNumber, note: normalize(notes), createdAt: date }); } } meta.put({ id: "purchaseReturnSequence", value: sequence, updatedAt: date }); await transactionDone(transaction); return returned;
+  },
+  async createSaleReturn({ saleId, items, notes = "" }) {
+    const selected = items.filter((item) => toNumber(item.quantity) > 0); if (!selected.length) throw new Error("حدد كمية مرتجعة واحدة على الأقل."); const database = await this.open(); const transaction = database.transaction(["sales", "saleItems", "saleReturns", "saleReturnItems", "products", "stockMovements", "meta", "customers", "customerTransactions"], "readwrite"); const sale = await requestAsPromise(transaction.objectStore("sales").get(saleId)); if (!sale) throw new Error("فاتورة البيع غير موجودة."); const saleItems = transaction.objectStore("saleItems"); const products = transaction.objectStore("products"); const resolved = [];
+    for (const line of selected) { const saleItem = await requestAsPromise(saleItems.get(line.saleItemId)); const product = saleItem && await requestAsPromise(products.get(saleItem.productId)); if (!saleItem || !product || !canReturn(saleItem.quantity, saleItem.returnedQuantity, line.quantity)) throw new Error("كمية مرتجع البيع تتجاوز الكمية المباعة."); resolved.push({ saleItem, product, quantity: toNumber(line.quantity) }); }
+    const meta = transaction.objectStore("meta"); const sequence = ((await requestAsPromise(meta.get("saleReturnSequence")))?.value || 0) + 1; const date = nowIso(); const total = roundMoney(resolved.reduce((sum, item) => sum + itemReturnTotal(item.saleItem, item.quantity), 0)); const returned = { id: uid("sale-return"), returnNumber: saleReturnNumber(sequence), saleId, date, notes: normalize(notes), total };
+    transaction.objectStore("saleReturns").add(returned);
+    for (const { saleItem, product, quantity } of resolved) { const previousQuantity = toNumber(product.quantity); const newQuantity = previousQuantity + quantity; products.put({ ...product, quantity: newQuantity, updatedAt: date }); saleItems.put({ ...saleItem, returnedQuantity: toNumber(saleItem.returnedQuantity) + quantity }); transaction.objectStore("saleReturnItems").add({ id: uid("sale-return-item"), saleReturnId: returned.id, saleItemId: saleItem.id, productId: product.id, productName: saleItem.productName, quantity, unitPrice: saleItem.unitPrice, unitCost: saleItem.unitCost, total: itemReturnTotal(saleItem, quantity), costTotal: roundMoney(toNumber(saleItem.unitCost) * quantity) }); createStockMovement(transaction.objectStore("stockMovements"), { productId: product.id, type: "SALE_RETURN", quantity, previousQuantity, newQuantity, date, note: `مرتجع بيع ${returned.returnNumber}`, referenceType: "SALE_RETURN", referenceId: returned.id }); }
+    if (sale.customerId) { const customers = transaction.objectStore("customers"); const customer = await requestAsPromise(customers.get(sale.customerId)); if (customer) { const reduction = Math.min(total, toNumber(sale.remainingAmount)); const nextRemaining = roundMoney(Math.max(0, toNumber(sale.remainingAmount) - reduction)); const nextBalance = roundMoney(Math.max(0, toNumber(customer.balance) - reduction)); transaction.objectStore("sales").put({ ...sale, returnedTotal: roundMoney(toNumber(sale.returnedTotal) + total), remainingAmount: nextRemaining, paymentStatus: nextRemaining === 0 ? "مدفوعة" : sale.paymentStatus }); customers.put({ ...customer, balance: nextBalance, updatedAt: date }); transaction.objectStore("customerTransactions").add({ id: uid("customer-transaction"), customerId: customer.id, type: "SALE_RETURN", date, amount: -total, paidAmount: 0, remainingAmount: nextBalance, referenceType: "SALE_RETURN", referenceId: returned.id, invoiceNumber: sale.invoiceNumber, note: normalize(notes), createdAt: date }); } }
+    meta.put({ id: "saleReturnSequence", value: sequence, updatedAt: date }); await transactionDone(transaction); return returned;
   },
 
-  async listSales() {
-    const database = await this.open();
-    const transaction = database.transaction("sales", "readonly");
-    const sales = await requestAsPromise(transaction.objectStore("sales").getAll());
-    return sales.sort((first, second) => new Date(second.date) - new Date(first.date));
+  async recordStockCount({ productId, actualQuantity, notes = "" }) { const database = await this.open(); const transaction = database.transaction(["products", "stockMovements", "stockCounts"], "readwrite"); const products = transaction.objectStore("products"); const product = await requestAsPromise(products.get(productId)); if (!product || product.isDeleted) throw new Error("المنتج غير متاح للجرد."); const previousQuantity = toNumber(product.quantity); const newQuantity = toNumber(actualQuantity); if (newQuantity < 0) throw new Error("الكمية الفعلية لا يمكن أن تكون سالبة."); const date = nowIso(); const count = { id: uid("stock-count"), productId, productName: product.name, previousQuantity, actualQuantity: newQuantity, difference: adjustmentDelta(previousQuantity, newQuantity), date, notes: normalize(notes) }; products.put({ ...product, quantity: newQuantity, updatedAt: date }); transaction.objectStore("stockCounts").add(count); createStockMovement(transaction.objectStore("stockMovements"), { productId, type: "COUNT", quantity: count.difference, previousQuantity, newQuantity, date, note: normalize(notes) || "تسوية جرد", referenceType: "STOCK_COUNT", referenceId: count.id }); await transactionDone(transaction); return count; },
+  async listStockCounts({ productId = "" } = {}) { const database = await this.open(); const store = database.transaction("stockCounts", "readonly").objectStore("stockCounts"); const items = productId ? await requestAsPromise(store.index("productId").getAll(productId)) : await requestAsPromise(store.getAll()); return items.sort((a, b) => new Date(b.date) - new Date(a.date)); },
+
+  async listCashMovements({ from = "", to = "" } = {}) { const database = await this.open(); const items = await requestAsPromise(database.transaction("cashMovements", "readonly").objectStore("cashMovements").getAll()); return items.filter((item) => isWithinDateRange(item.date, from, to)).sort((a, b) => new Date(b.date) - new Date(a.date)); },
+  async createCashMovement({ type, amount, date = dateKey(), notes = "" }) { const movementType = normalize(type); if (!["DEPOSIT", "WITHDRAWAL"].includes(movementType)) throw new Error("نوع حركة الصندوق غير صالح."); const value = roundMoney(toNumber(amount)); if (value <= 0) throw new Error("أدخل مبلغًا أكبر من صفر."); const database = await this.open(); const transaction = database.transaction("cashMovements", "readwrite"); const movement = { id: uid("cash-movement"), type: movementType, amount: value, date, notes: normalize(notes), createdAt: nowIso() }; transaction.objectStore("cashMovements").add(movement); await transactionDone(transaction); return movement; },
+  async getCashbox({ from = "", to = "" } = {}) {
+    const database = await this.open(); const names = ["settings", "sales", "purchases", "customerPayments", "supplierPayments", "saleReturns", "purchaseReturns", "expenses", "cashMovements"]; const transaction = database.transaction(names, "readonly"); const [settings, sales, purchases, customerPayments, supplierPayments, saleReturns, purchaseReturns, expenses, cashMovements] = await Promise.all([requestAsPromise(transaction.objectStore("settings").get("app")), ...names.slice(1).map((name) => requestAsPromise(transaction.objectStore(name).getAll()))]); const salesById = new Map(sales.map((sale) => [sale.id, sale])); const purchasesById = new Map(purchases.map((purchase) => [purchase.id, purchase])); const isCash = (method) => !method || method === "نقدي"; const summarize = (matches) => ({ cashSales: roundMoney(sales.filter((item) => matches(item) && isCash(item.paymentMethod)).reduce((sum, item) => sum + toNumber(item.initialPaidAmount ?? item.paidAmount), 0)), customerPayments: roundMoney(customerPayments.filter((item) => matches(item) && isCash(item.paymentMethod)).reduce((sum, item) => sum + toNumber(item.amount), 0)), purchaseReturns: roundMoney(purchaseReturns.filter((item) => { const purchase = purchasesById.get(item.purchaseId); return matches(item) && isCash(purchase?.paymentMethod) && purchase?.paymentType !== "آجل"; }).reduce((sum, item) => sum + toNumber(item.total), 0)), deposits: roundMoney(cashMovements.filter((item) => matches(item) && item.type === "DEPOSIT").reduce((sum, item) => sum + toNumber(item.amount), 0)), saleReturns: roundMoney(saleReturns.filter((item) => matches(item) && isCash(salesById.get(item.saleId)?.paymentMethod) && salesById.get(item.saleId)?.paymentType !== "آجل").reduce((sum, item) => sum + toNumber(item.total), 0)), cashPurchases: roundMoney(purchases.filter((item) => matches(item) && isCash(item.paymentMethod)).reduce((sum, item) => sum + toNumber(item.initialPaidAmount ?? item.paidAmount), 0)), supplierPayments: roundMoney(supplierPayments.filter((item) => matches(item) && isCash(item.paymentMethod)).reduce((sum, item) => sum + toNumber(item.amount), 0)), expenses: roundMoney(expenses.filter(matches).reduce((sum, item) => sum + toNumber(item.amount), 0)), withdrawals: roundMoney(cashMovements.filter((item) => matches(item) && item.type === "WITHDRAWAL").reduce((sum, item) => sum + toNumber(item.amount), 0)) }); const selected = summarize((item) => isWithinDateRange(item.date, from, to)); const prior = from ? summarize((item) => dateKey(item.date) < from) : {}; const openingBalance = calculateCashBalance({ openingBalance: toNumber(settings?.openingCash), ...prior }).closingBalance; return { from, to, openingBalance, ...selected, ...calculateCashBalance({ openingBalance, ...selected }) };
   },
 
-  async getInvoice(saleId) {
-    const database = await this.open();
-    const transaction = database.transaction(["sales", "saleItems"], "readonly");
-    const sale = await requestAsPromise(transaction.objectStore("sales").get(saleId));
-    const items = await requestAsPromise(transaction.objectStore("saleItems").index("saleId").getAll(saleId));
-    return sale ? { ...sale, items } : null;
-  },
+  async exportBackup() { const database = await this.open(); const storeNames = Array.from(database.objectStoreNames); const transaction = database.transaction(storeNames, "readonly"); const values = await Promise.all(storeNames.map((name) => requestAsPromise(transaction.objectStore(name).getAll()))); await transactionDone(transaction); return { schema: "hesabi-backup", version: 1, databaseVersion: DB_VERSION, exportedAt: nowIso(), stores: Object.fromEntries(storeNames.map((name, index) => [name, name === "meta" ? values[index].filter((item) => item.id !== ACTIVE_SESSION_META_ID) : values[index]])) }; },
+  validateBackup(payload) { if (!payload || payload.schema !== "hesabi-backup" || !payload.stores || typeof payload.stores !== "object") throw new Error("ملف النسخة الاحتياطية غير صالح."); if (!Array.isArray(payload.stores.settings) || !Array.isArray(payload.stores.products)) throw new Error("ملف النسخة الاحتياطية لا يحتوي على البيانات الأساسية."); return true; },
+  async restoreBackup(payload) { this.validateBackup(payload); const database = await this.open(); const storeNames = Array.from(database.objectStoreNames); const transaction = database.transaction(storeNames, "readwrite"); storeNames.forEach((name) => transaction.objectStore(name).clear()); storeNames.forEach((name) => (payload.stores[name] || []).filter((item) => name !== "meta" || item.id !== ACTIVE_SESSION_META_ID).forEach((item) => transaction.objectStore(name).put(item))); await transactionDone(transaction); return { restoredStores: storeNames.filter((name) => Array.isArray(payload.stores[name])).length }; },
+  async resetAllData() { const database = await this.open(); const storeNames = Array.from(database.objectStoreNames); const transaction = database.transaction(storeNames, "readwrite"); storeNames.forEach((name) => transaction.objectStore(name).clear()); await transactionDone(transaction); },
 
+  async listExpenses() { const database = await this.open(); const items = await requestAsPromise(database.transaction("expenses", "readonly").objectStore("expenses").getAll()); return items.sort((a, b) => new Date(b.date) - new Date(a.date)); },
+  async createExpense(values) { const amount = Math.max(0, toNumber(values.amount)); if (amount <= 0) throw new Error("أدخل مبلغ مصروف أكبر من صفر."); const database = await this.open(); const transaction = database.transaction("expenses", "readwrite"); const expense = { id: uid("expense"), amount, category: normalize(values.category || "مصروفات أخرى"), description: normalize(values.description), date: values.date || dateKey(), notes: normalize(values.notes), createdAt: nowIso(), updatedAt: nowIso() }; transaction.objectStore("expenses").add(expense); await transactionDone(transaction); return expense; },
+  async updateExpense(expenseId, values) { const database = await this.open(); const transaction = database.transaction("expenses", "readwrite"); const store = transaction.objectStore("expenses"); const current = await requestAsPromise(store.get(expenseId)); if (!current) throw new Error("المصروف غير موجود."); const amount = Math.max(0, toNumber(values.amount)); if (amount <= 0) throw new Error("أدخل مبلغ مصروف أكبر من صفر."); const updated = { ...current, amount, category: normalize(values.category), description: normalize(values.description), date: values.date || current.date, notes: normalize(values.notes), updatedAt: nowIso() }; store.put(updated); await transactionDone(transaction); return updated; },
+  async deleteExpense(expenseId) { const database = await this.open(); const transaction = database.transaction("expenses", "readwrite"); transaction.objectStore("expenses").delete(expenseId); await transactionDone(transaction); },
+
+  async listStockMovements() { const database = await this.open(); const movements = await requestAsPromise(database.transaction("stockMovements", "readonly").objectStore("stockMovements").getAll()); return movements.sort((a, b) => new Date(b.date) - new Date(a.date)); },
+  async getAnalytics({ from = "", to = "" } = {}) {
+    const database = await this.open(); const transaction = database.transaction(["sales", "saleItems", "saleReturns", "saleReturnItems", "purchases", "purchaseItems", "purchaseReturns", "purchaseReturnItems", "expenses"], "readonly");
+    const [sales, saleItems, saleReturns, saleReturnItems, purchases, purchaseItems, purchaseReturns, purchaseReturnItems, expenses] = await Promise.all(["sales", "saleItems", "saleReturns", "saleReturnItems", "purchases", "purchaseItems", "purchaseReturns", "purchaseReturnItems", "expenses"].map((name) => requestAsPromise(transaction.objectStore(name).getAll())));
+    const filter = (items) => items.filter((item) => isWithinDateRange(item.date, from, to)); const filteredSales = filter(sales); const saleIds = new Set(filteredSales.map((item) => item.id)); const filteredSaleItems = saleItems.filter((item) => saleIds.has(item.saleId)); const filteredReturns = filter(saleReturns); const returnIds = new Set(filteredReturns.map((item) => item.id)); const filteredReturnItems = saleReturnItems.filter((item) => returnIds.has(item.saleReturnId)); const filteredPurchases = filter(purchases); const purchaseIds = new Set(filteredPurchases.map((item) => item.id)); const filteredPurchaseItems = purchaseItems.filter((item) => purchaseIds.has(item.purchaseId)); const filteredPurchaseReturns = filter(purchaseReturns); const purchaseReturnIds = new Set(filteredPurchaseReturns.map((item) => item.id)); const filteredPurchaseReturnItems = purchaseReturnItems.filter((item) => purchaseReturnIds.has(item.purchaseReturnId)); const filteredExpenses = filter(expenses);
+    const salesTotal = roundMoney(filteredSales.reduce((sum, item) => sum + toNumber(item.total), 0)); const discounts = roundMoney(filteredSales.reduce((sum, item) => sum + toNumber(item.discount), 0)); const costOfGoods = roundMoney(filteredSaleItems.reduce((sum, item) => sum + toNumber(item.costTotal ?? toNumber(item.unitCost) * toNumber(item.quantity)), 0)); const salesReturnsTotal = roundMoney(filteredReturnItems.reduce((sum, item) => sum + toNumber(item.total), 0)); const returnCosts = roundMoney(filteredReturnItems.reduce((sum, item) => sum + toNumber(item.costTotal ?? toNumber(item.unitCost) * toNumber(item.quantity)), 0)); const expensesTotal = roundMoney(filteredExpenses.reduce((sum, item) => sum + toNumber(item.amount), 0)); const profit = calculateProfit({ sales: salesTotal, costOfGoods, expenses: expensesTotal, salesReturns: salesReturnsTotal, returnCosts }); const purchasesTotal = roundMoney(filteredPurchases.reduce((sum, item) => sum + toNumber(item.total), 0)); const purchasesReturnsTotal = roundMoney(filteredPurchaseReturnItems.reduce((sum, item) => sum + toNumber(item.total), 0)); const expensesByCategory = filteredExpenses.reduce((groups, item) => ({ ...groups, [item.category]: roundMoney((groups[item.category] || 0) + toNumber(item.amount)) }), {});
+    return { from, to, sales: { invoices: filteredSales.length, total: salesTotal, discounts, net: profit.netSales, costOfGoods: profit.netCostOfGoods, profit: profit.grossProfit, returns: salesReturnsTotal, items: filteredSales }, purchases: { invoices: filteredPurchases.length, total: purchasesTotal, net: roundMoney(purchasesTotal - purchasesReturnsTotal), products: filteredPurchaseItems.reduce((sum, item) => sum + toNumber(item.quantity), 0), returns: purchasesReturnsTotal, items: filteredPurchases }, expenses: { total: expensesTotal, byCategory: expensesByCategory, items: filteredExpenses }, profit, saleReturns: filteredReturns, purchaseReturns: filteredPurchaseReturns };
+  },
   async getDashboard() {
-    const [products, sales] = await Promise.all([this.listProducts(), this.listSales()]);
-    const today = new Date().toDateString();
-    const todaySales = sales.filter((sale) => new Date(sale.date).toDateString() === today);
-    return {
-      productCount: products.length,
-      inventoryValue: products.reduce((sum, product) => sum + toNumber(product.quantity) * toNumber(product.purchasePrice), 0),
-      lowStock: products.filter((product) => toNumber(product.quantity) <= toNumber(product.minimumStock)),
-      todaySales: todaySales.reduce((sum, sale) => sum + toNumber(sale.total), 0),
-      todayInvoiceCount: todaySales.length,
-    };
+    const today = dateKey(); const [products, sales, purchases, expenses, analytics, customers, suppliers, todayPayments, todaySupplierPayments, cashbox] = await Promise.all([this.listProducts(), this.listSales(), this.listPurchases(), this.listExpenses(), this.getAnalytics(), this.listCustomers(), this.listSuppliers(), this.listCustomerPayments({ from: today, to: today }), this.listSupplierPayments({ from: today, to: today }), this.getCashbox()]); const todaySales = sales.filter((item) => dateKey(item.date) === today); const todayPurchases = purchases.filter((item) => dateKey(item.date) === today); const todayExpenses = expenses.filter((item) => dateKey(item.date) === today); const todayAnalytics = await this.getAnalytics({ from: today, to: today }); const debtors = customers.filter((customer) => toNumber(customer.balance) > 0).sort((a, b) => toNumber(b.balance) - toNumber(a.balance)); const creditors = suppliers.filter((supplier) => toNumber(supplier.balance) > 0).sort((a, b) => toNumber(b.balance) - toNumber(a.balance));
+    return { productCount: products.length, inventoryValue: roundMoney(products.reduce((sum, product) => sum + toNumber(product.quantity) * toNumber(product.purchasePrice), 0)), lowStock: products.filter((product) => toNumber(product.quantity) <= toNumber(product.minimumStock)), todaySales: roundMoney(todaySales.reduce((sum, item) => sum + toNumber(item.total), 0)), todayPurchases: roundMoney(todayPurchases.reduce((sum, item) => sum + toNumber(item.total), 0)), todayExpenses: roundMoney(todayExpenses.reduce((sum, item) => sum + toNumber(item.amount), 0)), todayProfit: todayAnalytics.profit.netProfit, todayInvoiceCount: todaySales.length, customerCount: customers.length, supplierCount: suppliers.length, customerDebt: roundMoney(debtors.reduce((sum, customer) => sum + toNumber(customer.balance), 0)), supplierDebt: roundMoney(creditors.reduce((sum, supplier) => sum + toNumber(supplier.balance), 0)), todayCustomerPayments: roundMoney(todayPayments.reduce((sum, payment) => sum + toNumber(payment.amount), 0)), todaySupplierPayments: roundMoney(todaySupplierPayments.reduce((sum, payment) => sum + toNumber(payment.amount), 0)), cashBalance: cashbox.closingBalance, debtors: debtors.slice(0, 5), creditors: creditors.slice(0, 5), analytics };
   },
 };

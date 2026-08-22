@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { adjustmentDelta, calculateSaleTotals, canSell, invoiceNumber, stockStatus } from "../client/src/js/domain.js";
+import { adjustmentDelta, calculateCashBalance, calculateProfit, calculateSaleTotals, canRegisterPayment, canReturn, canSell, invoiceNumber, paymentStatus, purchaseNumber, remainingAmount, stockStatus } from "../client/src/js/domain.js";
 import { CURRENCIES, DEFAULT_CURRENCY_CODE } from "../client/src/js/constants.js";
 
 test("ينشئ تسلسل أرقام فواتير ثابتًا وغير مكرر", () => {
@@ -33,4 +33,38 @@ test("يحسب الإجمالي والخصم دون تجاوز الإجمالي"
 test("يضبط الريال اليمني كعملة افتراضية للمحل الجديد", () => {
   assert.equal(DEFAULT_CURRENCY_CODE, "YER");
   assert.deepEqual(CURRENCIES[0], { code: "YER", label: "ريال يمني (ر.ي)", symbol: "ر.ي" });
+});
+
+test("ينشئ أرقام فواتير شراء ثابتة وغير مكررة", () => {
+  assert.equal(purchaseNumber(1), "PUR-000001");
+  assert.equal(purchaseNumber(24), "PUR-000024");
+});
+
+test("يمنع كمية مرتجع تتجاوز الكمية الأصلية بعد المرتجعات السابقة", () => {
+  assert.equal(canReturn(10, 3, 7), true);
+  assert.equal(canReturn(10, 3, 8), false);
+  assert.equal(canReturn(10, 3, 0), false);
+});
+
+test("يفصل صافي الربح عن المبيعات ويخصم تكلفة البضاعة والمصروفات", () => {
+  assert.deepEqual(calculateProfit({ sales: 300, costOfGoods: 200, expenses: 40 }), { netSales: 300, netCostOfGoods: 200, grossProfit: 100, netProfit: 60 });
+  assert.deepEqual(calculateProfit({ sales: 300, salesReturns: 30, costOfGoods: 200, returnCosts: 20, expenses: 10 }), { netSales: 270, netCostOfGoods: 180, grossProfit: 90, netProfit: 80 });
+});
+
+test("يحسم الرصيد وحالة الدفع للفاتورة الآجلة والدفعة الجزئية", () => {
+  assert.equal(remainingAmount(100000, 0), 100000);
+  assert.equal(remainingAmount(100000, 30000), 70000);
+  assert.equal(paymentStatus(100000, 0), "غير مدفوعة");
+  assert.equal(paymentStatus(100000, 30000), "مدفوعة جزئيًا");
+  assert.equal(paymentStatus(100000, 100000), "مدفوعة");
+});
+
+test("يرفض الدفعة الصفرية أو الأعلى من رصيد العميل", () => {
+  assert.equal(canRegisterPayment(40000, 30000), true);
+  assert.equal(canRegisterPayment(40000, 0), false);
+  assert.equal(canRegisterPayment(40000, 50000), false);
+});
+
+test("يحسب الصندوق من الحركات النقدية الفعلية دون اعتبار الديون تحصيلًا", () => {
+  assert.deepEqual(calculateCashBalance({ openingBalance: 100000, cashSales: 50000, customerPayments: 40000, cashPurchases: 30000, supplierPayments: 20000, expenses: 10000 }), { inflows: 190000, outflows: 60000, closingBalance: 130000 });
 });
