@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function ownsBackup(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    match /backupOwners/{userId} {
+      allow read, write: if ownsBackup(userId);
+
+      match /backups/{backupId} {
+        allow read, write: if ownsBackup(userId);
+
+        match /chunks/{chunkId} {
+          allow read, write: if ownsBackup(userId);
+        }
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

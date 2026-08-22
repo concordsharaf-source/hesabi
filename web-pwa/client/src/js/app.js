@@ -1,8 +1,10 @@
 /* اتجاه التصميم: دفتر التاجر الهادئ — واجهة تشغيل يومية RTL تجعل الإجراء والمعلومة محور كل شاشة. */
 /* اتجاه التصميم: دفتر التاجر الهادئ — تفاعلات سريعة، RTL واضح، وماسح منتج لا يقطع سياق النموذج. */
-import { BUSINESS_TYPES, CURRENCIES, DEFAULT_CURRENCY_CODE, NAV_ITEMS, PAYMENT_METHODS, UNITS } from "./constants.js";
+import { ACCOUNT_ROLES, BUSINESS_TYPES, CURRENCIES, DEFAULT_CURRENCY_CODE, EXPENSE_CATEGORIES, NAV_ITEMS, PAYMENT_METHODS, UNITS } from "./constants.js";
 import { db } from "./database.js";
-import { calculateSaleTotals, roundMoney, stockStatus, toNumber } from "./domain.js";
+import { calculateSaleTotals, dateKey, roundMoney, stockStatus, toNumber } from "./domain.js";
+import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
+import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 
 const icon = (name, size = 20) => {
   const paths = {
@@ -24,12 +26,22 @@ const icon = (name, size = 20) => {
     alert: '<path d="M10.3 3.7 2.5 17.1A2 2 0 0 0 4.2 20h15.6a2 2 0 0 0 1.7-2.9L13.7 3.7a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4M12 17h.01"/>',
     trend: '<path d="M3 17 9 11l4 4 8-9"/><path d="M15 6h6v6"/>',
     box: '<path d="M4 4h16v16H4z"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+    users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
+    truck: '<path d="M10 17h4V5H2v12h3M14 9h4l4 4v4h-3M5 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0ZM15 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z"/>',
+    wallet: '<path d="M20 7V6a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v8a2 2 0 0 1-2 2H5a3 3 0 0 1-3-3V7"/><path d="M16 14h2"/>',
+    chart: '<path d="M4 19V5M4 19h16M8 16v-5M12 16V7M16 16v-8"/>',
+    history: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="M12 7v5l3 2"/>',
+    rotate: '<path d="M21 12a9 9 0 0 0-15.5-6.2L3 8M3 3v5h5M3 12a9 9 0 0 0 15.5 6.2L21 16m0 5v-5h-5"/>',
+    moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/>',
+    sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
   };
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ""}</svg>`;
 };
 
-const state = { view: "dashboard", settings: null, products: [], sales: [], dashboard: null, cart: [], productQuery: "", saleQuery: "", scanner: null };
+const state = { view: "dashboard", settings: null, accounts: [], currentUser: null, products: [], sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
 let root;
+const roleLabel = (role) => ACCOUNT_ROLES.find((item) => item.id === role)?.label || "كاشير";
+const adminOnlyMessage = () => showToast("هذه العملية متاحة لحساب الأدمن فقط.", "error");
 
 const money = (value) => {
   const currency = CURRENCIES.find((item) => item.code === (state.settings?.currency || DEFAULT_CURRENCY_CODE)) || CURRENCIES[0];
@@ -39,8 +51,9 @@ const money = (value) => {
 const amount = (value) => new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 2 }).format(toNumber(value));
 const dateTime = (value) => new Intl.DateTimeFormat("ar-SA", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[character]);
-const emptyImage = "/manus-storage/hesabi-empty-inventory_96623fe2.png";
-const markImage = "/manus-storage/hesabi-mark_5cb0429a.png";
+const assetBaseUrl = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage";
+const emptyImage = `${assetBaseUrl}/hesabi-empty-inventory_96623fe2.png`;
+const markImage = `${assetBaseUrl}/hesabi-mark_5cb0429a.png`;
 
 function showToast(message, type = "success") {
   const host = document.querySelector("#toast-host") || document.body.appendChild(Object.assign(document.createElement("div"), { id: "toast-host", className: "toast-host" }));
@@ -58,21 +71,26 @@ function formatStatus(product) {
 }
 
 async function refresh() {
-  [state.products, state.sales, state.dashboard] = await Promise.all([db.listProducts(), db.listSales(), db.getDashboard()]);
+  [state.products, state.sales, state.suppliers, state.supplierPayments, state.customers, state.customerPayments, state.purchases, state.expenses, state.stockMovements, state.cashMovements, state.cashbox, state.dashboard] = await Promise.all([db.listProducts(), db.listSales(), db.listSuppliers(), db.listSupplierPayments(), db.listCustomers(), db.listCustomerPayments(), db.listPurchases(), db.listExpenses(), db.listStockMovements(), db.listCashMovements({ from: state.cashFrom, to: state.cashTo }), db.getCashbox({ from: state.cashFrom, to: state.cashTo }), db.getDashboard()]);
+  state.analytics = await db.getAnalytics({ from: state.reportFrom, to: state.reportTo });
 }
 
 function navMarkup() {
-  const items = NAV_ITEMS.map((item) => `<button class="nav-item ${state.view === item.id ? "is-active" : ""}" data-action="navigate" data-view="${item.id}">${icon(item.icon)}<span>${item.label}</span></button>`).join("");
+  const items = NAV_ITEMS.filter((item) => canAccessView(state.currentUser, item.id)).map((item) => `<button class="nav-item ${state.view === item.id ? "is-active" : ""}" data-action="navigate" data-view="${item.id}">${icon(item.icon)}<span>${item.label}</span></button>`).join("");
   return `<aside class="sidebar">
     <div class="brand"><img src="${markImage}" alt="" /><div><strong>حسابي</strong><small>${escapeHtml(state.settings?.storeName || "متجرك")}</small></div></div>
     <div class="sidebar__label">تشغيل المتجر</div><nav>${items}</nav>
+    <div class="sidebar__account"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span><strong>${escapeHtml(state.currentUser?.name || "")}</strong><button class="text-button" data-action="logout">تسجيل الخروج</button></div>
     <div class="sidebar__footer"><span class="presence-dot"></span><span>البيانات محفوظة محليًا</span></div>
   </aside>
   <nav class="bottom-nav" aria-label="التنقل الرئيسي">${items}</nav>`;
 }
 
+function applyTheme() { document.documentElement.dataset.theme = state.settings?.theme === "dark" ? "dark" : "light"; }
+function themeToggleMarkup() { const dark = state.settings?.theme === "dark"; return `<button class="icon-button theme-toggle" data-action="toggle-theme" aria-label="${dark ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن"}" title="${dark ? "الوضع الفاتح" : "الوضع الداكن"}">${icon(dark ? "sun" : "moon", 19)}</button>`; }
+
 function topbarMarkup(title, description, action = "") {
-  return `<header class="topbar"><div><p class="eyebrow">${escapeHtml(state.settings?.businessType || "إدارة المتجر")}</p><h1>${title}</h1>${description ? `<p class="topbar__description">${description}</p>` : ""}</div>${action}</header>`;
+  return `<header class="topbar"><div><p class="eyebrow">${escapeHtml(state.settings?.businessType || "إدارة المتجر")}</p><h1>${title}</h1>${description ? `<p class="topbar__description">${description}</p>` : ""}</div><div class="topbar__actions"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span>${action}${themeToggleMarkup()}<button class="icon-button logout-button" data-action="logout" aria-label="تسجيل الخروج" title="تسجيل الخروج">${icon("arrow", 18)}</button></div></header>`;
 }
 
 function dashboardMarkup() {
@@ -82,19 +100,44 @@ function dashboardMarkup() {
   <section class="daily-ribbon"><div><span class="presence-dot"></span><strong>اليوم التشغيلي</strong><small>كل عملية تحفظ على هذا الجهاز تلقائيًا</small></div><div class="daily-ribbon__date">${new Intl.DateTimeFormat("ar-SA", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</div></section>
   <section class="metric-grid">
     ${metricCard("مبيعات اليوم", money(dashboard.todaySales), "trend", "قيمة الفواتير المكتملة")}
-    ${metricCard("فواتير اليوم", amount(dashboard.todayInvoiceCount), "receipt", "عملية بيع محفوظة")}
+    ${metricCard("مشتريات اليوم", money(dashboard.todayPurchases), "truck", "توريد محفوظ")}
+    ${metricCard("مصروفات اليوم", money(dashboard.todayExpenses), "wallet", "تؤثر على صافي الربح")}
+    ${metricCard("أرباح اليوم", money(dashboard.todayProfit), "chart", "صافي بعد التكلفة والمصروفات")}
     ${metricCard("المنتجات", amount(dashboard.productCount), "package", "منتجات فعّالة")}
     ${metricCard("قيمة المخزون", money(dashboard.inventoryValue), "layers", "وفق سعر الشراء")}
+    ${metricCard("فواتير اليوم", amount(dashboard.todayInvoiceCount), "receipt", "عملية بيع محفوظة")}
+    ${metricCard("ديون العملاء", money(dashboard.customerDebt), "users", "رصيد مستحق")}
+    ${metricCard("دفعات اليوم", money(dashboard.todayCustomerPayments), "wallet", "تسديد ديون سابقة")}
+    ${metricCard("مستحقات الموردين", money(dashboard.supplierDebt), "truck", "شراء آجل غير مسدد")}
+    ${metricCard("رصيد الصندوق", money(dashboard.cashBalance), "wallet", "نقد متاح حاليًا")}
   </section>
   <section class="dashboard-split">
     <article class="panel panel--low-stock"><div class="panel__head"><div><span class="eyebrow">تنبيه تشغيلي</span><h2>مخزون يحتاج انتباهك</h2></div><button class="text-button" data-action="navigate" data-view="inventory">عرض المخزون ${icon("arrow", 16)}</button></div>
     ${low.length ? `<div class="warning-list">${low.map((product) => `<button class="warning-row" data-action="open-product" data-id="${product.id}"><div class="warning-row__icon">${icon("package", 18)}</div><div><strong>${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)} متبقية</small></div>${formatStatus(product)}</button>`).join("")}</div>` : emptyState("لا توجد تنبيهات مخزون", "كل المنتجات أعلى من الحد الأدنى المحدد.", "inventory")}</article>
-    <article class="panel action-panel"><span class="eyebrow">اختصار سريع</span><h2>ابدأ من حيث تكون الحركة</h2><p>أضف منتجًا، اضبط المخزون، أو أتم بيعًا جديدًا. كل خطوة ترتبط بالسجل المحلي.</p><div class="quick-actions"><button data-action="new-product">${icon("plus", 18)}إضافة منتج</button><button data-action="navigate" data-view="inventory">${icon("layers", 18)}تعديل مخزون</button><button data-action="navigate" data-view="sales">${icon("cart", 18)}فتح المبيعات</button></div></article>
+    <article class="panel action-panel"><span class="eyebrow">اختصار سريع</span><h2>ابدأ من حيث تكون الحركة</h2><p>أضف منتجًا، عميلًا، توريدًا أو عملية بيع. كل خطوة ترتبط بالسجل المحلي.</p><div class="quick-actions"><button data-action="new-product">${icon("plus", 18)}إضافة منتج</button><button data-action="new-customer">${icon("users", 18)}إضافة عميل</button><button data-action="new-supplier">${icon("truck", 18)}إضافة مورد</button><button data-action="new-purchase">${icon("truck", 18)}فاتورة شراء</button><button data-action="navigate" data-view="sales">${icon("cart", 18)}فتح المبيعات</button></div></article>
+    <article class="panel debtor-panel"><div class="panel__head"><div><span class="eyebrow">متابعة التحصيل</span><h2>أعلى العملاء مديونية</h2></div><button class="text-button" data-action="navigate" data-view="customers">عرض العملاء ${icon("arrow", 16)}</button></div>${dashboard.debtors?.length ? `<div class="debtor-list">${dashboard.debtors.map((customer) => `<button class="debtor-row" data-action="open-customer" data-id="${customer.id}"><span>${escapeHtml(customer.name)}</span><strong>${money(customer.balance)}</strong></button>`).join("")}</div>` : `<p class="panel__empty">لا توجد ديون عملاء مستحقة.</p>`}</article>
+    <article class="panel debtor-panel"><div class="panel__head"><div><span class="eyebrow">التزامات التوريد</span><h2>أعلى مستحقات الموردين</h2></div><button class="text-button" data-action="navigate" data-view="suppliers">عرض الموردين ${icon("arrow", 16)}</button></div>${dashboard.creditors?.length ? `<div class="debtor-list">${dashboard.creditors.map((supplier) => `<button class="debtor-row" data-action="open-supplier-account" data-id="${supplier.id}"><span>${escapeHtml(supplier.name)}</span><strong>${money(supplier.balance)}</strong></button>`).join("")}</div>` : `<p class="panel__empty">لا توجد مستحقات موردين حالية.</p>`}</article>
   </section>`;
 }
 
 function metricCard(label, value, iconName, helper) {
   return `<article class="metric-card"><div class="metric-card__icon">${icon(iconName, 19)}</div><div><small>${label}</small><strong>${value}</strong><span>${helper}</span></div></article>`;
+}
+
+function quantityControlMarkup({ value = 1, min = 1, max = "", step = "1", inputAttrs = "" } = {}) {
+  return `<div class="quantity-control"><button type="button" class="quantity-control__button" data-quantity-step="-1" aria-label="إنقاص الكمية">${icon("minus", 16)}</button><input type="number" inputmode="decimal" min="${min}" ${max !== "" ? `max="${max}"` : ""} step="${step}" value="${value}" ${inputAttrs} /><button type="button" class="quantity-control__button" data-quantity-step="1" aria-label="زيادة الكمية">${icon("plus", 16)}</button></div>`;
+}
+
+function bindQuantityControl(host, { min = 1, max = Infinity, step = 1, onChange } = {}) {
+  const input = host.querySelector("input[type=number]");
+  const commit = (next) => {
+    const bounded = Math.min(max, Math.max(min, toNumber(next)));
+    input.value = bounded;
+    onChange(bounded);
+  };
+  host.querySelectorAll("[data-quantity-step]").forEach((button) => button.addEventListener("click", () => commit(toNumber(input.value) + toNumber(button.dataset.quantityStep) * step)));
+  input.addEventListener("change", () => commit(input.value));
+  input.addEventListener("blur", () => commit(input.value));
 }
 
 function emptyState(title, text, destination = "new-product") {
@@ -123,7 +166,7 @@ function inventoryMarkup() {
   const products = [...state.products].sort((a, b) => ({ "نافد": 0, "منخفض": 1, "متوفر": 2 }[stockStatus(a.quantity, a.minimumStock)] - { "نافد": 0, "منخفض": 1, "متوفر": 2 }[stockStatus(b.quantity, b.minimumStock)]));
   return `${topbarMarkup("المخزون", "عدّل الكميات من حركة موثقة، وليس من بطاقة المنتج.")}
   <section class="inventory-summary"><div><span>إجمالي قيمة المخزون</span><strong>${money(state.dashboard.inventoryValue)}</strong></div><div><span>منخفض أو نافد</span><strong>${amount(state.dashboard.lowStock.length)} منتج</strong></div></section>
-  <section class="panel inventory-list">${products.length ? products.map((product) => `<article class="inventory-row"><div class="inventory-row__main"><div class="inventory-icon">${icon("package", 20)}</div><div><strong dir="rtl">${escapeHtml(product.name)}</strong><small>شراء: ${money(product.purchasePrice)} · قيمة: ${money(product.purchasePrice * product.quantity)}</small></div></div><div class="inventory-row__stock"><div>${formatStatus(product)}<strong>${amount(product.quantity)} <small>${escapeHtml(product.unit)}</small></strong></div><button class="button button--secondary" data-action="adjust-stock" data-id="${product.id}">تعديل</button></div></article>`).join("") : emptyState("المخزون بانتظار أول منتج", "أضف منتجًا مع كمية افتتاحية ليظهر هنا.")}</section>`;
+  <section class="panel inventory-list">${products.length ? products.map((product) => `<article class="inventory-row"><div class="inventory-row__main"><div class="inventory-icon">${icon("package", 20)}</div><div><strong dir="rtl">${escapeHtml(product.name)}</strong><small dir="auto">${escapeHtml(product.barcode || "دون باركود")} · ${escapeHtml(product.category || product.unit)} · شراء: ${money(product.purchasePrice)} · بيع: ${money(product.salePrice)}</small><small>قيمة المخزون: ${money(product.purchasePrice * product.quantity)}</small></div></div><div class="inventory-row__stock"><div>${formatStatus(product)}<strong>${amount(product.quantity)} <small>${escapeHtml(product.unit)}</small></strong></div><button class="button button--secondary" data-action="count-stock" data-id="${product.id}">جرد</button><button class="button button--secondary" data-action="adjust-stock" data-id="${product.id}">تعديل</button><button class="icon-button" data-action="open-stock-history" data-id="${product.id}" aria-label="سجل الحركة">${icon("history", 18)}</button></div></article>`).join("") : emptyState("المخزون بانتظار أول منتج", "أضف منتجًا مع كمية افتتاحية ليظهر هنا.")}</section><div class="dialog__actions"><button class="button button--secondary button--wide" data-action="open-stock-history">${icon("history", 17)} سجل حركة المخزون</button></div>`;
 }
 
 function salesMarkup() {
@@ -132,38 +175,175 @@ function salesMarkup() {
   const totals = calculateSaleTotals(state.cart, 0);
   return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.")}
   <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div>
-  <div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => `<button class="sale-product ${product.quantity <= 0 ? "is-disabled" : ""}" data-action="add-cart" data-id="${product.id}" ${product.quantity <= 0 ? "disabled" : ""}><div><strong dir="rtl">${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)} متاح</small></div><span>${money(product.salePrice)}</span><i>${icon("plus", 18)}</i></button>`).join("") : `<div class="no-match"><strong>لا توجد نتيجة</strong><span>تحقق من الاسم أو الباركود أو أضف منتجًا جديدًا.</span><button class="text-button" data-action="new-product">إنشاء منتج</button></div>`}</div></div>
+  <div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => `<button class="sale-product ${product.quantity <= 0 ? "is-disabled" : ""}" data-action="add-cart" data-id="${product.id}" ${product.quantity <= 0 ? "disabled" : ""}><div><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)} متاح</small></div><span>${money(product.salePrice)}</span><i>${icon("plus", 18)}</i></button>`).join("") : `<div class="no-match"><strong>لا توجد نتيجة</strong><span>تحقق من الاسم أو الباركود أو أضف منتجًا جديدًا.</span><button class="text-button" data-action="new-product">إنشاء منتج</button></div>`}</div></div>
   <aside class="cart-panel"><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div>${state.cart.length ? `<button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div>
   <div class="cart-lines">${state.cart.length ? state.cart.map(cartLine).join("") : `<div class="cart-empty">${icon("cart", 30)}<p>اختر منتجًا من القائمة لتبدأ البيع.</p></div>`}</div>
   <div class="cart-total"><div><span>الإجمالي المبدئي</span><strong>${money(totals.subtotal)}</strong></div><button class="button button--primary button--wide" data-action="checkout" ${state.cart.length ? "" : "disabled"}>إتمام البيع ${icon("arrow", 18)}</button></div></aside></section>`;
 }
 
 function cartLine(line) {
-  return `<article class="cart-line"><div class="cart-line__detail"><strong>${escapeHtml(line.name)}</strong><small>${money(line.unitPrice)} × ${amount(line.quantity)}</small></div><strong>${money(line.unitPrice * line.quantity)}</strong><div class="quantity-stepper"><button aria-label="إنقاص" data-action="cart-decrement" data-id="${line.productId}">${icon("minus", 15)}</button><span>${amount(line.quantity)}</span><button aria-label="زيادة" data-action="cart-increment" data-id="${line.productId}">${icon("plus", 15)}</button></div><button class="remove-line" aria-label="حذف من السلة" data-action="cart-remove" data-id="${line.productId}">${icon("close", 16)}</button></article>`;
+  const product = state.products.find((item) => item.id === line.productId);
+  return `<article class="cart-line"><div class="cart-line__detail"><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(line.name)}</strong><small>${money(line.unitPrice)} × ${amount(line.quantity)}</small></div><strong>${money(line.unitPrice * line.quantity)}</strong><div class="quantity-control quantity-control--dark"><button aria-label="إنقاص" data-action="cart-decrement" data-id="${line.productId}">${icon("minus", 15)}</button><input data-cart-quantity="${line.productId}" type="number" inputmode="decimal" min="1" max="${toNumber(product?.quantity)}" step="1" value="${line.quantity}" /><button aria-label="زيادة" data-action="cart-increment" data-id="${line.productId}">${icon("plus", 15)}</button></div><button class="remove-line" aria-label="حذف من السلة" data-action="cart-remove" data-id="${line.productId}">${icon("close", 16)}</button></article>`;
 }
 
 function invoicesMarkup() {
   return `${topbarMarkup("الفواتير", "كل فاتورة محفوظة مع منتجاتها وحركات خصم المخزون.")}
-  <section class="panel invoice-list">${state.sales.length ? state.sales.map((sale) => `<button class="invoice-row" data-action="open-invoice" data-id="${sale.id}"><div class="invoice-row__mark">${icon("receipt", 20)}</div><div class="invoice-row__main"><strong>${sale.invoiceNumber}</strong><small>${dateTime(sale.date)} · ${sale.paymentMethod}</small></div><strong>${money(sale.total)}</strong>${icon("arrow", 18)}</button>`).join("") : emptyState("لا توجد فواتير حتى الآن", "أتم أول عملية بيع لتظهر تفاصيلها هنا.", "sales")}</section>`;
+  <section class="panel invoice-list">${state.sales.length ? state.sales.map((sale) => `<button class="invoice-row" data-action="open-invoice" data-id="${sale.id}"><div class="invoice-row__mark">${icon("receipt", 20)}</div><div class="invoice-row__main"><strong>${sale.invoiceNumber}</strong><small>${dateTime(sale.date)} · ${escapeHtml(sale.paymentType || "نقدي")} · ${escapeHtml(sale.paymentStatus || "مدفوعة")}${sale.customerName ? ` · ${escapeHtml(sale.customerName)}` : ""}</small></div><strong>${money(sale.total)}</strong>${icon("arrow", 18)}</button>`).join("") : emptyState("لا توجد فواتير حتى الآن", "أتم أول عملية بيع لتظهر تفاصيلها هنا.", "sales")}</section>`;
+}
+
+function suppliersMarkup() {
+  const query = state.supplierQuery.trim().toLocaleLowerCase("ar");
+  const suppliers = state.suppliers.filter((supplier) => !query || [supplier.name, supplier.phone, supplier.address].some((value) => value?.toLocaleLowerCase("ar").includes(query)));
+  const totalDue = suppliers.reduce((sum, supplier) => sum + toNumber(supplier.balance), 0);
+  return `${topbarMarkup("الموردون", "تابع الأرصدة والشراء الآجل ودفعات الموردين في حساب واحد.", `<button class="button button--primary" data-action="new-supplier">${icon("plus", 18)}<span>إضافة مورد</span></button>`)}
+  <section class="toolbar"><label class="search-field">${icon("search", 19)}<input id="supplier-search" autocomplete="off" placeholder="ابحث باسم المورد أو رقم الهاتف..." value="${escapeHtml(state.supplierQuery)}" /></label></section>
+  <section class="inventory-summary"><div><span>مستحقات الموردين</span><strong>${money(totalDue)}</strong></div><div><span>الموردون النشطون</span><strong>${amount(suppliers.length)} مورد</strong></div></section>
+  <section class="panel entity-list">${suppliers.length ? suppliers.map((supplier) => `<article class="entity-row"><button class="entity-row__icon" data-action="open-supplier-account" data-id="${supplier.id}" aria-label="حساب ${escapeHtml(supplier.name)}">${icon("users", 20)}</button><button class="entity-row__main entity-row__main--button" data-action="open-supplier-account" data-id="${supplier.id}"><strong>${escapeHtml(supplier.name)}</strong><small>${escapeHtml(supplier.phone || supplier.address || "لا توجد بيانات اتصال")}</small></button><strong class="entity-row__amount">${money(supplier.balance)}</strong><div class="entity-row__actions"><button class="icon-button" aria-label="تعديل ${escapeHtml(supplier.name)}" data-action="open-supplier" data-id="${supplier.id}">${icon("edit", 18)}</button><button class="icon-button icon-button--danger" aria-label="حذف ${escapeHtml(supplier.name)}" data-action="delete-supplier" data-id="${supplier.id}">${icon("trash", 18)}</button></div></article>`).join("") : emptyState(query ? "لا توجد نتائج مطابقة" : "لم تضف موردين بعد", query ? "جرّب اسمًا أو رقمًا آخر." : "أضف أول مورد لتبدأ تسجيل فواتير الشراء.", "new-supplier")}</section>`;
+}
+
+function supplierPaymentsMarkup() {
+  const query = state.supplierPaymentQuery.trim().toLocaleLowerCase("ar");
+  const payments = state.supplierPayments.filter((payment) => (!query || [payment.supplierName, payment.notes].some((value) => value?.toLocaleLowerCase("ar").includes(query))) && (!state.supplierPaymentFrom || dateKey(payment.date) >= state.supplierPaymentFrom) && (!state.supplierPaymentTo || dateKey(payment.date) <= state.supplierPaymentTo));
+  const total = payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+  return `${topbarMarkup("دفعات الموردين", "دفعات تسدد مستحقات سابقة ولا تُعد مشتريات جديدة.")}
+  <section class="toolbar toolbar--filter"><label class="search-field">${icon("search", 19)}<input id="supplier-payment-search" autocomplete="off" placeholder="ابحث عن مورد أو ملاحظة..." value="${escapeHtml(state.supplierPaymentQuery)}" /></label><form id="supplier-payment-filter" class="date-filter"><input name="from" type="date" value="${state.supplierPaymentFrom}" /><input name="to" type="date" value="${state.supplierPaymentTo}" /></form></section>
+  <section class="inventory-summary"><div><span>إجمالي الدفعات</span><strong>${money(total)}</strong></div><div><span>العمليات</span><strong>${amount(payments.length)} دفعة</strong></div></section>
+  <section class="panel entity-list">${payments.length ? payments.map((payment) => `<article class="entity-row"><div class="entity-row__icon entity-row__icon--expense">${icon("wallet", 20)}</div><button class="entity-row__main entity-row__main--button" data-action="open-supplier-account" data-id="${payment.supplierId}"><strong>${escapeHtml(payment.supplierName)}</strong><small>${payment.date} · ${escapeHtml(payment.notes || "تسديد مستحق")}</small></button><strong class="entity-row__amount">${money(payment.amount)}</strong></article>`).join("") : emptyState("لا توجد دفعات ضمن الفترة", "تسجل الدفعات من صفحة حساب المورد.", "suppliers")}</section>`;
+}
+
+function customersMarkup() {
+  const query = state.customerQuery.trim().toLocaleLowerCase("ar");
+  const customers = state.customers.filter((customer) => !query || [customer.name, customer.phone, customer.address].some((value) => value?.toLocaleLowerCase("ar").includes(query)));
+  const totalDebt = customers.reduce((sum, customer) => sum + toNumber(customer.balance), 0);
+  return `${topbarMarkup("العملاء", "تابع الأرصدة والبيع الآجل والدفعات في حساب واحد.", `<button class="button button--primary" data-action="new-customer">${icon("plus", 18)}<span>إضافة عميل</span></button>`)}
+  <section class="toolbar"><label class="search-field">${icon("search", 19)}<input id="customer-search" autocomplete="off" placeholder="ابحث باسم العميل أو رقم الهاتف..." value="${escapeHtml(state.customerQuery)}" /></label></section>
+  <section class="inventory-summary"><div><span>إجمالي الديون</span><strong>${money(totalDebt)}</strong></div><div><span>العملاء النشطون</span><strong>${amount(customers.length)} عميل</strong></div></section>
+  <section class="panel entity-list">${customers.length ? customers.map((customer) => `<article class="entity-row"><button class="entity-row__icon" data-action="open-customer" data-id="${customer.id}" aria-label="حساب ${escapeHtml(customer.name)}">${icon("users", 20)}</button><button class="entity-row__main entity-row__main--button" data-action="open-customer" data-id="${customer.id}"><strong>${escapeHtml(customer.name)}</strong><small>${escapeHtml(customer.phone || customer.address || "لا توجد بيانات اتصال")}</small></button><strong class="entity-row__amount">${money(customer.balance)}</strong><div class="entity-row__actions"><button class="icon-button" aria-label="تعديل ${escapeHtml(customer.name)}" data-action="edit-customer" data-id="${customer.id}">${icon("edit", 18)}</button><button class="icon-button icon-button--danger" aria-label="حذف ${escapeHtml(customer.name)}" data-action="delete-customer" data-id="${customer.id}">${icon("trash", 18)}</button></div></article>`).join("") : emptyState(query ? "لا توجد نتائج مطابقة" : "لم تضف عملاء بعد", query ? "جرّب اسمًا أو رقمًا آخر." : "أضف أول عميل لتبدأ البيع الآجل وتسجيل الدفعات.", "new-customer")}</section>`;
+}
+
+function customerPaymentsMarkup() {
+  const query = state.paymentQuery.trim().toLocaleLowerCase("ar");
+  const payments = state.customerPayments.filter((payment) => (!query || [payment.customerName, payment.notes].some((value) => value?.toLocaleLowerCase("ar").includes(query))) && (!state.paymentFrom || dateKey(payment.date) >= state.paymentFrom) && (!state.paymentTo || dateKey(payment.date) <= state.paymentTo));
+  const total = payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0);
+  return `${topbarMarkup("دفعات العملاء", "دفعات تسدد دينًا سابقًا ولا تُعد مبيعات جديدة.")}
+  <section class="toolbar toolbar--filter"><label class="search-field">${icon("search", 19)}<input id="payment-search" autocomplete="off" placeholder="ابحث عن عميل أو ملاحظة..." value="${escapeHtml(state.paymentQuery)}" /></label><form id="payment-filter" class="date-filter"><input name="from" type="date" value="${state.paymentFrom}" /><input name="to" type="date" value="${state.paymentTo}" /></form></section>
+  <section class="inventory-summary"><div><span>إجمالي الدفعات</span><strong>${money(total)}</strong></div><div><span>العمليات</span><strong>${amount(payments.length)} دفعة</strong></div></section>
+  <section class="panel entity-list">${payments.length ? payments.map((payment) => `<article class="entity-row"><div class="entity-row__icon entity-row__icon--expense">${icon("wallet", 20)}</div><button class="entity-row__main entity-row__main--button" data-action="open-customer" data-id="${payment.customerId}"><strong>${escapeHtml(payment.customerName)}</strong><small>${payment.date} · ${escapeHtml(payment.notes || "تسديد رصيد")}</small></button><strong class="entity-row__amount">${money(payment.amount)}</strong></article>`).join("") : emptyState("لا توجد دفعات ضمن الفترة", "تسجل الدفعات من صفحة حساب العميل.", "customers")}</section>`;
+}
+
+function purchasesMarkup() {
+  return `${topbarMarkup("المشتريات", "أنشئ فاتورة شراء لزيادة المخزون وتثبيت تكلفة المنتجات، مع إمكانية ربط المورد عند توفره.", `<button class="button button--primary" data-action="new-purchase">${icon("plus", 18)}<span>فاتورة شراء</span></button>`)}
+  <section class="inventory-summary"><div><span>إجمالي المشتريات</span><strong>${money(state.analytics?.purchases.total || 0)}</strong></div><div><span>فواتير الشراء</span><strong>${amount(state.purchases.length)} فاتورة</strong></div></section>
+  <section class="panel invoice-list">${state.purchases.length ? state.purchases.map((purchase) => `<button class="invoice-row" data-action="open-purchase" data-id="${purchase.id}"><div class="invoice-row__mark invoice-row__mark--purchase">${icon("truck", 20)}</div><div class="invoice-row__main"><strong>${purchase.invoiceNumber}</strong><small>${escapeHtml(purchase.supplierName)} · ${dateTime(purchase.date)}</small></div><strong>${money(purchase.total)}</strong>${icon("arrow", 18)}</button>`).join("") : emptyState("لا توجد فواتير شراء", "سجّل أول فاتورة شراء لزيادة المخزون، مع المورد أو بدونه.", "new-purchase")}</section>`;
+}
+
+function expensesMarkup() {
+  const matches = state.expenses.filter((expense) => (!state.expenseQuery || [expense.category, expense.description, expense.notes].some((value) => value?.toLocaleLowerCase("ar").includes(state.expenseQuery.toLocaleLowerCase("ar")))) && (!state.expenseFrom || expense.date >= state.expenseFrom) && (!state.expenseTo || expense.date <= state.expenseTo));
+  const total = matches.reduce((sum, expense) => sum + toNumber(expense.amount), 0);
+  return `${topbarMarkup("المصروفات", "سجّل المصروفات لتظهر في صافي الربح والتقارير.", `<button class="button button--primary" data-action="new-expense">${icon("plus", 18)}<span>إضافة مصروف</span></button>`)}
+  <section class="toolbar toolbar--filter"><label class="search-field">${icon("search", 19)}<input id="expense-search" autocomplete="off" placeholder="ابحث في المصروفات..." value="${escapeHtml(state.expenseQuery)}" /></label><form id="expense-filter" class="date-filter"><input name="from" type="date" value="${state.expenseFrom}" /><input name="to" type="date" value="${state.expenseTo}" /></form></section>
+  <section class="inventory-summary"><div><span>إجمالي الفترة</span><strong>${money(total)}</strong></div><div><span>العمليات</span><strong>${amount(matches.length)} مصروف</strong></div></section>
+  <section class="panel entity-list">${matches.length ? matches.map((expense) => `<article class="entity-row"><div class="entity-row__icon entity-row__icon--expense">${icon("wallet", 20)}</div><div class="entity-row__main"><strong>${escapeHtml(expense.category)}</strong><small>${escapeHtml(expense.description || "بلا وصف")} · ${expense.date}</small></div><strong class="entity-row__amount">${money(expense.amount)}</strong><div class="entity-row__actions"><button class="icon-button" aria-label="تعديل المصروف" data-action="edit-expense" data-id="${expense.id}">${icon("edit", 18)}</button><button class="icon-button icon-button--danger" aria-label="حذف المصروف" data-action="delete-expense" data-id="${expense.id}">${icon("trash", 18)}</button></div></article>`).join("") : emptyState("لا توجد مصروفات ضمن الفترة", "أضف أول مصروف ليظهر في الإجمالي والأرباح.", "new-expense")}</section>`;
+}
+
+function reportsMarkup() {
+  const data = state.analytics || { sales: {}, purchases: {}, expenses: {}, profit: {} };
+  const categories = Object.entries(data.expenses.byCategory || {});
+  const debtQuery = state.debtQuery.trim().toLocaleLowerCase("ar");
+  const debtors = state.customers.filter((customer) => toNumber(customer.balance) > 0 && (!debtQuery || [customer.name, customer.phone].some((value) => value?.toLocaleLowerCase("ar").includes(debtQuery)))).sort((a, b) => state.debtSort === "lowest" ? toNumber(a.balance) - toNumber(b.balance) : state.debtSort === "name" ? a.name.localeCompare(b.name, "ar") : toNumber(b.balance) - toNumber(a.balance));
+  const debtReport = `<section class="panel debt-report"><div class="panel__head"><div><span class="eyebrow">تقرير ديون العملاء</span><h2>الأرصدة المستحقة</h2></div><strong>${money(debtors.reduce((sum, customer) => sum + toNumber(customer.balance), 0))}</strong></div><div class="toolbar debt-report__toolbar"><label class="search-field">${icon("search", 18)}<input id="debt-search" autocomplete="off" placeholder="ابحث عن عميل..." value="${escapeHtml(state.debtQuery)}" /></label><select id="debt-sort"><option value="highest" ${state.debtSort === "highest" ? "selected" : ""}>الأعلى مديونية</option><option value="lowest" ${state.debtSort === "lowest" ? "selected" : ""}>الأقل مديونية</option><option value="name" ${state.debtSort === "name" ? "selected" : ""}>اسم العميل</option></select></div><div class="debt-report__list">${debtors.length ? debtors.map((customer) => `<button class="debtor-row" data-action="open-customer" data-id="${customer.id}"><span><strong>${escapeHtml(customer.name)}</strong><small>${escapeHtml(customer.phone || "لا يوجد هاتف")}</small></span><strong>${money(customer.balance)}</strong></button>`).join("") : `<div class="inline-empty">لا توجد ديون عملاء ضمن البحث الحالي.</div>`}</div></section>`;
+  return `${topbarMarkup("التقارير", "ملخص تشغيلي للمبيعات والمشتريات والمصروفات والأرباح.", `<button class="button button--secondary" data-action="export-report">تصدير CSV</button>`)}${debtReport}
+  <section class="toolbar toolbar--filter"><form id="report-filter" class="date-filter"><label>من<input name="from" type="date" value="${state.reportFrom}" /></label><label>إلى<input name="to" type="date" value="${state.reportTo}" /></label></form></section>
+  <section class="metric-grid metric-grid--reports">${metricCard("صافي المبيعات", money(data.profit.netSales || 0), "trend", "بعد مرتجعات البيع")}${metricCard("تكلفة البضاعة", money(data.profit.netCostOfGoods || 0), "package", "تكلفة وقت البيع")}${metricCard("إجمالي المصروفات", money(data.expenses.total || 0), "wallet", "ضمن الفترة")}${metricCard("صافي الربح", money(data.profit.netProfit || 0), "chart", "ليس المبيعات")}</section>
+  <section class="report-grid"><article class="panel report-card"><span class="eyebrow">تقرير المبيعات</span><h2>${money(data.sales.total || 0)}</h2><div><span>الفواتير</span><strong>${amount(data.sales.invoices || 0)}</strong></div><div><span>الخصومات</span><strong>${money(data.sales.discounts || 0)}</strong></div><div><span>مرتجع البيع</span><strong>${money(data.sales.returns || 0)}</strong></div></article><article class="panel report-card"><span class="eyebrow">تقرير المشتريات</span><h2>${money(data.purchases.net || 0)}</h2><div><span>الفواتير</span><strong>${amount(data.purchases.invoices || 0)}</strong></div><div><span>المنتجات المشتراة</span><strong>${amount(data.purchases.products || 0)}</strong></div><div><span>مرتجع الشراء</span><strong>${money(data.purchases.returns || 0)}</strong></div></article><article class="panel report-card"><span class="eyebrow">المصروفات حسب النوع</span>${categories.length ? categories.map(([category, total]) => `<div><span>${escapeHtml(category)}</span><strong>${money(total)}</strong></div>`).join("") : `<p>لا توجد مصروفات ضمن الفترة.</p>`}</article><article class="panel report-card report-card--profit"><span class="eyebrow">معادلة الربح</span><div><span>المبيعات</span><strong>${money(data.profit.netSales || 0)}</strong></div><div><span>− تكلفة البضاعة</span><strong>${money(data.profit.netCostOfGoods || 0)}</strong></div><div><span>= الربح الإجمالي</span><strong>${money(data.profit.grossProfit || 0)}</strong></div><div><span>− المصروفات</span><strong>${money(data.expenses.total || 0)}</strong></div><div class="report-card__final"><span>= صافي الربح</span><strong>${money(data.profit.netProfit || 0)}</strong></div></article></section>`;
+}
+
+function cashboxMarkup() {
+  const cash = state.cashbox || { openingBalance: 0, inflows: 0, outflows: 0, closingBalance: 0 };
+  const movementLabel = { DEPOSIT: "إيداع في الصندوق", WITHDRAWAL: "سحب من الصندوق" };
+  return `${topbarMarkup("الصندوق", "رصيد نقدي محسوب من العمليات النقدية الفعلية وحركات الصندوق اليدوية.", `<div class="topbar__actions"><button class="button button--secondary" data-action="new-cash-withdrawal">سحب</button><button class="button button--primary" data-action="new-cash-deposit">${icon("plus", 18)}<span>إيداع</span></button></div>`)}
+  <section class="toolbar toolbar--filter"><form id="cash-filter" class="date-filter"><label>من<input name="from" type="date" value="${state.cashFrom}" /></label><label>إلى<input name="to" type="date" value="${state.cashTo}" /></label></form></section>
+  <section class="metric-grid metric-grid--reports">${metricCard("رصيد الافتتاح", money(cash.openingBalance), "wallet", "قبل بداية الفترة")}${metricCard("إجمالي الداخل", money(cash.inflows), "trend", "نقدي فقط")}${metricCard("إجمالي الخارج", money(cash.outflows), "wallet", "مصروفات وسداد وسحب")}${metricCard("الرصيد الحالي", money(cash.closingBalance), "chart", "بعد كل الحركات")}</section>
+  <section class="report-grid"><article class="panel report-card"><span class="eyebrow">مصادر الداخل</span><div><span>مبيعات نقدية</span><strong>${money(cash.cashSales)}</strong></div><div><span>دفعات العملاء</span><strong>${money(cash.customerPayments)}</strong></div><div><span>إيداعات يدوية</span><strong>${money(cash.deposits)}</strong></div><div><span>مرتجعات شراء</span><strong>${money(cash.purchaseReturns)}</strong></div></article><article class="panel report-card"><span class="eyebrow">مصادر الخارج</span><div><span>مشتريات نقدية</span><strong>${money(cash.cashPurchases)}</strong></div><div><span>دفعات الموردين</span><strong>${money(cash.supplierPayments)}</strong></div><div><span>مصروفات</span><strong>${money(cash.expenses)}</strong></div><div><span>سحوبات يدوية</span><strong>${money(cash.withdrawals)}</strong></div></article><article class="panel report-card"><span class="eyebrow">حركات الصندوق اليدوية</span>${state.cashMovements.length ? state.cashMovements.map((movement) => `<div><span>${movementLabel[movement.type]}<small>${movement.date}${movement.notes ? ` · ${escapeHtml(movement.notes)}` : ""}</small></span><strong class="${movement.type === "WITHDRAWAL" ? "is-negative" : ""}">${movement.type === "WITHDRAWAL" ? "−" : "+"}${money(movement.amount)}</strong></div>`).join("") : `<p>لا توجد إيداعات أو سحوبات يدوية ضمن الفترة.</p>`}</article></section>`;
+}
+
+function cloudBytes(value) {
+  const bytes = Math.max(0, Number(value) || 0);
+  if (bytes < 1024) return `${bytes} بايت`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;
+  return `${(bytes / 1024 / 1024).toFixed(2)} MiB`;
+}
+
+function cloudBackupMarkup() {
+  const cloud = state.cloud;
+  const busy = Boolean(cloud.busy);
+  if (!cloud.user) {
+    return `<section class="panel report-card cloud-backup-card"><span class="eyebrow">نسخ سحابي مجاني</span><h2>نسخة آمنة بين الأجهزة</h2><p>اربط بريدًا وكلمة مرور خاصين بالنسخ فقط. لا يحل هذا الحساب محل أدمن حسابي، ولا توجد مزامنة لحظية.</p><div class="cloud-backup-card__note"><strong>ما الذي يبقى محليًا؟</strong><span>تستمر المبيعات والعمل دون اتصال على IndexedDB؛ الرفع والاستعادة عمليتان يدويتان.</span></div><div class="dialog__actions"><button class="button button--primary" data-action="open-cloud-auth">ربط النسخ السحابية</button></div></section>`;
+  }
+  const rows = cloud.backups.map((backup) => `<article class="cloud-backup-row"><div><strong>${escapeHtml(backup.storeName || "حسابي")}</strong><small>${dateTime(backup.createdAtClient)} · ${cloudBytes(backup.encodedBytes)} · ${amount(backup.chunkCount)} جزء</small></div><div class="cloud-backup-row__actions"><button class="button button--secondary" data-action="cloud-restore-backup" data-id="${escapeHtml(backup.id)}" ${busy ? "disabled" : ""}>استعادة</button><button class="icon-button icon-button--danger" data-action="cloud-delete-backup" data-id="${escapeHtml(backup.id)}" aria-label="حذف النسخة" ${busy ? "disabled" : ""}>${icon("trash", 18)}</button></div></article>`).join("");
+  return `<section class="panel report-card cloud-backup-card"><div class="panel__head"><div><span class="eyebrow">نسخ سحابي مجاني</span><h2>نسخ ${escapeHtml(cloud.user.email || "السحابية")}</h2></div><button class="text-button" data-action="cloud-signout" ${busy ? "disabled" : ""}>فصل الحساب</button></div><p>يُحتفظ بآخر 3 نسخ مكتملة فقط لهذا البريد. لا تتغير البيانات بين الأجهزة إلا عند اختيار «استعادة» صراحة.</p><div class="dialog__actions"><button class="button button--primary" data-action="cloud-upload-backup" ${busy ? "disabled" : ""}>${busy === "upload" ? "جارٍ رفع النسخة…" : "إنشاء نسخة سحابية الآن"}</button><button class="button button--secondary" data-action="cloud-refresh-backups" ${busy ? "disabled" : ""}>تحديث القائمة</button></div>${cloud.error ? `<p class="cloud-backup-error">${escapeHtml(cloud.error)}</p>` : ""}<div class="cloud-backup-list">${cloud.loading ? `<div class="inline-empty">جارٍ تحميل النسخ السحابية…</div>` : rows || `<div class="inline-empty">لا توجد نسخة سحابية بعد. أنشئ أول نسخة بعد مراجعة بيانات جهازك.</div>`}</div></section>`;
+}
+
+function settingsMarkup() {
+  return `${topbarMarkup("الإعدادات", "تعمل بيانات المتجر محليًا دون اتصال، والنسخ السحابي اختياري ويدوي.")}
+  <section class="report-grid"><form id="settings-form" class="panel form-grid"><div class="panel__head form-full"><div><span class="eyebrow">بيانات المتجر</span><h2>إعدادات عامة</h2></div></div><label>اسم المتجر<input name="storeName" required maxlength="60" dir="rtl" value="${escapeHtml(state.settings?.storeName || "")}" /></label><label>نوع النشاط<select name="businessType">${BUSINESS_TYPES.map((type) => `<option value="${type}" ${state.settings?.businessType === type ? "selected" : ""}>${type}</option>`).join("")}</select></label><label>العملة<select name="currency">${CURRENCIES.map((currency) => `<option value="${currency.code}" ${state.settings?.currency === currency.code ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><label>رصيد افتتاحي للصندوق<input name="openingCash" type="number" min="0" step="0.01" value="${escapeHtml(state.settings?.openingCash ?? "")}" /></label><div class="dialog__actions form-full"><button class="button button--primary" type="submit">حفظ الإعدادات ${icon("check", 17)}</button></div></form><section class="panel report-card"><span class="eyebrow">نسخة محلية</span><h2>حماية بيانات هذا الجهاز</h2><p>صدّر ملف JSON يحتفظ بكل البيانات المحلية، واستعده فقط من ملف حسابي موثوق.</p><div class="dialog__actions"><button class="button button--secondary" data-action="export-backup">تصدير نسخة</button><label class="button button--primary" for="restore-file">استعادة نسخة</label><input id="restore-file" type="file" accept="application/json" hidden /></div></section>${cloudBackupMarkup()}<section class="panel report-card"><span class="eyebrow">منطقة حساسة</span><h2>مسح البيانات</h2><p>يمسح كل بيانات هذا الجهاز ويعيد التطبيق إلى شاشة الإعداد. صدّر نسخة احتياطية أولًا.</p><button class="button button--danger" data-action="reset-data">مسح جميع البيانات</button></section></section>`;
+}
+
+function loginMarkup() {
+  const users = state.accounts.filter((account) => account.isActive);
+  return `<main class="setup-page login-page"><section class="setup-art"><div class="setup-art__brand"><img src="${markImage}" alt="" /><span class="brand-wordmark">حسابي</span><small>سجلّ المتجر اليومي</small></div><div class="setup-art__status"><span class="presence-dot"></span><span>بيانات المتجر تبقى على هذا الجهاز</span></div><div class="setup-art__copy"><p class="eyebrow">دخول آمن</p><h1>اختر حسابك<br />وابدأ وردية العمل.</h1><p>حساب الأدمن يدير الإدخال والأرباح والإحصائيات، وحساب الكاشير مخصص للمبيعات والفواتير.</p><div class="setup-art__stamps"><span>أدمن</span><span>كاشير</span><span>مبيعات</span></div></div></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-sheet__brand"><img src="${markImage}" alt="" /><div><strong>تسجيل الدخول</strong><span>${escapeHtml(state.settings?.storeName || "حسابي")}</span></div></div><div class="setup-form"><span class="eyebrow">مرحبًا بعودتك</span><h2>الدخول إلى الحساب</h2><p>أدخل اسم المستخدم ورمز الدخول المكوّن من أرقام.</p><form id="login-form"><label>اسم المستخدم<input name="username" autocomplete="username" required minlength="3" maxlength="30" autofocus placeholder="مثال: admin" /></label><label>رمز الدخول<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" required minlength="4" maxlength="12" placeholder="••••" /></label><button class="button button--primary button--wide" type="submit">دخول إلى حسابي ${icon("arrow", 18)}</button></form><div class="account-hints"><strong>الحسابات المتاحة</strong>${users.map((account) => `<button type="button" class="account-hint" data-action="fill-login" data-username="${escapeHtml(account.username)}"><span>${escapeHtml(account.name)}</span><small>${escapeHtml(account.username)} · ${roleLabel(account.role)}</small></button>`).join("")}</div><small class="offline-note"><span class="presence-dot"></span>يسجل الدخول محليًا ولا يحتاج اتصالًا بالإنترنت</small></div></div></section></main>`;
+}
+
+function requiredPinMarkup() {
+  return `<main class="setup-page login-page"><section class="setup-art"><div class="setup-art__brand"><img src="${markImage}" alt="" /><span class="brand-wordmark">حسابي</span><small>حماية الحساب</small></div><div class="setup-art__copy"><p class="eyebrow">خطوة أمنية</p><h1>غيّر رمز الدخول<br />قبل متابعة العمل.</h1><p>تم إنشاء الحساب برمز مؤقت. اختر رمزًا خاصًا من 4 إلى 12 رقمًا.</p></div></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-form"><span class="eyebrow">مرحبًا ${escapeHtml(state.currentUser?.name || "")}</span><h2>تعيين رمز دخول جديد</h2><form id="required-pin-form"><label>رمز الدخول الجديد<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" autofocus /></label><label>تأكيد الرمز<input name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" /></label><button class="button button--primary button--wide" type="submit">حفظ ومتابعة ${icon("check", 18)}</button></form></div></div></section></main>`;
+}
+
+function accountsMarkup() {
+  const accounts = state.accounts;
+  return `${topbarMarkup("الحسابات والصلاحيات", "أدر حسابات فريقك وحدد من يرى البيانات المالية ومن يقتصر على البيع.", `<button class="button button--primary" data-action="new-account">${icon("plus", 18)}<span>إضافة حساب</span></button>`)}
+  <section class="panel account-list"><div class="panel__head"><div><span class="eyebrow">فريق المتجر</span><h2>الحسابات المحلية</h2></div><small>الأدمن: كامل الصلاحيات · الكاشير: المبيعات والفواتير فقط</small></div>${accounts.map((account) => `<article class="account-row"><div class="account-row__icon">${icon("users", 20)}</div><div class="account-row__main"><strong>${escapeHtml(account.name)}</strong><small dir="ltr">${escapeHtml(account.username)}</small></div><span class="account-badge account-badge--${account.role}">${roleLabel(account.role)}</span><span class="status status--${account.isActive ? "available" : "empty"}">${account.isActive ? "نشط" : "موقوف"}</span><div class="entity-row__actions"><button class="icon-button" data-action="change-account-pin" data-id="${account.id}" aria-label="تغيير رمز دخول ${escapeHtml(account.name)}">${icon("edit", 18)}</button><button class="icon-button" data-action="open-account" data-id="${account.id}" aria-label="تعديل ${escapeHtml(account.name)}">${icon("dots", 18)}</button></div></article>`).join("")}</section>`;
 }
 
 function render() {
   if (!state.settings?.setupCompleted) { root.innerHTML = setupMarkup(); bindEvents(); return; }
-  const body = { dashboard: dashboardMarkup, products: productsMarkup, inventory: inventoryMarkup, sales: salesMarkup, invoices: invoicesMarkup }[state.view]?.() || dashboardMarkup();
+  if (!state.currentUser) { root.innerHTML = loginMarkup(); bindEvents(); return; }
+  if (state.currentUser.mustChangePin) { root.innerHTML = requiredPinMarkup(); bindEvents(); return; }
+  if (!canAccessView(state.currentUser, state.view)) state.view = isAdmin(state.currentUser) ? "dashboard" : "sales";
+  const body = { dashboard: dashboardMarkup, products: productsMarkup, inventory: inventoryMarkup, sales: salesMarkup, invoices: invoicesMarkup, customers: customersMarkup, "customer-payments": customerPaymentsMarkup, suppliers: suppliersMarkup, "supplier-payments": supplierPaymentsMarkup, purchases: purchasesMarkup, expenses: expensesMarkup, cashbox: cashboxMarkup, reports: reportsMarkup, accounts: accountsMarkup, settings: settingsMarkup }[state.view]?.() || dashboardMarkup();
   root.innerHTML = `<div class="app-shell">${navMarkup()}<main class="workspace">${body}</main></div>`;
   bindEvents();
 }
 
 function setupMarkup() {
-  return `<main class="setup-page"><section class="setup-art"><div class="setup-art__brand"><img src="${markImage}" alt="" /><span class="brand-wordmark">حسابي</span><small>سجلّ المتجر اليومي</small></div><div class="setup-art__status"><span class="presence-dot"></span><span>نظامك المحلي جاهز للعمل دون اتصال</span></div><div class="setup-art__copy"><p class="eyebrow">سجل تشغيلي · المرحلة الأولى</p><h1>بيانات واضحة<br />لبداية يوم بيع منظّم.</h1><p>ستسجل هنا البيانات التي تظهر على الفواتير وتضبط عرض المخزون والمبيعات اليومية.</p><div class="setup-art__stamps"><span>المنتجات</span><span>المخزون</span><span>الفواتير</span></div></div><div class="setup-art__ledger-card"><span>خط سير اليوم</span><strong>منتج ← مخزون ← فاتورة</strong><i></i><i></i><i></i></div><img class="setup-art__image" src="/manus-storage/hesabi-setup-ledger_a7b0fae4.png" alt="رسم تعبيري لأدوات تنظيم المتجر" /></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-sheet__brand"><img src="${markImage}" alt="" /><div><strong>حسابي</strong><span>دفتر التاجر الهادئ</span></div><span class="setup-stamp">خطوة 1 من 1</span></div><div class="setup-form"><span class="eyebrow">سجل بداية العمل</span><h2>بيانات تُستخدم كل يوم</h2><p>أدخل اسم المتجر والنشاط والعملة. ستظهر هذه البيانات في الفواتير، وتُنظّم طريقة قراءة المخزون والمبيعات.</p><form id="setup-form"><label>اسم المتجر<input name="storeName" dir="rtl" required maxlength="60" placeholder="مثال: بقالة الواحة" autofocus /></label><label>نوع النشاط<select name="businessType" required>${BUSINESS_TYPES.map((type) => `<option value="${type}">${type}</option>`).join("")}</select></label><label>العملة<select name="currency" required>${CURRENCIES.map((currency) => `<option value="${currency.code}" ${currency.code === DEFAULT_CURRENCY_CODE ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><button class="button button--primary button--wide" type="submit">فتح سجل المتجر ${icon("arrow", 18)}</button></form><small class="offline-note"><span class="presence-dot"></span>يحفظ محليًا ويظل متاحًا بعد أول تحميل</small></div></div></section></main>`;
+  return `<main class="setup-page"><section class="setup-art"><div class="setup-art__brand"><img src="${markImage}" alt="" /><span class="brand-wordmark">حسابي</span><small>سجلّ المتجر اليومي</small></div><div class="setup-art__status"><span class="presence-dot"></span><span>نظامك المحلي جاهز للعمل دون اتصال</span></div><div class="setup-art__copy"><p class="eyebrow">سجل تشغيلي · المرحلة الأولى</p><h1>بيانات واضحة<br />لبداية يوم بيع منظّم.</h1><p>ستسجل هنا البيانات التي تظهر على الفواتير وتضبط عرض المخزون والمبيعات اليومية.</p><div class="setup-art__stamps"><span>المنتجات</span><span>المخزون</span><span>الفواتير</span></div></div><div class="setup-art__ledger-card"><span>خط سير اليوم</span><strong>منتج ← مخزون ← فاتورة</strong><i></i><i></i><i></i></div><img class="setup-art__image" src="${assetBaseUrl}/hesabi-setup-ledger_a7b0fae4.png" alt="رسم تعبيري لأدوات تنظيم المتجر" /></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-sheet__brand"><img src="${markImage}" alt="" /><div><strong>حسابي</strong><span>دفتر التاجر الهادئ</span></div><span class="setup-stamp">خطوة 1 من 1</span></div><div class="setup-form"><span class="eyebrow">سجل بداية العمل</span><h2>بيانات تُستخدم كل يوم</h2><p>أدخل اسم المتجر والنشاط والعملة. ستظهر هذه البيانات في الفواتير، وتُنظّم طريقة قراءة المخزون والمبيعات اليومية.</p><form id="setup-form"><label>اسم المتجر<input name="storeName" dir="rtl" required maxlength="60" placeholder="مثال: بقالة الواحة" autofocus /></label><label>نوع النشاط<select name="businessType" required>${BUSINESS_TYPES.map((type) => `<option value="${type}">${type}</option>`).join("")}</select></label><label>العملة<select name="currency" required>${CURRENCIES.map((currency) => `<option value="${currency.code}" ${currency.code === DEFAULT_CURRENCY_CODE ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><button class="button button--primary button--wide" type="submit">فتح سجل المتجر ${icon("arrow", 18)}</button></form><small class="offline-note"><span class="presence-dot"></span>يحفظ محليًا ويظل متاحًا بعد أول تحميل</small></div></div></section></main>`;
 }
 
 function bindEvents() {
   root.querySelectorAll("[data-action]").forEach((element) => element.addEventListener("click", handleAction));
   root.querySelector("#setup-form")?.addEventListener("submit", handleSetup);
+  root.querySelector("#login-form")?.addEventListener("submit", handleLogin);
+  root.querySelector("#required-pin-form")?.addEventListener("submit", changeRequiredPin);
   root.querySelector("#product-search")?.addEventListener("input", (event) => { state.productQuery = event.target.value; render(); root.querySelector("#product-search")?.focus(); });
   root.querySelector("#sale-search")?.addEventListener("input", (event) => { state.saleQuery = event.target.value; render(); root.querySelector("#sale-search")?.focus(); });
   root.querySelector("#sale-search")?.addEventListener("keydown", async (event) => { if (event.key === "Enter" && event.target.value.trim()) await findBarcode(event.target.value.trim(), "sale"); });
+  root.querySelector("#supplier-search")?.addEventListener("input", (event) => { state.supplierQuery = event.target.value; render(); root.querySelector("#supplier-search")?.focus(); });
+  root.querySelector("#customer-search")?.addEventListener("input", (event) => { state.customerQuery = event.target.value; render(); root.querySelector("#customer-search")?.focus(); });
+  root.querySelector("#payment-search")?.addEventListener("input", (event) => { state.paymentQuery = event.target.value; render(); root.querySelector("#payment-search")?.focus(); });
+  root.querySelector("#payment-filter")?.addEventListener("change", (event) => { state.paymentFrom = event.currentTarget.querySelector("[name=from]").value; state.paymentTo = event.currentTarget.querySelector("[name=to]").value; render(); });
+  root.querySelector("#supplier-payment-search")?.addEventListener("input", (event) => { state.supplierPaymentQuery = event.target.value; render(); root.querySelector("#supplier-payment-search")?.focus(); });
+  root.querySelector("#supplier-payment-filter")?.addEventListener("change", (event) => { state.supplierPaymentFrom = event.currentTarget.querySelector("[name=from]").value; state.supplierPaymentTo = event.currentTarget.querySelector("[name=to]").value; render(); });
+  root.querySelector("#debt-search")?.addEventListener("input", (event) => { state.debtQuery = event.target.value; render(); root.querySelector("#debt-search")?.focus(); });
+  root.querySelector("#debt-sort")?.addEventListener("change", (event) => { state.debtSort = event.target.value; render(); });
+  root.querySelector("#expense-search")?.addEventListener("input", (event) => { state.expenseQuery = event.target.value; render(); root.querySelector("#expense-search")?.focus(); });
+  root.querySelector("#expense-filter")?.addEventListener("change", (event) => { state.expenseFrom = event.currentTarget.querySelector("[name=from]").value; state.expenseTo = event.currentTarget.querySelector("[name=to]").value; render(); });
+  root.querySelector("#report-filter")?.addEventListener("change", async (event) => { state.reportFrom = event.currentTarget.querySelector("[name=from]").value; state.reportTo = event.currentTarget.querySelector("[name=to]").value; state.analytics = await db.getAnalytics({ from: state.reportFrom, to: state.reportTo }); render(); });
+  root.querySelector("#cash-filter")?.addEventListener("change", async (event) => { state.cashFrom = event.currentTarget.querySelector("[name=from]").value; state.cashTo = event.currentTarget.querySelector("[name=to]").value; await refresh(); render(); });
+  root.querySelector("#settings-form")?.addEventListener("submit", saveSettings);
+  root.querySelector("#restore-file")?.addEventListener("change", restoreBackupFromFile);
+  root.querySelectorAll("[data-cart-quantity]").forEach((input) => input.addEventListener("change", (event) => {
+    setCartQuantity(event.currentTarget.dataset.cartQuantity, event.currentTarget.value, { renderNow: false });
+    window.setTimeout(render, 0);
+  }));
 }
 
 async function handleSetup(event) {
@@ -177,13 +357,44 @@ async function handleSetup(event) {
   showToast(`أهلًا بك في ${state.settings.storeName}`);
 }
 
+async function handleLogin(event) {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.currentTarget));
+  try {
+    state.currentUser = await db.authenticateAccount(values);
+    await db.savePersistentSession(state.currentUser.id);
+    state.view = state.currentUser.role === "admin" ? "dashboard" : "sales";
+    render();
+    showToast(`مرحبًا ${state.currentUser.name}`);
+  } catch (error) { showToast(error.message || "تعذر تسجيل الدخول.", "error"); }
+}
+
+async function changeRequiredPin(event) {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(event.currentTarget));
+  if (values.pin !== values.pinConfirm) { showToast("رمزا الدخول غير متطابقين.", "error"); return; }
+  try {
+    await db.changeAccountPin(state.currentUser.id, values.pin);
+    state.currentUser = { ...state.currentUser, mustChangePin: false };
+    state.accounts = await db.listAccounts();
+    render();
+    showToast("تم تعيين رمز دخول جديد.");
+  } catch (error) { showToast(error.message || "تعذر حفظ رمز الدخول.", "error"); }
+}
+
 async function handleAction(event) {
   const action = event.currentTarget.dataset.action;
   const id = event.currentTarget.dataset.id;
-  if (action === "navigate") { state.view = event.currentTarget.dataset.view; render(); return; }
+  if (action === "fill-login") { const input = root.querySelector("#login-form [name=username]"); if (input) { input.value = event.currentTarget.dataset.username; root.querySelector("#login-form [name=pin]")?.focus(); } return; }
+  if (action === "logout") { await db.clearPersistentSession(); state.currentUser = null; state.cart = []; state.view = "sales"; closeDialog(); render(); showToast("تم تسجيل الخروج."); return; }
+  if (action === "navigate") { const view = event.currentTarget.dataset.view; if (!canAccessView(state.currentUser, view)) { adminOnlyMessage(); return; } state.view = view; render(); if (view === "settings" && isAdmin(state.currentUser)) void refreshCloudBackups({ quiet: true }); return; }
+  if (!state.currentUser) { render(); return; }
+  if (!canUseAction(state.currentUser, action, { mode: event.currentTarget.dataset.mode })) { adminOnlyMessage(); return; }
+  if (action === "toggle-theme") { toggleTheme(); return; }
   if (action === "new-product") { openProductDialog(); return; }
   if (action === "open-product") { openProductDialog(await db.getProduct(id)); return; }
   if (action === "adjust-stock") { openAdjustmentDialog(await db.getProduct(id)); return; }
+  if (action === "count-stock") { openStockCountDialog(await db.getProduct(id)); return; }
   if (action === "open-scanner") { openScanner(event.currentTarget.dataset.mode); return; }
   if (action === "add-cart") { addToCart(id); return; }
   if (action === "cart-increment") { changeCart(id, 1); return; }
@@ -191,7 +402,39 @@ async function handleAction(event) {
   if (action === "cart-remove") { state.cart = state.cart.filter((line) => line.productId !== id); render(); return; }
   if (action === "clear-cart") { state.cart = []; render(); return; }
   if (action === "checkout") { openCheckoutDialog(); return; }
-  if (action === "open-invoice") { openInvoiceDialog(id); }
+  if (action === "open-invoice") { openInvoiceDialog(id); return; }
+  if (action === "new-customer") { openCustomerDialog(); return; }
+  if (action === "open-customer") { openCustomerAccountDialog(id); return; }
+  if (action === "edit-customer") { openCustomerDialog(state.customers.find((customer) => customer.id === id)); return; }
+  if (action === "delete-customer") { deleteCustomer(id); return; }
+  if (action === "record-customer-payment") { openCustomerPaymentDialog(id); return; }
+  if (action === "new-supplier") { openSupplierDialog(); return; }
+  if (action === "open-supplier") { openSupplierDialog(state.suppliers.find((supplier) => supplier.id === id)); return; }
+  if (action === "open-supplier-account") { openSupplierAccountDialog(id); return; }
+  if (action === "delete-supplier") { deleteSupplier(id); return; }
+  if (action === "record-supplier-payment") { openSupplierPaymentDialog(id); return; }
+  if (action === "new-purchase") { openPurchaseDialog(); return; }
+  if (action === "open-purchase") { openPurchaseDialog(id); return; }
+  if (action === "purchase-return") { openPurchaseReturnDialog(id); return; }
+  if (action === "sale-return") { openSaleReturnDialog(id); return; }
+  if (action === "new-expense") { openExpenseDialog(); return; }
+  if (action === "edit-expense") { openExpenseDialog(state.expenses.find((expense) => expense.id === id)); return; }
+  if (action === "delete-expense") { deleteExpense(id); return; }
+  if (action === "open-stock-history") { openStockHistoryDialog(id); return; }
+  if (action === "new-cash-deposit") { openCashMovementDialog("DEPOSIT"); return; }
+  if (action === "new-cash-withdrawal") { openCashMovementDialog("WITHDRAWAL"); return; }
+  if (action === "export-backup") { downloadBackup(); return; }
+  if (action === "open-cloud-auth") { openCloudAuthDialog(); return; }
+  if (action === "cloud-upload-backup") { uploadCurrentCloudBackup(); return; }
+  if (action === "cloud-refresh-backups") { refreshCloudBackups(); return; }
+  if (action === "cloud-restore-backup") { restoreCloudBackup(id); return; }
+  if (action === "cloud-delete-backup") { removeCloudBackup(id); return; }
+  if (action === "cloud-signout") { disconnectCloudBackup(); return; }
+  if (action === "export-report") { downloadReportCsv(); return; }
+  if (action === "reset-data") { resetAllData(); return; }
+  if (action === "new-account") { openAccountDialog(); return; }
+  if (action === "open-account") { openAccountDialog(state.accounts.find((account) => account.id === id)); return; }
+  if (action === "change-account-pin") { openAccountPinDialog(state.accounts.find((account) => account.id === id)); return; }
 }
 
 function addToCart(productId) {
@@ -215,6 +458,17 @@ function changeCart(productId, delta) {
   render();
 }
 
+function setCartQuantity(productId, quantity, { renderNow = true } = {}) {
+  const product = state.products.find((item) => item.id === productId);
+  const line = state.cart.find((item) => item.productId === productId);
+  if (!product || !line) return;
+  const next = toNumber(quantity);
+  if (next <= 0) { state.cart = state.cart.filter((item) => item.productId !== productId); if (renderNow) render(); return; }
+  if (next > toNumber(product.quantity)) { showToast("الكمية المتوفرة غير كافية", "error"); if (renderNow) render(); return; }
+  line.quantity = next;
+  if (renderNow) render();
+}
+
 function openDialog(content) {
   closeDialog();
   const overlay = document.createElement("div");
@@ -230,11 +484,53 @@ function openDialog(content) {
 
 function closeDialog() { closeScannerDialog(); document.querySelector("#dialog-backdrop")?.remove(); }
 
+function accountFormMarkup(account = null) {
+  const isEdit = Boolean(account);
+  return `<div class="dialog__head"><div><span class="eyebrow">${isEdit ? "تعديل الحساب" : "حساب جديد"}</span><h2>${isEdit ? `بيانات ${escapeHtml(account.name)}` : "إضافة حساب"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="account-form" class="form-grid"><label>الاسم الظاهر<input name="name" dir="rtl" required maxlength="60" value="${escapeHtml(account?.name || "")}" autofocus /></label><label>اسم المستخدم<input name="username" dir="ltr" autocomplete="off" required minlength="3" maxlength="30" value="${escapeHtml(account?.username || "")}" ${isEdit ? "disabled" : ""} /></label>${isEdit ? "" : `<label>رمز الدخول<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" /></label>`}<label>الدور<select name="role">${ACCOUNT_ROLES.map((role) => `<option value="${role.id}" ${account?.role === role.id || (!account && role.id === "cashier") ? "selected" : ""}>${role.label}</option>`).join("")}</select></label><label class="checkbox-field"><input name="isActive" type="checkbox" ${account?.isActive !== false ? "checked" : ""} /><span>الحساب نشط ويمكنه الدخول</span></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">${isEdit ? "حفظ التعديلات" : "إنشاء الحساب"} ${icon("check", 17)}</button></div></form>`;
+}
+
+function openAccountDialog(account = null) {
+  const overlay = openDialog(accountFormMarkup(account));
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#account-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = Object.fromEntries(new FormData(form));
+    values.isActive = form.querySelector("[name=isActive]").checked;
+    try {
+      const updated = account ? await db.updateAccount(account.id, values) : await db.createAccount(values);
+      state.accounts = await db.listAccounts();
+      if (account?.id === state.currentUser?.id) {
+        state.currentUser = updated.isActive ? { ...state.currentUser, name: updated.name, role: updated.role } : null;
+        if (!state.currentUser) { await db.clearPersistentSession(); state.cart = []; }
+      }
+      closeDialog(); render(); showToast(account ? "تم حفظ بيانات الحساب." : "تم إنشاء الحساب.");
+    } catch (error) { showToast(error.message || "تعذر حفظ الحساب.", "error"); }
+  });
+}
+
+function openAccountPinDialog(account) {
+  if (!account) return;
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">رمز الدخول</span><h2>تغيير رمز ${escapeHtml(account.name)}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="account-pin-form" class="form-grid"><label>رمز الدخول الجديد<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" autofocus /></label><label>تأكيد الرمز<input name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" /></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ الرمز ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#account-pin-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    if (values.pin !== values.pinConfirm) { showToast("رمزا الدخول غير متطابقين.", "error"); return; }
+    try {
+      await db.changeAccountPin(account.id, values.pin);
+      state.accounts = await db.listAccounts();
+      if (account.id === state.currentUser?.id) state.currentUser = { ...state.currentUser, mustChangePin: false };
+      closeDialog(); render(); showToast("تم تغيير رمز الدخول.");
+    } catch (error) { showToast(error.message || "تعذر تغيير رمز الدخول.", "error"); }
+  });
+}
+
 function productFormMarkup(product = null, presetBarcode = "") {
   const isEdit = Boolean(product);
   const input = (name, label, type = "text", value = "", attrs = "") => `<label>${label}<input name="${name}" type="${type}" value="${escapeHtml(value)}" ${attrs} /></label>`;
   const barcodeField = `<label class="barcode-field">الباركود<div class="barcode-field__control"><input id="product-barcode" name="barcode" type="text" dir="ltr" inputmode="numeric" autocomplete="off" value="${escapeHtml(product?.barcode || presetBarcode)}" /><button id="scan-product-barcode" class="button button--secondary barcode-field__scan" type="button">${icon("scan", 17)}<span>مسح</span></button></div><small id="barcode-feedback" class="barcode-feedback" aria-live="polite">اكتب الباركود أو امسحه بالكاميرا.</small></label>`;
-  return `<div class="dialog__head"><div><span class="eyebrow">${isEdit ? "تحديث الكتالوج" : "منتج جديد"}</span><h2>${isEdit ? `تعديل ${escapeHtml(product.name)}` : "إضافة منتج"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="product-form" class="form-grid" data-id="${product?.id || ""}">${input("name", "اسم المنتج", "text", product?.name, "required maxlength=100 autofocus dir=rtl")}${barcodeField}${input("internalCode", "الكود الداخلي", "text", product?.internalCode, "dir=ltr autocomplete=off")}${input("purchasePrice", "سعر الشراء", "number", product?.purchasePrice ?? "", "min=0 step=0.01 required")}${input("salePrice", "سعر البيع", "number", product?.salePrice ?? "", "min=0 step=0.01 required")}${!isEdit ? input("quantity", "الكمية الافتتاحية", "number", "0", "min=0 step=0.001") : `<div class="locked-field"><span>الكمية الحالية</span><strong>${amount(product.quantity)} ${escapeHtml(product.unit)}</strong><small>تُعدّل من شاشة المخزون فقط.</small></div>`}${input("minimumStock", "الحد الأدنى للمخزون", "number", product?.minimumStock ?? "0", "min=0 step=0.001 required")}<label>الوحدة<select name="unit">${UNITS.map((unit) => `<option value="${unit}" ${product?.unit === unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button type="submit" class="button button--primary">${isEdit ? "حفظ التعديلات" : "حفظ المنتج"} ${icon("check", 17)}</button></div></form>${isEdit ? `<div class="dialog__danger"><span>لا يُحذف المنتج نهائيًا؛ يحتفظ التطبيق بسجله إذا ارتبط بفواتير.</span><button class="text-button text-button--danger" id="delete-product">${icon("trash", 16)} حذف من القائمة</button></div>` : ""}`;
+  return `<div class="dialog__head"><div><span class="eyebrow">${isEdit ? "تحديث الكتالوج" : "منتج جديد"}</span><h2>${isEdit ? `تعديل ${escapeHtml(product.name)}` : "إضافة منتج"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="product-form" class="form-grid" data-id="${product?.id || ""}">${input("name", "اسم المنتج", "text", product?.name, "required maxlength=100 autofocus dir=rtl")}${barcodeField}${input("internalCode", "الكود الداخلي", "text", product?.internalCode, "dir=ltr autocomplete=off")}${input("purchasePrice", "سعر الشراء", "number", product?.purchasePrice ?? "", "min=0 step=0.01 required")}${input("salePrice", "سعر البيع", "number", product?.salePrice ?? "", "min=0 step=0.01 required")}${!isEdit ? input("quantity", "الكمية الافتتاحية", "number", "", "min=0 step=0.001") : `<div class="locked-field"><span>الكمية الحالية</span><strong>${amount(product.quantity)} ${escapeHtml(product.unit)}</strong><small>تُعدّل من شاشة المخزون فقط.</small></div>`}${input("minimumStock", "الحد الأدنى للمخزون", "number", product?.minimumStock ?? "", "min=0 step=0.001")}<label>الوحدة<select name="unit">${UNITS.map((unit) => `<option value="${unit}" ${product?.unit === unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">${isEdit ? "حفظ التعديلات" : "حفظ المنتج"} ${icon("check", 17)}</button></div></form>${isEdit ? `<div class="dialog__danger"><span>لا يُحذف المنتج نهائيًا؛ يحتفظ التطبيق بسجله إذا ارتبط بفواتير.</span><button class="text-button text-button--danger" id="delete-product">${icon("trash", 16)} حذف من القائمة</button></div>` : ""}`;
 }
 
 function openProductDialog(product = null, presetBarcode = "") {
@@ -271,24 +567,229 @@ function openProductDialog(product = null, presetBarcode = "") {
 }
 
 function openAdjustmentDialog(product) {
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حركة مخزون</span><h2>تعديل مخزون ${escapeHtml(product.name)}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="stock-before"><span>الكمية الحالية</span><strong>${amount(product.quantity)} ${escapeHtml(product.unit)}</strong></div><form id="adjustment-form" class="form-grid"><label>الكمية الجديدة<input required name="newQuantity" type="number" min="0" step="0.001" value="${product.quantity}" autofocus /></label><label>سبب التعديل<textarea name="note" required maxlength="180" placeholder="مثال: جرد آخر اليوم"></textarea></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button type="submit" class="button button--primary">تسجيل الحركة ${icon("check", 17)}</button></div></form>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حركة مخزون</span><h2>تعديل مخزون ${escapeHtml(product.name)}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="stock-before"><span>الكمية الحالية</span><strong>${amount(product.quantity)} ${escapeHtml(product.unit)}</strong></div><form id="adjustment-form" class="form-grid"><label>الكمية الجديدة${quantityControlMarkup({ value: product.quantity, min: 0, step: "0.001", inputAttrs: "name=\"newQuantity\" autofocus" })}</label><label>سبب التعديل<textarea name="note" required maxlength="180" placeholder="مثال: جرد آخر اليوم"></textarea></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button type="submit" class="button button--primary">تسجيل الحركة ${icon("check", 17)}</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  bindQuantityControl(overlay.querySelector(".quantity-control"), { min: 0, step: 0.001, onChange: () => {} });
   overlay.querySelector("#adjustment-form").addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); try { await db.adjustStock(product.id, values.newQuantity, values.note); await refresh(); closeDialog(); render(); showToast("تم تسجيل حركة تعديل المخزون"); } catch (error) { showToast(error.message, "error"); } });
 }
 
+function openStockCountDialog(product) {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">جرد المخزون</span><h2>جرد ${escapeHtml(product.name)}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="stock-before"><span>الكمية المسجلة</span><strong>${amount(product.quantity)} ${escapeHtml(product.unit)}</strong></div><form id="stock-count-form" class="form-grid"><label>الكمية الفعلية${quantityControlMarkup({ value: product.quantity, min: 0, step: "0.001", inputAttrs: "name=\"actualQuantity\" autofocus" })}</label><label>ملاحظة الجرد<textarea name="notes" required maxlength="180" placeholder="مثال: جرد نهاية اليوم"></textarea></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button type="submit" class="button button--primary">تسجيل الجرد ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); bindQuantityControl(overlay.querySelector(".quantity-control"), { min: 0, step: 0.001, onChange: () => {} }); overlay.querySelector("#stock-count-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); const count = await db.recordStockCount({ productId: product.id, ...values }); await refresh(); closeDialog(); render(); showToast(`تم تسجيل الجرد بفارق ${amount(count.difference)} ${product.unit}`); } catch (error) { showToast(error.message, "error"); } });
+}
+
+function openCashMovementDialog(type) {
+  const label = type === "DEPOSIT" ? "إيداع في الصندوق" : "سحب من الصندوق";
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حركة صندوق</span><h2>${label}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="cash-movement-form" class="form-grid"><label>المبلغ${quantityControlMarkup({ value: "", min: 0.01, step: "0.01", inputAttrs: "name=\"amount\" required autofocus" })}</label><label>التاريخ<input name="date" required type="date" value="${dateKey()}" /></label><label class="form-full">السبب أو الملاحظة<textarea name="notes" required maxlength="180" placeholder="مثال: إيداع بداية اليوم"></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ الحركة ${icon("check", 17)}</button></div></form>`); overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); bindQuantityControl(overlay.querySelector(".quantity-control"), { min: 0.01, step: 0.01, onChange: () => {} }); overlay.querySelector("#cash-movement-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); await db.createCashMovement({ type, ...values }); await refresh(); closeDialog(); render(); showToast(`تم حفظ ${label}`); } catch (error) { showToast(error.message, "error"); } });
+}
+
+async function saveSettings(event) { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); await db.saveSettings(values); state.settings = await db.getSettings(); await refresh(); render(); showToast("تم حفظ إعدادات المتجر"); } catch (error) { showToast(error.message, "error"); } }
+
+function downloadBackupPayload(backup, suffix = dateKey()) { const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `hesabi-backup-${suffix}.json`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); }
+
+async function downloadBackup() { try { downloadBackupPayload(await db.exportBackup()); showToast("تم تصدير النسخة الاحتياطية"); } catch (error) { showToast(error.message || "تعذر تصدير النسخة الاحتياطية.", "error"); } }
+
+async function refreshCloudBackups({ quiet = false } = {}) {
+  if (!isAdmin(state.currentUser) || !state.cloud.user) return;
+  state.cloud.loading = true; state.cloud.error = ""; if (state.view === "settings") render();
+  try { state.cloud.backups = await listCloudBackups(); }
+  catch (error) { state.cloud.error = error.message || "تعذر تحميل النسخ السحابية."; if (!quiet) showToast(state.cloud.error, "error"); }
+  finally { state.cloud.loading = false; if (state.view === "settings") render(); }
+}
+
+function openCloudAuthDialog() {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حساب النسخ السحابية</span><h2>ربط نسخة حسابي</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><p class="dialog__subtext">هذا بريد وكلمة مرور للنسخ السحابي فقط. لا يغيّر حساب الأدمن أو الكاشير المحليين، واستخدم نفس الحساب عند فتح النسخ من جهاز آخر.</p><form id="cloud-auth-form" class="form-grid"><label class="form-full">البريد الإلكتروني<input name="email" type="email" dir="ltr" autocomplete="email" required autofocus /></label><label class="form-full">كلمة مرور النسخ السحابية<input name="password" type="password" dir="ltr" autocomplete="current-password" minlength="6" required /></label><div class="cloud-backup-card__note form-full"><strong>تنبيه</strong><span>لا تحفظ كلمة المرور في حسابي. يحتفظ بها Firebase Authentication وفقًا لجلسة المتصفح فقط.</span></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--secondary" type="submit" data-cloud-auth-mode="signin">دخول</button><button class="button button--primary" type="submit" data-cloud-auth-mode="register">إنشاء وربط</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#cloud-auth-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    const submitter = event.submitter;
+    const controls = [...event.currentTarget.querySelectorAll("button")]; controls.forEach((button) => { button.disabled = true; });
+    try {
+      state.cloud.user = submitter?.dataset.cloudAuthMode === "register" ? await registerCloudBackupUser(values.email, values.password) : await signInCloudBackupUser(values.email, values.password);
+      state.cloud.backups = []; state.cloud.error = ""; closeDialog(); render(); await refreshCloudBackups({ quiet: true }); showToast("تم ربط حساب النسخ السحابية.");
+    } catch (error) { controls.forEach((button) => { button.disabled = false; }); showToast(error.message || "تعذر ربط حساب النسخ السحابية.", "error"); }
+  });
+}
+
+async function uploadCurrentCloudBackup() {
+  if (!window.confirm("سيُرفع وضع بيانات هذا الجهاز الحالي فقط إلى السحابة. لا توجد مزامنة لحظية. هل تريد إنشاء النسخة؟")) return;
+  state.cloud.busy = "upload"; state.cloud.error = ""; render();
+  try { const backup = await db.exportBackup(); await uploadCloudBackup(backup, { storeName: state.settings?.storeName || "حسابي" }); await refreshCloudBackups({ quiet: true }); showToast("اكتمل رفع النسخة السحابية بنجاح."); }
+  catch (error) { state.cloud.error = error.message || "تعذر رفع النسخة السحابية."; showToast(state.cloud.error, "error"); }
+  finally { state.cloud.busy = ""; if (state.view === "settings") render(); }
+}
+
+async function restoreCloudBackup(backupId) {
+  if (!window.confirm("ستتحقق حسابي من النسخة ثم تستبدل بيانات هذا الجهاز. سيُنزل أولًا ملف JSON وقائيًا محليًا، وستعود إلى شاشة الدخول. هل تريد المتابعة؟")) return;
+  state.cloud.busy = "restore"; state.cloud.error = ""; render();
+  try {
+    const safetyBackup = await db.exportBackup();
+    downloadBackupPayload(safetyBackup, `before-cloud-restore-${dateKey()}`);
+    const { payload } = await readCloudBackup(backupId);
+    db.validateBackup(payload);
+    await db.restoreBackup(payload);
+    await db.clearPersistentSession();
+    state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = null; state.cart = []; state.view = "sales"; await refresh(); render();
+    showToast("اكتملت الاستعادة بعد تنزيل نسخة وقائية محلية.");
+  } catch (error) { state.cloud.error = error.message || "تعذرت استعادة النسخة السحابية."; if (state.view === "settings") render(); showToast(state.cloud.error, "error"); }
+  finally { state.cloud.busy = ""; }
+}
+
+async function removeCloudBackup(backupId) {
+  if (!window.confirm("هل تريد حذف هذه النسخة السحابية نهائيًا؟ لن تتأثر بيانات هذا الجهاز.")) return;
+  state.cloud.busy = "delete"; render();
+  try { await deleteCloudBackup(backupId); await refreshCloudBackups({ quiet: true }); showToast("تم حذف النسخة السحابية."); }
+  catch (error) { state.cloud.error = error.message || "تعذر حذف النسخة السحابية."; showToast(state.cloud.error, "error"); }
+  finally { state.cloud.busy = ""; if (state.view === "settings") render(); }
+}
+
+async function disconnectCloudBackup() {
+  if (!window.confirm("سيُفصل حساب النسخ من هذا الجهاز فقط، ولن تُحذف النسخ السحابية. هل تريد المتابعة؟")) return;
+  try { await signOutCloudBackupUser(); state.cloud = { user: null, backups: [], loading: false, busy: "", error: "" }; render(); showToast("تم فصل حساب النسخ السحابية من هذا الجهاز."); }
+  catch (error) { showToast(error.message || "تعذر فصل الحساب السحابي.", "error"); }
+}
+
+function downloadReportCsv() { try { const data = state.analytics || { sales: {}, purchases: {}, expenses: {}, profit: {} }; const rows = [["البند", "القيمة"], ["من", state.reportFrom || "بداية السجل"], ["إلى", state.reportTo || "اليوم"], ["إجمالي المبيعات", data.sales.total || 0], ["مرتجع البيع", data.sales.returns || 0], ["صافي المبيعات", data.profit.netSales || 0], ["تكلفة البضاعة", data.profit.netCostOfGoods || 0], ["إجمالي المشتريات", data.purchases.total || 0], ["مرتجع الشراء", data.purchases.returns || 0], ["إجمالي المصروفات", data.expenses.total || 0], ["صافي الربح", data.profit.netProfit || 0], ["ديون العملاء الحالية", state.customers.reduce((sum, customer) => sum + toNumber(customer.balance), 0)], ["مستحقات الموردين الحالية", state.suppliers.reduce((sum, supplier) => sum + toNumber(supplier.balance), 0)]]; const escapeCsv = (value) => `"${String(value).replaceAll('"', '""')}"`; const blob = new Blob([`\uFEFF${rows.map((row) => row.map(escapeCsv).join(",")).join("\n")}`], { type: "text/csv;charset=utf-8" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `hesabi-report-${dateKey()}.csv`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); showToast("تم تصدير تقرير CSV"); } catch (error) { showToast(error.message || "تعذر تصدير التقرير.", "error"); } }
+
+async function restoreBackupFromFile(event) { const file = event.currentTarget.files?.[0]; if (!file) return; try { const parsed = JSON.parse(await file.text()); db.validateBackup(parsed); if (!window.confirm("ستستبدل الاستعادة كل بيانات هذا الجهاز بالنسخة المختارة. ستعود بعد ذلك إلى شاشة الدخول. هل تريد المتابعة؟")) { event.currentTarget.value = ""; return; } await db.restoreBackup(parsed); await db.clearPersistentSession(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = null; state.cart = []; state.view = "sales"; await refresh(); render(); showToast("تمت استعادة النسخة الاحتياطية بنجاح"); } catch (error) { showToast(error.message || "تعذر استعادة ملف النسخة الاحتياطية.", "error"); } finally { event.currentTarget.value = ""; } }
+
+async function resetAllData() { if (!window.confirm("سيُمسح كل السجل المحلي على هذا الجهاز. صدّر نسخة احتياطية أولًا. هل تريد المتابعة؟")) return; if (!window.confirm("تأكيد نهائي: لا يمكن التراجع من داخل التطبيق. هل تمضي في المسح؟")) return; try { await db.resetAllData(); state.settings = null; state.cart = []; state.view = "dashboard"; await refresh(); render(); showToast("مُسحت البيانات المحلية. يمكنك بدء سجل متجر جديد."); } catch (error) { showToast(error.message, "error"); } }
+
+async function toggleTheme() { try { const theme = state.settings?.theme === "dark" ? "light" : "dark"; await db.saveSettings({ ...state.settings, theme }); state.settings = await db.getSettings(); applyTheme(); render(); showToast(theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح"); } catch (error) { showToast(error.message, "error"); } }
+
 function openCheckoutDialog() {
   const initial = calculateSaleTotals(state.cart, 0);
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تثبيت الفاتورة</span><h2>مراجعة البيع</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="checkout-lines">${state.cart.map((line) => `<div><span>${escapeHtml(line.name)} × ${amount(line.quantity)}</span><strong>${money(line.unitPrice * line.quantity)}</strong></div>`).join("")}</div><form id="checkout-form" class="form-grid"><label>الخصم<input name="discount" type="number" min="0" step="0.01" value="0" /></label><label>طريقة الدفع<select name="paymentMethod">${PAYMENT_METHODS.map((method) => `<option value="${method}">${method}</option>`).join("")}</select></label><label class="form-full">المبلغ المدفوع<input id="paid-amount" name="paidAmount" type="number" min="0" step="0.01" value="${initial.total}" required /></label><div class="checkout-total form-full"><span>الإجمالي النهائي</span><strong id="checkout-total">${money(initial.total)}</strong></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>رجوع</button><button type="submit" class="button button--primary">تأكيد البيع ${icon("check", 17)}</button></div></form>`);
+  const paymentMethodToggle = `<fieldset class="payment-method-toggle"><legend>طريقة التحصيل</legend><input type="hidden" name="paymentMethod" value="نقدي" /><button class="payment-method-toggle__button is-selected is-cash" type="button" data-sale-payment-method="نقدي">كاش</button><button class="payment-method-toggle__button is-transfer" type="button" data-sale-payment-method="تحويل">تحويل</button></fieldset>`;
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تثبيت الفاتورة</span><h2>مراجعة البيع</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="checkout-lines">${state.cart.map((line) => `<div><span>${escapeHtml(line.name)} × ${amount(line.quantity)}</span><strong>${money(line.unitPrice * line.quantity)}</strong></div>`).join("")}</div><form id="checkout-form" class="form-grid"><label>الخصم<input name="discount" type="number" inputmode="decimal" min="0" step="0.01" /></label>${paymentMethodToggle}<fieldset class="payment-type form-full"><legend>نوع الدفع</legend><label><input name="paymentType" type="radio" value="نقدي" checked /> نقدي</label><label><input name="paymentType" type="radio" value="آجل" /> آجل</label></fieldset><label id="credit-customer-field" class="form-full" hidden>العميل<select name="customerId"><option value="">اختر العميل</option>${state.customers.map((customer) => `<option value="${customer.id}">${escapeHtml(customer.name)}${toNumber(customer.balance) ? ` — رصيد ${money(customer.balance)}` : ""}</option>`).join("")}</select></label><label class="form-full">المبلغ المدفوع<input id="paid-amount" name="paidAmount" type="number" inputmode="decimal" min="0" max="${initial.total}" step="0.01" value="${initial.total}" required /></label><div class="credit-summary form-full" id="credit-summary" hidden><span>المبلغ المتبقي</span><strong id="remaining-amount">${money(0)}</strong><small id="payment-status">مدفوعة</small></div><div class="checkout-total form-full"><span>الإجمالي النهائي</span><strong id="checkout-total">${money(initial.total)}</strong></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>رجوع</button><button type="submit" class="button button--primary">تأكيد البيع ${icon("check", 17)}</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
-  overlay.querySelector("[name=discount]").addEventListener("input", (event) => { const totals = calculateSaleTotals(state.cart, event.target.value); overlay.querySelector("#checkout-total").textContent = money(totals.total); overlay.querySelector("#paid-amount").value = totals.total; });
-  overlay.querySelector("#checkout-form").addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); try { const sale = await db.completeSale({ items: state.cart, ...values }); state.cart = []; await refresh(); closeDialog(); state.view = "invoices"; render(); showToast(`تم حفظ الفاتورة ${sale.invoiceNumber} وخصم المخزون`); } catch (error) { showToast(error.message, "error"); } });
+  const form = overlay.querySelector("#checkout-form"); const paidInput = overlay.querySelector("#paid-amount"); const creditField = overlay.querySelector("#credit-customer-field"); const creditSummary = overlay.querySelector("#credit-summary");
+  const setPaymentMethod = (method) => { form.paymentMethod.value = method; overlay.querySelectorAll("[data-sale-payment-method]").forEach((button) => button.classList.toggle("is-selected", button.dataset.salePaymentMethod === method)); };
+  overlay.querySelectorAll("[data-sale-payment-method]").forEach((button) => button.addEventListener("click", () => setPaymentMethod(button.dataset.salePaymentMethod)));
+  const totalsForForm = () => calculateSaleTotals(state.cart, form.discount.value);
+  const syncCheckout = ({ resetPaid = false } = {}) => { const totals = totalsForForm(); const isCredit = form.paymentType.value === "آجل"; paidInput.max = totals.total; if (!isCredit || resetPaid) paidInput.value = totals.total; if (toNumber(paidInput.value) > totals.total) paidInput.value = totals.total; const remaining = Math.max(0, totals.total - toNumber(paidInput.value)); overlay.querySelector("#checkout-total").textContent = money(totals.total); overlay.querySelector("#remaining-amount").textContent = money(remaining); overlay.querySelector("#payment-status").textContent = remaining === 0 ? "مدفوعة" : toNumber(paidInput.value) > 0 ? "مدفوعة جزئيًا — دين العميل المتبقي" : "غير مدفوعة — دين على العميل"; creditField.hidden = !isCredit; creditSummary.hidden = !isCredit; };
+  form.querySelectorAll("[name=paymentType]").forEach((input) => input.addEventListener("change", () => syncCheckout({ resetPaid: form.paymentType.value === "نقدي" }))); form.discount.addEventListener("input", () => syncCheckout({ resetPaid: form.paymentType.value === "نقدي" })); paidInput.addEventListener("input", () => syncCheckout());
+  form.addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); try { const sale = await db.completeSale({ items: state.cart, ...values }); state.cart = []; await refresh(); closeDialog(); state.view = "invoices"; render(); showToast(sale.paymentType === "آجل" ? `حُفظت الفاتورة ${sale.invoiceNumber} وربطت بحساب العميل` : `تم حفظ الفاتورة ${sale.invoiceNumber} وخصم المخزون`); } catch (error) { showToast(error.message, "error"); } });
 }
 
 async function openInvoiceDialog(saleId) {
   const invoice = await db.getInvoice(saleId);
   if (!invoice) return;
-  openDialog(`<div class="dialog__head"><div><span class="eyebrow">فاتورة محفوظة</span><h2>${invoice.invoiceNumber}</h2><p class="dialog__subtext">${dateTime(invoice.date)} · ${invoice.paymentMethod}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="invoice-detail">${invoice.items.map((item) => `<div><span><strong>${escapeHtml(item.productName)}</strong><small>${amount(item.quantity)} ${escapeHtml(item.unit)} × ${money(item.unitPrice)}</small></span><strong>${money(item.total)}</strong></div>`).join("")}<div class="invoice-detail__total"><span>الإجمالي قبل الخصم</span><strong>${money(invoice.subtotal)}</strong></div><div><span>الخصم</span><strong>${money(invoice.discount)}</strong></div><div class="invoice-detail__final"><span>الإجمالي النهائي</span><strong>${money(invoice.total)}</strong></div><div><span>المبلغ المدفوع</span><strong>${money(invoice.paidAmount)}</strong></div></div><div class="dialog__actions"><button class="button button--primary button--wide" data-dialog-close>إغلاق الفاتورة</button></div>`);
-  document.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">فاتورة محفوظة</span><h2>${invoice.invoiceNumber}</h2><p class="dialog__subtext">${dateTime(invoice.date)} · ${escapeHtml(invoice.paymentType || "نقدي")} · ${escapeHtml(invoice.paymentStatus || "مدفوعة")}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="invoice-detail">${invoice.items.map((item) => `<div><span><strong>${escapeHtml(item.productName)}</strong><small>${amount(item.quantity)} ${escapeHtml(item.unit)} × ${money(item.unitPrice)}${toNumber(item.returnedQuantity) ? ` · مرتجع ${amount(item.returnedQuantity)}` : ""}</small></span><strong>${money(item.total)}</strong></div>`).join("")}<div class="invoice-detail__total"><span>الإجمالي قبل الخصم</span><strong>${money(invoice.subtotal)}</strong></div><div><span>الخصم</span><strong>${money(invoice.discount)}</strong></div><div class="invoice-detail__final"><span>الإجمالي النهائي</span><strong>${money(invoice.total)}</strong></div>${invoice.customerName ? `<div><span>العميل</span><strong>${escapeHtml(invoice.customerName)}</strong></div>` : ""}<div><span>المبلغ المدفوع</span><strong>${money(invoice.paidAmount)}</strong></div>${invoice.paymentType === "آجل" ? `<div><span>المبلغ المتبقي</span><strong>${money(invoice.remainingAmount)}</strong></div>` : ""}</div><div class="dialog__actions"><button id="sale-return" class="button button--secondary" type="button">مرتجع بيع ${icon("rotate", 17)}</button>${invoice.customerId ? `<button id="open-invoice-customer" class="button button--secondary" type="button">حساب العميل</button>` : ""}<button class="button button--primary" data-dialog-close>إغلاق الفاتورة</button></div>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#sale-return").addEventListener("click", () => { closeDialog(); openSaleReturnDialog(saleId); });
+  overlay.querySelector("#open-invoice-customer")?.addEventListener("click", () => { closeDialog(); openCustomerAccountDialog(invoice.customerId); });
+}
+
+function openSupplierDialog(supplier = null) {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">${supplier ? "تحديث مورد" : "مورد جديد"}</span><h2>${supplier ? `تعديل ${escapeHtml(supplier.name)}` : "إضافة مورد"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="supplier-form" class="form-grid"><label>اسم المورد<input name="name" required maxlength="100" dir="rtl" value="${escapeHtml(supplier?.name || "")}" autofocus /></label><label>رقم الهاتف<input name="phone" type="tel" dir="ltr" value="${escapeHtml(supplier?.phone || "")}" /></label><label class="form-full">العنوان<input name="address" dir="rtl" value="${escapeHtml(supplier?.address || "")}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl">${escapeHtml(supplier?.notes || "")}</textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#supplier-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); if (supplier) await db.updateSupplier(supplier.id, values); else await db.createSupplier(values); await refresh(); closeDialog(); render(); showToast(supplier ? "تم تعديل المورد" : "تم حفظ المورد"); } catch (error) { showToast(error.message, "error"); } });
+}
+
+async function deleteSupplier(supplierId) { if (!window.confirm("هل تريد حذف المورد من القائمة؟")) return; try { await db.softDeleteSupplier(supplierId); await refresh(); render(); showToast("تم حذف المورد من القائمة"); } catch (error) { showToast(error.message, "error"); } }
+
+async function openSupplierAccountDialog(supplierId) {
+  const account = await db.getSupplierAccount(supplierId); if (!account) return; const typeLabel = { PURCHASE: "شراء", PAYMENT: "دفعة للمورد", PURCHASE_RETURN: "مرتجع شراء" };
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حساب المورد</span><h2>${escapeHtml(account.supplier.name)}</h2><p class="dialog__subtext">${escapeHtml(account.supplier.phone || account.supplier.address || "لا توجد بيانات اتصال")}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section class="account-summary"><div><span>إجمالي المشتريات</span><strong>${money(account.totalPurchases)}</strong></div><div><span>إجمالي المسدد</span><strong>${money(account.totalPaid)}</strong></div><div class="account-summary__balance"><span>المستحق للمورد</span><strong>${money(account.balance)}</strong></div></section><div class="dialog__actions"><button id="record-supplier-payment" class="button button--primary" data-action="record-supplier-payment" data-id="${account.supplier.id}" ${toNumber(account.balance) <= 0 ? "disabled" : ""}>تسجيل دفعة ${icon("wallet", 17)}</button><button class="button button--secondary" data-dialog-close>إغلاق</button></div><section class="account-transactions"><div class="section-caption"><span class="eyebrow">سجل الحساب</span><strong>العمليات المرتبطة</strong></div>${account.transactions.length ? account.transactions.map((transaction) => `<article><div><strong>${typeLabel[transaction.type] || transaction.type}</strong><small>${dateTime(transaction.date)}${transaction.invoiceNumber ? ` · ${escapeHtml(transaction.invoiceNumber)}` : ""}</small></div><div><strong class="${toNumber(transaction.amount) < 0 ? "is-negative" : ""}">${money(transaction.amount)}</strong><small>الرصيد: ${money(transaction.remainingAmount)}</small></div></article>`).join("") : `<div class="inline-empty">لا توجد عمليات على حساب هذا المورد.</div>`}</section>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); overlay.querySelector("#record-supplier-payment")?.addEventListener("click", () => { closeDialog(); openSupplierPaymentDialog(account.supplier.id); });
+}
+
+async function openSupplierPaymentDialog(supplierId) {
+  const account = await db.getSupplierAccount(supplierId); if (!account) return; const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تسديد مورد</span><h2>دفعة إلى ${escapeHtml(account.supplier.name)}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="stock-before"><span>المستحق الحالي</span><strong>${money(account.balance)}</strong></div><form id="supplier-payment-form" class="form-grid"><label>المبلغ${quantityControlMarkup({ value: "", min: 0.01, step: "0.01", inputAttrs: "name=\"amount\" required autofocus" })}</label><label>طريقة الدفع<select name="paymentMethod">${PAYMENT_METHODS.map((method) => `<option value="${method}">${method}</option>`).join("")}</select></label><label>التاريخ<input name="date" required type="date" value="${dateKey()}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl" placeholder="اختياري"></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ الدفعة ${icon("check", 17)}</button></div></form>`); overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); bindQuantityControl(overlay.querySelector(".quantity-control"), { min: 0.01, step: 0.01, onChange: () => {} }); overlay.querySelector("#supplier-payment-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); const payment = await db.registerSupplierPayment({ supplierId, ...values }); await refresh(); closeDialog(); openSupplierPaymentReceipt(payment); } catch (error) { showToast(error.message, "error"); } });
+}
+
+function openSupplierPaymentReceipt(payment) {
+  const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">إيصال دفعة مورد</span><h2>${escapeHtml(state.settings?.storeName || "حسابي")}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="supplier-payment-receipt" class="payment-receipt"><div><span>المورد</span><strong>${escapeHtml(payment.supplierName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>طريقة الدفع</span><strong>${escapeHtml(payment.paymentMethod)}</strong></div></section><div class="dialog__actions"><button id="print-supplier-receipt" class="button button--primary">طباعة الإيصال</button></div>`); overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); overlay.querySelector("#print-supplier-receipt").addEventListener("click", () => window.print());
+}
+
+function openCustomerDialog(customer = null) {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">${customer ? "تحديث عميل" : "عميل جديد"}</span><h2>${customer ? `تعديل ${escapeHtml(customer.name)}` : "إضافة عميل"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="customer-form" class="form-grid"><label>اسم العميل<input name="name" required maxlength="100" dir="rtl" value="${escapeHtml(customer?.name || "")}" autofocus /></label><label>رقم الهاتف<input name="phone" type="tel" inputmode="tel" dir="ltr" value="${escapeHtml(customer?.phone || "")}" /></label><label class="form-full">العنوان<input name="address" dir="rtl" value="${escapeHtml(customer?.address || "")}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl">${escapeHtml(customer?.notes || "")}</textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ العميل ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#customer-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); if (customer) await db.updateCustomer(customer.id, values); else await db.createCustomer(values); await refresh(); closeDialog(); state.view = "customers"; render(); showToast(customer ? "تم تعديل العميل" : "تم حفظ العميل"); } catch (error) { showToast(error.message, "error"); } });
+}
+
+async function deleteCustomer(customerId) { if (!window.confirm("هل تريد إخفاء العميل من القائمة؟ سيبقى تاريخه وفواتيره محفوظين.")) return; try { await db.softDeleteCustomer(customerId); await refresh(); render(); showToast("أُخفي العميل مع الحفاظ على سجله التاريخي."); } catch (error) { showToast(error.message, "error"); } }
+
+async function openCustomerAccountDialog(customerId) {
+  const account = await db.getCustomerAccount(customerId); if (!account) return; const typeLabel = { CREDIT_SALE: "بيع آجل", PAYMENT: "دفعة عميل", SALE_RETURN: "مرتجع بيع" };
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حساب العميل</span><h2>${escapeHtml(account.customer.name)}</h2><p class="dialog__subtext">${escapeHtml(account.customer.phone || account.customer.address || "لا توجد بيانات اتصال")}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section class="account-summary"><div><span>إجمالي المبيعات</span><strong>${money(account.totalSales)}</strong></div><div><span>إجمالي المدفوع</span><strong>${money(account.totalPaid)}</strong></div><div class="account-summary__balance"><span>الرصيد المستحق</span><strong>${money(account.balance)}</strong></div></section><div class="dialog__actions"><button id="record-customer-payment" class="button button--primary" data-action="record-customer-payment" data-id="${account.customer.id}" ${toNumber(account.balance) <= 0 ? "disabled" : ""}>تسجيل دفعة ${icon("wallet", 17)}</button><button class="button button--secondary" data-dialog-close>إغلاق</button></div><section class="account-transactions"><div class="section-caption"><span class="eyebrow">سجل الحساب</span><strong>العمليات المرتبطة</strong></div>${account.transactions.length ? account.transactions.map((transaction) => `<article><div><strong>${typeLabel[transaction.type] || transaction.type}</strong><small>${dateTime(transaction.date)}${transaction.invoiceNumber ? ` · ${escapeHtml(transaction.invoiceNumber)}` : ""}</small></div><div><strong class="${toNumber(transaction.amount) < 0 ? "is-negative" : ""}">${money(transaction.amount)}</strong><small>الرصيد: ${money(transaction.remainingAmount)}</small></div></article>`).join("") : `<div class="inline-empty">لا توجد عمليات على حساب هذا العميل.</div>`}</section>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#record-customer-payment")?.addEventListener("click", () => { closeDialog(); openCustomerPaymentDialog(account.customer.id); });
+}
+
+async function openCustomerPaymentDialog(customerId) {
+  const account = await db.getCustomerAccount(customerId); if (!account) return; const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تسديد رصيد</span><h2>دفعة من ${escapeHtml(account.customer.name)}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="stock-before"><span>الرصيد الحالي</span><strong>${money(account.balance)}</strong></div><form id="customer-payment-form" class="form-grid"><label>المبلغ${quantityControlMarkup({ value: "", min: 0.01, step: "0.01", inputAttrs: "name=\"amount\" required autofocus" })}</label><label>التاريخ<input name="date" required type="date" value="${dateKey()}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl" placeholder="اختياري"></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ الدفعة ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); bindQuantityControl(overlay.querySelector(".quantity-control"), { min: 0.01, step: 0.01, onChange: () => {} });
+  overlay.querySelector("#customer-payment-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); const payment = await db.registerCustomerPayment({ customerId, ...values }); await refresh(); closeDialog(); openPaymentReceipt(payment); } catch (error) { showToast(error.message, "error"); } });
+}
+
+function openPaymentReceipt(payment) {
+  const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">إيصال دفعة</span><h2>${escapeHtml(state.settings?.storeName || "حسابي")}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="payment-receipt" class="payment-receipt"><div><span>العميل</span><strong>${escapeHtml(payment.customerName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>العملة</span><strong>${escapeHtml(state.settings?.currency || "YER")}</strong></div></section><div class="dialog__actions"><button id="share-receipt" class="button button--secondary">مشاركة الإيصال</button><button id="print-receipt" class="button button--primary">طباعة إيصال</button></div>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#print-receipt").addEventListener("click", () => window.print());
+  overlay.querySelector("#share-receipt").addEventListener("click", async () => { const text = `${state.settings?.storeName || "حسابي"}\nإيصال دفعة\nالعميل: ${payment.customerName}\nالمبلغ: ${money(payment.amount)}\nالرصيد بعد الدفع: ${money(payment.balanceAfter)}`; try { if (navigator.share) await navigator.share({ title: "إيصال دفعة", text }); else { await navigator.clipboard.writeText(text); showToast("تم نسخ الإيصال للمشاركة"); } } catch { showToast("تعذرت مشاركة الإيصال الآن.", "error"); } });
+}
+
+function openExpenseDialog(expense = null) {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">${expense ? "تعديل المصروف" : "مصروف جديد"}</span><h2>${expense ? "تحديث بيانات المصروف" : "إضافة مصروف"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="expense-form" class="form-grid"><label>المبلغ<input name="amount" required type="number" min="0.01" step="0.01" value="${expense?.amount || ""}" autofocus /></label><label>نوع المصروف<select name="category">${EXPENSE_CATEGORIES.map((category) => `<option value="${category}" ${expense?.category === category ? "selected" : ""}>${category}</option>`).join("")}</select></label><label>التاريخ<input name="date" required type="date" value="${expense?.date || dateKey()}" /></label><label>الوصف<input name="description" dir="rtl" value="${escapeHtml(expense?.description || "")}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl">${escapeHtml(expense?.notes || "")}</textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ المصروف ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#expense-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); if (expense) await db.updateExpense(expense.id, values); else await db.createExpense(values); await refresh(); closeDialog(); render(); showToast(expense ? "تم تعديل المصروف" : "تم حفظ المصروف"); } catch (error) { showToast(error.message, "error"); } });
+}
+
+async function deleteExpense(expenseId) { if (!window.confirm("هل تريد حذف المصروف؟")) return; try { await db.deleteExpense(expenseId); await refresh(); render(); showToast("تم حذف المصروف"); } catch (error) { showToast(error.message, "error"); } }
+
+async function openPurchaseDialog(purchaseIdOrDraft = null) {
+  if (typeof purchaseIdOrDraft === "string") { openPurchaseDetail(await db.getPurchase(purchaseIdOrDraft)); return; }
+  const draft = purchaseIdOrDraft || { supplierId: "", notes: "", lines: [], paymentType: "نقدي", paidAmount: "", paymentMethod: "نقدي" }; const lines = draft.lines || []; const isDraftCredit = draft.paymentType === "آجل";
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">إدخال شراء</span><h2>فاتورة شراء جديدة</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="purchase-form" class="purchase-form"><label id="purchase-supplier-field">المورد <small id="purchase-supplier-note">اختياري للنقدي</small><select name="supplierId"><option value="">بدون مورد</option>${state.suppliers.map((supplier) => `<option value="${supplier.id}" ${draft.supplierId === supplier.id ? "selected" : ""}>${escapeHtml(supplier.name)}</option>`).join("")}</select></label><fieldset class="payment-type"><legend>نوع الدفع</legend><label><input name="paymentType" type="radio" value="نقدي" ${isDraftCredit ? "" : "checked"} /> نقدي</label><label><input name="paymentType" type="radio" value="آجل" ${isDraftCredit ? "checked" : ""} /> آجل</label></fieldset><label>طريقة الدفع<select name="paymentMethod">${PAYMENT_METHODS.map((method) => `<option value="${method}" ${draft.paymentMethod === method ? "selected" : ""}>${method}</option>`).join("")}</select></label><label>المبلغ المدفوع<input name="paidAmount" type="number" inputmode="decimal" min="0" step="0.01" value="${escapeHtml(draft.paidAmount ?? "")}" /></label><div class="credit-summary" id="purchase-credit-summary" hidden><span>المبلغ المتبقي للمورد</span><strong id="purchase-remaining-amount">${money(0)}</strong><small id="purchase-payment-status">مدفوعة</small></div><div class="purchase-picker"><label>إضافة منتج إلى الفاتورة<input id="purchase-product-search" dir="rtl" autocomplete="off" placeholder="ابحث بالاسم أو الباركود..." /></label><div id="purchase-product-results" class="purchase-product-results"></div><button id="purchase-new-product" class="text-button" type="button">${icon("plus", 16)} إضافة منتج جديد</button></div><div id="purchase-lines" class="purchase-lines"></div><label>ملاحظات<textarea name="notes" dir="rtl">${escapeHtml(draft.notes || "")}</textarea></label><div class="checkout-total"><span>إجمالي فاتورة الشراء</span><strong id="purchase-total">${money(0)}</strong></div><div class="dialog__actions"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ فاتورة الشراء ${icon("check", 17)}</button></div></form>`);
+  const form = overlay.querySelector("#purchase-form"); const search = overlay.querySelector("#purchase-product-search"); const results = overlay.querySelector("#purchase-product-results"); const linesHost = overlay.querySelector("#purchase-lines"); const paidInput = form.paidAmount; const supplierField = overlay.querySelector("#purchase-supplier-field"); const supplierNote = overlay.querySelector("#purchase-supplier-note"); const creditSummary = overlay.querySelector("#purchase-credit-summary");
+  const getDraft = () => ({ supplierId: form.supplierId.value, notes: form.notes.value, paymentType: form.paymentType.value, paidAmount: paidInput.value, paymentMethod: form.paymentMethod.value, lines: lines.map((line) => ({ ...line })) });
+  const syncPurchase = ({ resetPaid = false } = {}) => { const total = roundMoney(lines.reduce((sum, line) => sum + toNumber(line.quantity) * toNumber(line.unitCost), 0)); const isCredit = form.paymentType.value === "آجل"; if (!isCredit) paidInput.value = total || ""; else if (resetPaid) paidInput.value = ""; if (toNumber(paidInput.value) > total) paidInput.value = total; const remaining = Math.max(0, total - toNumber(paidInput.value)); creditSummary.hidden = !isCredit; supplierField.classList.toggle("is-required", isCredit); supplierNote.textContent = isCredit ? "مطلوب للشراء الآجل" : "اختياري للنقدي"; overlay.querySelector("#purchase-total").textContent = money(total); overlay.querySelector("#purchase-remaining-amount").textContent = money(remaining); overlay.querySelector("#purchase-payment-status").textContent = remaining === 0 ? "مدفوعة" : toNumber(paidInput.value) > 0 ? "مدفوعة جزئيًا — دين المورد المتبقي" : "غير مدفوعة — دين للمورد"; };
+  const renderLines = () => {
+    linesHost.innerHTML = lines.length ? lines.map((line, index) => `<article class="purchase-line"><div><strong>${escapeHtml(line.productName)}</strong><small>${escapeHtml(line.unit)}</small></div><label>الكمية${quantityControlMarkup({ value: line.quantity || "", min: 0.001, step: "0.001", inputAttrs: `data-purchase-quantity=\"${index}\"` })}</label><label>سعر الشراء<input data-purchase-cost="${index}" type="number" inputmode="decimal" min="0" step="0.01" value="${line.unitCost || ""}" /></label><strong>${money(toNumber(line.quantity) * toNumber(line.unitCost))}</strong><button data-remove-purchase-line="${index}" class="icon-button icon-button--danger" type="button" aria-label="حذف">${icon("close", 17)}</button></article>`).join("") : `<div class="inline-empty">أضف منتجًا واحدًا على الأقل.</div>`;
+    syncPurchase();
+    linesHost.querySelectorAll("[data-purchase-quantity]").forEach((input) => bindQuantityControl(input.closest(".quantity-control"), { min: 0.001, step: 0.001, onChange: (value) => { lines[Number(input.dataset.purchaseQuantity)].quantity = value; renderLines(); } }));
+    linesHost.querySelectorAll("[data-purchase-cost]").forEach((input) => input.addEventListener("change", (event) => { lines[Number(event.currentTarget.dataset.purchaseCost)].unitCost = Math.max(0, toNumber(event.currentTarget.value)); renderLines(); }));
+    linesHost.querySelectorAll("[data-remove-purchase-line]").forEach((button) => button.addEventListener("click", () => { lines.splice(Number(button.dataset.removePurchaseLine), 1); renderLines(); }));
+  };
+  const renderResults = (query = "") => { const normalized = query.trim().toLocaleLowerCase("ar"); const matches = state.products.filter((product) => !normalized || [product.name, product.barcode, product.internalCode].some((value) => value?.toLocaleLowerCase("ar").includes(normalized))).slice(0, 6); results.innerHTML = normalized ? (matches.length ? matches.map((product) => `<button type="button" data-add-purchase-product="${product.id}"><span><strong>${escapeHtml(product.name)}</strong><small dir="auto">${escapeHtml(product.barcode || product.internalCode || "دون رمز")}</small></span><span>${money(product.purchasePrice)}</span>${icon("plus", 16)}</button>`).join("") : `<p>لا يوجد منتج مطابق.</p>`) : ""; results.querySelectorAll("[data-add-purchase-product]").forEach((button) => button.addEventListener("click", () => { const product = state.products.find((item) => item.id === button.dataset.addPurchaseProduct); if (!product || lines.some((line) => line.productId === product.id)) return; lines.push({ productId: product.id, productName: product.name, unit: product.unit, quantity: 1, unitCost: product.purchasePrice }); search.value = ""; renderResults(); renderLines(); })); };
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); search.addEventListener("input", (event) => renderResults(event.target.value)); overlay.querySelector("#purchase-new-product").addEventListener("click", () => openPurchaseProductDialog(getDraft())); form.querySelectorAll("[name=paymentType]").forEach((input) => input.addEventListener("change", () => syncPurchase({ resetPaid: form.paymentType.value === "آجل" }))); paidInput.addEventListener("input", () => syncPurchase()); renderLines();
+  form.addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(form)); await db.createPurchase({ ...values, items: lines }); await refresh(); closeDialog(); state.view = "purchases"; render(); showToast("تم حفظ فاتورة الشراء وزيادة المخزون"); } catch (error) { showToast(error.message, "error"); } });
+}
+
+function openPurchaseProductDialog(draft) {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">ضمن فاتورة شراء</span><h2>إضافة منتج جديد</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="purchase-product-form" class="form-grid"><label>اسم المنتج<input name="name" required dir="rtl" autofocus /></label><label>الباركود<input name="barcode" dir="ltr" /></label><label>الصنف<input name="category" dir="rtl" placeholder="مثال: مشروبات" /></label><label>الوحدة<select name="unit">${UNITS.map((unit) => `<option value="${unit}">${unit}</option>`).join("")}</select></label><label>سعر الشراء<input name="purchasePrice" type="number" min="0" step="0.01" required /></label><label>سعر البيع<input name="salePrice" type="number" min="0" step="0.01" required /></label><label>الكمية للفاتورة<input name="purchaseQuantity" type="number" min="0.001" step="0.001" required /></label><label>الحد الأدنى<input name="minimumStock" type="number" min="0" step="0.001" /></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button type="submit" class="button button--primary">إضافة للفاتورة ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); overlay.querySelector("#purchase-product-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); const product = await db.createProduct({ ...values, quantity: 0, internalCode: "" }); await refresh(); closeDialog(); draft.lines.push({ productId: product.id, productName: product.name, unit: product.unit, quantity: values.purchaseQuantity, unitCost: values.purchasePrice }); openPurchaseDialog(draft); } catch (error) { showToast(error.message, "error"); } });
+}
+
+function openPurchaseDetail(purchase) {
+  if (!purchase) return;
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">فاتورة شراء محفوظة</span><h2>${purchase.invoiceNumber}</h2><p class="dialog__subtext">${escapeHtml(purchase.supplierName)} · ${dateTime(purchase.date)}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="invoice-detail">${purchase.items.map((item) => `<div><span><strong>${escapeHtml(item.productName)}</strong><small>${amount(item.quantity)} ${escapeHtml(item.unit)} × ${money(item.unitCost)}${toNumber(item.returnedQuantity) ? ` · مرتجع ${amount(item.returnedQuantity)}` : ""}</small></span><strong>${money(item.total)}</strong></div>`).join("")}<div class="invoice-detail__final"><span>الإجمالي</span><strong>${money(purchase.total)}</strong></div></div><div class="dialog__actions"><button id="purchase-return" class="button button--secondary">مرتجع شراء ${icon("rotate", 17)}</button><button class="button button--primary" data-dialog-close>إغلاق</button></div>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#purchase-return").addEventListener("click", () => { closeDialog(); openPurchaseReturnDialog(purchase.id); });
+}
+
+async function openPurchaseReturnDialog(purchaseId) {
+  const purchase = await db.getPurchase(purchaseId); if (!purchase) return;
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">مرتجع شراء</span><h2>${purchase.invoiceNumber}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="purchase-return-form" class="return-form">${purchase.items.map((item) => { const max = Math.max(0, toNumber(item.quantity) - toNumber(item.returnedQuantity)); return `<div class="return-line"><span><strong>${escapeHtml(item.productName)}</strong><small>المتاح للإرجاع: ${amount(max)}</small></span>${quantityControlMarkup({ value: "", min: 0, max, step: "0.001", inputAttrs: `name=\"${item.id}\"` })}</div>`; }).join("")}<label>ملاحظات<textarea name="notes" dir="rtl"></textarea></label><div class="dialog__actions"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button type="submit" class="button button--primary">تسجيل المرتجع ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelectorAll(".quantity-control").forEach((control) => bindQuantityControl(control, { min: 0, max: toNumber(control.querySelector("input").max), step: 0.001, onChange: () => {} }));
+  overlay.querySelector("#purchase-return-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); try { await db.createPurchaseReturn({ purchaseId, notes: data.get("notes"), items: purchase.items.map((item) => ({ purchaseItemId: item.id, quantity: data.get(item.id) })) }); await refresh(); closeDialog(); render(); showToast("تم حفظ مرتجع الشراء وتحديث المخزون"); } catch (error) { showToast(error.message, "error"); } });
+}
+
+async function openSaleReturnDialog(saleId) {
+  const invoice = await db.getInvoice(saleId); if (!invoice) return;
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">مرتجع بيع</span><h2>${invoice.invoiceNumber}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="sale-return-form" class="return-form">${invoice.items.map((item) => { const max = Math.max(0, toNumber(item.quantity) - toNumber(item.returnedQuantity)); return `<div class="return-line"><span><strong>${escapeHtml(item.productName)}</strong><small>المتاح للإرجاع: ${amount(max)}</small></span>${quantityControlMarkup({ value: "", min: 0, max, step: "0.001", inputAttrs: `name=\"${item.id}\"` })}</div>`; }).join("")}<label>ملاحظات<textarea name="notes" dir="rtl"></textarea></label><div class="dialog__actions"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button type="submit" class="button button--primary">تسجيل المرتجع ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelectorAll(".quantity-control").forEach((control) => bindQuantityControl(control, { min: 0, max: toNumber(control.querySelector("input").max), step: 0.001, onChange: () => {} }));
+  overlay.querySelector("#sale-return-form").addEventListener("submit", async (event) => { event.preventDefault(); const data = new FormData(event.currentTarget); try { await db.createSaleReturn({ saleId, notes: data.get("notes"), items: invoice.items.map((item) => ({ saleItemId: item.id, quantity: data.get(item.id) })) }); await refresh(); closeDialog(); render(); showToast("تم حفظ مرتجع البيع وزيادة المخزون"); } catch (error) { showToast(error.message, "error"); } });
+}
+
+function openStockHistoryDialog(productId = "") {
+  const products = new Map(state.products.map((product) => [product.id, product])); const movements = state.stockMovements.filter((movement) => !productId || movement.productId === productId);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">سجل حركة المخزون</span><h2>${productId ? escapeHtml(products.get(productId)?.name || "المنتج") : "كل الحركات"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="movement-list">${movements.length ? movements.map((movement) => `<article><div><strong>${escapeHtml(products.get(movement.productId)?.name || "منتج محذوف")}</strong><small>${dateTime(movement.date)} · ${escapeHtml(movement.type)}</small></div><div><strong class="movement-amount ${toNumber(movement.quantity) >= 0 ? "is-positive" : "is-negative"}">${toNumber(movement.quantity) >= 0 ? "+" : ""}${amount(movement.quantity)}</strong><small>${amount(movement.previousQuantity)} ← ${amount(movement.newQuantity)}</small></div></article>`).join("") : `<div class="inline-empty">لا توجد حركات مسجلة.</div>`}</div><div class="dialog__actions"><button class="button button--primary button--wide" data-dialog-close>إغلاق</button></div>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
 }
 
 async function findBarcode(code, mode) {
@@ -332,8 +833,38 @@ function closeScannerDialog() {
   document.querySelector("#scanner-backdrop")?.remove();
 }
 
+let scannerSuccessAudioContext;
+function getScannerSuccessAudioContext() {
+  const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextConstructor) return null;
+  return scannerSuccessAudioContext ||= new AudioContextConstructor();
+}
+function primeScannerSuccessSound() {
+  try { getScannerSuccessAudioContext()?.resume().catch(() => {}); } catch { /* لا تمنع قيود الصوت بدء الماسح. */ }
+}
+function playScannerSuccessSound() {
+  try {
+    const context = getScannerSuccessAudioContext();
+    if (!context) return;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const startAt = context.currentTime;
+    context.resume().catch(() => {});
+    oscillator.type = "sine";
+    oscillator.frequency.setValueAtTime(880, startAt);
+    oscillator.frequency.exponentialRampToValueAtTime(1175, startAt + 0.09);
+    gain.gain.setValueAtTime(0.0001, startAt);
+    gain.gain.exponentialRampToValueAtTime(0.11, startAt + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.16);
+    oscillator.connect(gain).connect(context.destination);
+    oscillator.start(startAt);
+    oscillator.stop(startAt + 0.17);
+  } catch { /* لا يؤثر غياب الصوت في مسار المسح أو الإدخال اليدوي. */ }
+}
+
 function openScannerOverlay({ title, description, onDetected, unsupportedMessage, manualMode, onManualEntry = null }) {
   closeScannerDialog();
+  primeScannerSuccessSound();
   const overlay = document.createElement("div");
   overlay.id = "scanner-backdrop";
   overlay.className = "scanner-backdrop";
@@ -380,6 +911,7 @@ async function startCameraScanner(overlay, onDetected, unsupportedMessage, manua
           const codes = await detector.detect(video);
           if (codes[0]?.rawValue) {
             session.reading = true;
+            playScannerSuccessSound();
             stopScanner();
             const closeAfterRead = await onDetected(codes[0].rawValue.trim(), overlay);
             if (closeAfterRead !== false) closeScannerDialog();
@@ -440,5 +972,5 @@ function stopScanner() {
 
 export async function bootApp(target) {
   root = target;
-  try { await db.open(); state.settings = await db.getSettings(); if (state.settings?.setupCompleted) await refresh(); render(); } catch (error) { root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>${escapeHtml(error.message)}</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
+  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); } catch (error) { root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>${escapeHtml(error.message)}</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }
