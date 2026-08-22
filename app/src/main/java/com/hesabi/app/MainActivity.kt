@@ -124,7 +124,8 @@ private fun HesabiNavHost(startRoute: String) {
                 onBarcodeScan = {
                     navController.navigate("${Routes.BARCODE}/${Routes.TARGET_SALES}")
                 },
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                navController = navController
             )
         }
 
@@ -150,7 +151,8 @@ private fun HesabiNavHost(startRoute: String) {
                     navController.navigate("${Routes.BARCODE}/${Routes.TARGET_PRODUCT_ADD}")
                 },
                 onSaved = { navController.popBackStack() },
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                navController = navController
             )
         }
 
@@ -165,7 +167,8 @@ private fun HesabiNavHost(startRoute: String) {
                     navController.navigate("${Routes.BARCODE}/${Routes.TARGET_PRODUCT_ADD}")
                 },
                 onSaved = { navController.popBackStack() },
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                navController = navController
             )
         }
 
@@ -242,8 +245,10 @@ private fun HesabiNavHost(startRoute: String) {
 
         composable(Routes.PURCHASE_ADD) {
             PurchaseFormScreen(
+                onBarcodeScan = { navController.navigate(Routes.BARCODE.replace("{target}", Routes.PURCHASE_ADD)) },
                 onSaved = { navController.popBackStack() },
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                navController = navController
             )
         }
 

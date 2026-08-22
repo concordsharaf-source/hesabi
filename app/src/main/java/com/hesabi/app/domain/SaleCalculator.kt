@@ -12,7 +12,7 @@ data class CartItem(
     val unitPrice: Long // سعر البيع بوحدة العملة الصغرى وقت الإضافة للسلة
 ) {
     /** إجمالي هذا العنصر بوحدة العملة الصغرى */
-    fun itemTotal(): Long = (unitPrice * quantity.toLong())
+    fun itemTotal(): Long = (unitPrice * quantity).toLong()
 }
 
 /**
@@ -42,7 +42,7 @@ object SaleCalculator {
     fun calculateSubtotal(items: List<CartItem>): Long {
         var total = 0L
         for (item in items) {
-            total += item.unitPrice * item.quantity.toLong()
+            total += (item.unitPrice * item.quantity).toLong()
         }
         return total
     }
@@ -106,7 +106,7 @@ object SaleCalculator {
     fun calculateInventoryValue(products: List<Product>): Long {
         var total = 0L
         for (product in products) {
-            total += product.purchasePrice * product.quantity.toLong()
+            total += (product.purchasePrice * product.quantity).toLong()
         }
         return total
     }

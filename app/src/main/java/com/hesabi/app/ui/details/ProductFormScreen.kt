@@ -57,7 +57,7 @@ fun ProductFormScreen(
     onBarcodeScan: () -> Unit,
     onSaved: () -> Unit,
     onBack: () -> Unit,
-    
+    navController: androidx.navigation.NavHostController
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
     // استخدام viewModel(factory) يضمن الاحتفاظ بنفس النسخة عبر كل إعادة تركيب —
@@ -67,11 +67,23 @@ fun ProductFormScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val title = if (state.isEditMode) "تعديل المنتج" else "إضافة منتج"
 
-    var showUnitPicker by remember { mutableStateOf(false) }
+    var activeDialog by remember { mutableStateOf<ProductDialog?>(null) }
 
     // عند نجاح الحفظ
     LaunchedEffect(state.isSaved) {
         if (state.isSaved) onSaved()
+    }
+
+    // مراقبة نتيجة مسح الباركود
+    val barcodeResult = navController.currentBackStackEntry
+        ?.savedStateHandle
+        ?.get<String>("barcode")
+    LaunchedEffect(barcodeResult) {
+        if (barcodeResult != null) {
+            viewModel.updateField(ProductField.BARCODE, barcodeResult)
+            // مسح القيمة من savedStateHandle لمنع التكرار
+            navController.currentBackStackEntry?.savedStateHandle?.remove<String>("barcode")
+        }
     }
 
     Scaffold(
@@ -183,7 +195,7 @@ fun ProductFormScreen(
             SelectionField(
                 label = "الوحدة",
                 displayValue = state.unit,
-                onClick = { showUnitPicker = true }
+                onClick = { activeDialog = ProductDialog.UNIT_PICKER }
             )
 
             // رسالة الخطأ
@@ -229,17 +241,24 @@ fun ProductFormScreen(
         }
     }
 
-    // نافذة اختيار الوحدة
-    if (showUnitPicker) {
-        UnitChoiceDialog(
-            selected = state.unit,
-            onUnitSelected = {
-                viewModel.updateField(ProductField.UNIT, it)
-                showUnitPicker = false
-            },
-            onDismiss = { showUnitPicker = false }
-        )
+    // إدارة النوافذ المنبثقة بشكل حصري
+    when (activeDialog) {
+        ProductDialog.UNIT_PICKER -> {
+            UnitChoiceDialog(
+                selected = state.unit,
+                onUnitSelected = {
+                    viewModel.updateField(ProductField.UNIT, it)
+                    activeDialog = null
+                },
+                onDismiss = { activeDialog = null }
+            )
+        }
+        null -> {}
     }
+}
+
+private enum class ProductDialog {
+    UNIT_PICKER
 }
 
 /**

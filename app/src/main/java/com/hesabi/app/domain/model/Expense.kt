@@ -35,5 +35,6 @@ data class Expense(
     val description: String,
     val date: Long = System.currentTimeMillis(),
     val notes: String? = null,
-    val isDeleted: Boolean = false
+    val isDeleted: Boolean = false,
+    val isFromCashbox: Boolean = true
 )

@@ -46,6 +46,12 @@ class HesabiApp : Application() {
         private set
     lateinit var expenseDao: ExpenseDao
         private set
+    lateinit var customerDao: com.hesabi.app.data.dao.CustomerDao
+        private set
+    lateinit var cashMovementDao: com.hesabi.app.data.dao.CashMovementDao
+        private set
+    lateinit var customerTransactionDao: com.hesabi.app.data.dao.CustomerTransactionDao
+        private set
 
     // المرحلة الثانية: الموردون، المشتريات، المرتجعات، المصروفات، الأرباح
     lateinit var purchaseRepository: PurchaseRepository
@@ -71,10 +77,19 @@ class HesabiApp : Application() {
         settingsUseCase = SettingsUseCase(storeRepository)
         productUseCase = ProductUseCase(db.productDao(), db.stockMovementDao())
         inventoryUseCase = InventoryUseCase(db.productDao(), db.stockMovementDao())
-        checkoutUseCase = CheckoutUseCase(db.productDao(), db.saleDao(), db.stockMovementDao())
+        checkoutUseCase = CheckoutUseCase(
+            db.productDao(),
+            db.saleDao(),
+            db.stockMovementDao(),
+            db.cashMovementDao(),
+            db.customerTransactionDao()
+        )
         movementDao = db.stockMovementDao()
         saleDao = db.saleDao()
         expenseDao = db.expenseDao()
+        customerDao = db.customerDao()
+        cashMovementDao = db.cashMovementDao()
+        customerTransactionDao = db.customerTransactionDao()
 
         purchaseRepository = PurchaseRepository(
             db.supplierDao(),
@@ -83,14 +98,20 @@ class HesabiApp : Application() {
             db.saleReturnDao(),
             db.expenseDao()
         )
-        purchaseUseCase = PurchaseUseCase(db.productDao(), db.purchaseDao(), db.stockMovementDao())
+        purchaseUseCase = PurchaseUseCase(
+            db.productDao(),
+            db.purchaseDao(),
+            db.stockMovementDao(),
+            db.cashMovementDao(),
+            db.supplierDao()
+        )
         purchaseReturnUseCase = PurchaseReturnUseCase(
             db.purchaseDao(), db.purchaseReturnDao(), db.productDao(), db.stockMovementDao()
         )
         saleReturnUseCase = SaleReturnUseCase(
             db.saleDao(), db.saleReturnDao(), db.productDao(), db.stockMovementDao()
         )
-        expenseUseCase = ExpenseUseCase(db.expenseDao())
+        expenseUseCase = ExpenseUseCase(db.expenseDao(), db.cashMovementDao())
         profitUseCase = ProfitUseCase(
             db.saleDao(),
             db.saleReturnDao(),

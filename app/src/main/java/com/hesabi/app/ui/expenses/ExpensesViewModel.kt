@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 data class ExpenseFormUiState(
     val amount: String = "",
     val typeIndex: Int = 0,
+    val isFromCashbox: Boolean = true,
     val description: String = "",
     val notes: String = "",
     val isSaving: Boolean = false,
@@ -31,6 +32,10 @@ class ExpensesViewModel(app: HesabiApp) : ViewModel() {
 
     fun setType(index: Int) {
         _state.update { it.copy(typeIndex = index) }
+    }
+
+    fun onSourceChange(isFromCashbox: Boolean) {
+        _state.update { it.copy(isFromCashbox = isFromCashbox) }
     }
 
     fun onDescriptionChange(value: String) {
@@ -57,7 +62,8 @@ class ExpensesViewModel(app: HesabiApp) : ViewModel() {
                 amount = amountMinor,
                 type = type,
                 description = description,
-                notes = current.notes.ifBlank { null }
+                notes = current.notes.ifBlank { null },
+                isFromCashbox = current.isFromCashbox
             )) {
                 is com.hesabi.app.domain.ExpenseResult.Success -> {
                     _state.update { it.copy(isSaving = false, isSaved = true) }

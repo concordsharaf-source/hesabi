@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.room.Room
 import com.hesabi.app.data.db.AppDatabase
 import com.hesabi.app.data.db.MIGRATION_1_2
+import com.hesabi.app.data.db.MIGRATION_2_3
+import com.hesabi.app.data.db.MIGRATION_3_4
 import java.util.concurrent.atomic.AtomicReference
 
 /**
@@ -23,7 +25,7 @@ object DatabaseProvider {
                 AppDatabase::class.java,
                 "hesabi_database"
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build()
             instanceRef.set(db)
             return db

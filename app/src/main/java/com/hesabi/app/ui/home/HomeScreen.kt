@@ -45,6 +45,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hesabi.app.HesabiApp
 import com.hesabi.app.util.formatMoney
 import com.hesabi.app.util.formatQuantity
+import com.hesabi.app.domain.model.UserRole
 import com.hesabi.app.ui.home.HomeViewModelFactory
 
 /**
@@ -89,7 +90,9 @@ fun HomeScreen(
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            // بطاقة مبيعات اليوم
+            val isAdmin = state.userRole == UserRole.ADMIN
+
+            // بطاقة مبيعات اليوم (تظهر للجميع)
             StatCard(
                 icon = Icons.Rounded.AttachMoney,
                 title = "مبيعات اليوم",
@@ -110,77 +113,81 @@ fun HomeScreen(
                     value = state.todayInvoiceCount.formatQuantity(),
                     tint = MaterialTheme.colorScheme.secondary
                 )
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.Storefront,
-                    title = "عدد المنتجات",
-                    value = state.productCount.formatQuantity(),
-                    tint = MaterialTheme.colorScheme.tertiary
-                )
+                if (isAdmin) {
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.Storefront,
+                        title = "عدد المنتجات",
+                        value = state.productCount.formatQuantity(),
+                        tint = MaterialTheme.colorScheme.tertiary
+                    )
+                }
             }
 
-            Spacer(Modifier.height(12.dp))
+            if (isAdmin) {
+                Spacer(Modifier.height(12.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.Inventory2,
-                    title = "قيمة المخزون",
-                    value = state.inventoryValue.formatMoney(state.currencySymbol),
-                    tint = MaterialTheme.colorScheme.primary
-                )
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.Warning,
-                    title = "مخزون منخفض",
-                    value = "${state.lowStockCount} منتج",
-                    tint = MaterialTheme.colorScheme.error,
-                    isWarning = state.lowStockCount > 0
-                )
-            }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.Inventory2,
+                        title = "قيمة المخزون",
+                        value = state.inventoryValue.formatMoney(state.currencySymbol),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.Warning,
+                        title = "مخزون منخفض",
+                        value = "${state.lowStockCount} منتج",
+                        tint = MaterialTheme.colorScheme.error,
+                        isWarning = state.lowStockCount > 0
+                    )
+                }
 
-            Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.ShoppingBag,
-                    title = "صافي المشتريات اليوم",
-                    value = state.todayNetPurchases.formatMoney(state.currencySymbol),
-                    tint = MaterialTheme.colorScheme.secondary
-                )
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.Payments,
-                    title = "مصروفات اليوم",
-                    value = state.todayExpenses.formatMoney(state.currencySymbol),
-                    tint = MaterialTheme.colorScheme.tertiary
-                )
-            }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.ShoppingBag,
+                        title = "صافي المشتريات اليوم",
+                        value = state.todayNetPurchases.formatMoney(state.currencySymbol),
+                        tint = MaterialTheme.colorScheme.secondary
+                    )
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.Payments,
+                        title = "مصروفات اليوم",
+                        value = state.todayExpenses.formatMoney(state.currencySymbol),
+                        tint = MaterialTheme.colorScheme.tertiary
+                    )
+                }
 
-            Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(12.dp))
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                StatCard(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.TrendingUp,
-                    title = "صافي الربح اليوم",
-                    value = state.todayNetProfit.formatMoney(state.currencySymbol),
-                    tint = if (state.todayNetProfit >= 0L)
-                        MaterialTheme.colorScheme.primary
-                    else
-                        MaterialTheme.colorScheme.error,
-                    isWarning = state.todayNetProfit < 0L
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.TrendingUp,
+                        title = "صافي الربح اليوم",
+                        value = state.todayNetProfit.formatMoney(state.currencySymbol),
+                        tint = if (state.todayNetProfit >= 0L)
+                            MaterialTheme.colorScheme.primary
+                        else
+                            MaterialTheme.colorScheme.error,
+                        isWarning = state.todayNetProfit < 0L
+                    )
+                }
             }
 
             Spacer(Modifier.height(20.dp))
@@ -204,20 +211,22 @@ fun HomeScreen(
                     tint = MaterialTheme.colorScheme.primary,
                     onClick = onNavigateToSales
                 )
-                QuickAction(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.Storefront,
-                    label = "المنتجات",
-                    tint = MaterialTheme.colorScheme.secondary,
-                    onClick = onNavigateToProducts
-                )
-                QuickAction(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.Inventory2,
-                    label = "المخزون",
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    onClick = onNavigateToInventory
-                )
+                if (isAdmin) {
+                    QuickAction(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.Storefront,
+                        label = "المنتجات",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        onClick = onNavigateToProducts
+                    )
+                    QuickAction(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.Inventory2,
+                        label = "المخزون",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        onClick = onNavigateToInventory
+                    )
+                }
             }
             Spacer(Modifier.height(12.dp))
             Row(
@@ -232,51 +241,54 @@ fun HomeScreen(
                     onClick = onNavigateToInvoices
                 )
             }
-            Spacer(Modifier.height(12.dp))
-            Text(
-                "المشتريات والمالية",
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                QuickAction(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.People,
-                    label = "الموردون",
-                    tint = MaterialTheme.colorScheme.primary,
-                    onClick = onNavigateToSuppliers
+            
+            if (isAdmin) {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "المشتريات والمالية",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                QuickAction(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.ShoppingBag,
-                    label = "المشتريات",
-                    tint = MaterialTheme.colorScheme.secondary,
-                    onClick = onNavigateToPurchases
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                QuickAction(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.Payments,
-                    label = "المصروفات",
-                    tint = MaterialTheme.colorScheme.tertiary,
-                    onClick = onNavigateToExpenses
-                )
-                QuickAction(
-                    modifier = Modifier.weight(1f),
-                    icon = Icons.Rounded.Analytics,
-                    label = "التقارير والأرباح",
-                    tint = MaterialTheme.colorScheme.primary,
-                    onClick = onNavigateToReports
-                )
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    QuickAction(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.People,
+                        label = "الموردون",
+                        tint = MaterialTheme.colorScheme.primary,
+                        onClick = onNavigateToSuppliers
+                    )
+                    QuickAction(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.ShoppingBag,
+                        label = "المشتريات",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        onClick = onNavigateToPurchases
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    QuickAction(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.Payments,
+                        label = "المصروفات",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        onClick = onNavigateToExpenses
+                    )
+                    QuickAction(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.Analytics,
+                        label = "التقارير والأرباح",
+                        tint = MaterialTheme.colorScheme.primary,
+                        onClick = onNavigateToReports
+                    )
+                }
             }
             Spacer(Modifier.height(24.dp))
         }

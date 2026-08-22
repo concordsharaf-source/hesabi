@@ -52,6 +52,7 @@ fun ExpensesScreen(
 
     val types = ExpenseType.entries
     val selectedType = if (state.typeIndex in types.indices) types[state.typeIndex] else types[0]
+    var showSourcePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let { snackbarHostState.showSnackbar(it) }
@@ -60,36 +61,62 @@ fun ExpensesScreen(
         if (state.isSaved) onSaved()
     }
 
-    if (showTypePicker) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showTypePicker = false },
-            title = { Text("اختر نوع المصروف", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(320.dp)
-                        .verticalScroll(rememberScrollState())
-                ) {
-                    types.forEachIndexed { index, type ->
-                        TextButton(
-                            onClick = { viewModel.setType(index); showTypePicker = false },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                type.label,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.End
-                            )
+    when {
+        showTypePicker -> {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showTypePicker = false },
+                title = { Text("اختر نوع المصروف", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+                text = {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(320.dp)
+                            .verticalScroll(rememberScrollState())
+                    ) {
+                        types.forEachIndexed { index, type ->
+                            TextButton(
+                                onClick = { viewModel.setType(index); showTypePicker = false },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    type.label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.End
+                                )
+                            }
                         }
                     }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showTypePicker = false }) { Text("إلغاء") }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = { showTypePicker = false }) { Text("إلغاء") }
-            }
-        )
+            )
+        }
+        showSourcePicker -> {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { showSourcePicker = false },
+                title = { Text("مصدر المبلغ", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+                text = {
+                    Column {
+                        listOf(true to "من الصندوق", false to "خارج الصندوق").forEach { (isFromCashbox, label) ->
+                            TextButton(
+                                onClick = { 
+                                    viewModel.onSourceChange(isFromCashbox)
+                                    showSourcePicker = false 
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showSourcePicker = false }) { Text("إلغاء") }
+                }
+            )
+        }
     }
 
     Scaffold(
@@ -119,6 +146,18 @@ fun ExpensesScreen(
             ) {
                 Text(
                     "نوع المصروف: ${selectedType.label}",
+                    modifier = Modifier.fillMaxWidth(),
+                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+            Spacer(Modifier.height(12.dp))
+            OutlinedButton(
+                onClick = { showSourcePicker = true },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    "مصدر المبلغ: ${if (state.isFromCashbox) "من الصندوق" else "خارج الصندوق"}",
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center,
                     fontWeight = FontWeight.Medium

@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
+import com.hesabi.app.domain.model.UserRole
+
 data class HomeUiState(
     val store: Store? = null,
     val todaySalesTotal: Long = 0L,
@@ -27,7 +29,8 @@ data class HomeUiState(
     // المرحلة الثانية: مشتريات اليوم ومصروفاته وصافي الربح اليومي
     val todayNetPurchases: Long = 0L,
     val todayExpenses: Long = 0L,
-    val todayNetProfit: Long = 0L
+    val todayNetProfit: Long = 0L,
+    val userRole: UserRole = UserRole.ADMIN // افتراضي أدمن حتى نطبق تسجيل الدخول
 )
 
 /**

@@ -9,6 +9,7 @@ import com.hesabi.app.domain.CheckoutResult
 import com.hesabi.app.domain.SaleCalculator
 import com.hesabi.app.domain.model.PaymentMethod
 import com.hesabi.app.domain.model.Product
+import com.hesabi.app.domain.model.SalePaymentType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -19,16 +20,23 @@ data class SalesUiState(
     val cart: List<CartItem> = emptyList(),
     val searchQuery: String = "",
     val searchResults: List<Product> = emptyList(),
+    val selectedProduct: Product? = null,
+    val selectedQuantity: Double = 1.0,
     val subtotal: Long = 0L,
     val discount: Long = 0L,
     val discountInput: String = "",
     val finalTotal: Long = 0L,
     val paidInput: String = "",
     val paymentMethod: PaymentMethod = PaymentMethod.CASH,
+    val customerId: Long? = null,
+    val customerName: String? = null,
+    val paymentType: SalePaymentType = SalePaymentType.CASH,
+    val remainingAmount: Long = 0L,
     val errorMessage: String? = null,
     val isCheckingOut: Boolean = false,
     val lastInvoice: String? = null,
-    val checkoutSuccess: Boolean = false
+    val checkoutSuccess: Boolean = false,
+    val currencySymbol: String = ""
 )
 
 /**
@@ -50,6 +58,13 @@ class SalesViewModel(app: HesabiApp) : ViewModel() {
 
     private var searchJob: kotlinx.coroutines.Job? = null
 
+    init {
+        viewModelScope.launch {
+            val store = app.settingsUseCase.getStore()
+            _state.update { it.copy(currencySymbol = store?.currencySymbol ?: "") }
+        }
+    }
+
     /** البحث الفوري عن المنتجات (بالاسم أو الباركود أو الكود) */
     fun search(query: String) {
         _state.update { it.copy(searchQuery = query, errorMessage = null) }
@@ -68,13 +83,34 @@ class SalesViewModel(app: HesabiApp) : ViewModel() {
         _state.update { it.copy(searchQuery = "", searchResults = emptyList()) }
     }
 
+    fun selectProduct(product: Product?) {
+        _state.update { 
+            it.copy(
+                selectedProduct = product, 
+                selectedQuantity = 1.0, 
+                searchQuery = "", 
+                searchResults = emptyList()
+            ) 
+        }
+    }
+
+    fun updateSelectedQuantity(quantity: Double) {
+        _state.update { it.copy(selectedQuantity = quantity) }
+    }
+
+    fun addSelectedToCart() {
+        val product = _state.value.selectedProduct ?: return
+        val quantity = _state.value.selectedQuantity
+        addToCart(product, quantity)
+        selectProduct(null)
+    }
+
     /** استقبال نتيجة مسح الباركود في شاشة البيع */
     fun onBarcodeScanned(barcode: String) {
         viewModelScope.launch {
             val product = productRepository.getByBarcode(barcode)
             if (product != null) {
-                addToCart(product, 1.0)
-                clearSearch()
+                selectProduct(product)
             } else {
                 _state.update {
                     it.copy(errorMessage = "هذا الباركود غير موجود")
@@ -95,7 +131,13 @@ class SalesViewModel(app: HesabiApp) : ViewModel() {
             val check = SaleCalculator.checkStock(product.quantity, newQty, product.name)
             when (check) {
                 is com.hesabi.app.domain.StockCheckResult.Ok -> {
-                    existing.quantity = newQty
+                    _state.update { state ->
+                        state.copy(
+                            cart = state.cart.map { 
+                                if (it.product.id == product.id) it.copy(quantity = newQty) else it 
+                            }
+                        )
+                    }
                     recalculate()
                 }
                 is com.hesabi.app.domain.StockCheckResult.Insufficient ->
@@ -125,7 +167,13 @@ class SalesViewModel(app: HesabiApp) : ViewModel() {
         val check = SaleCalculator.checkStock(item.product.quantity, newQty, item.product.name)
         when (check) {
             is com.hesabi.app.domain.StockCheckResult.Ok -> {
-                item.quantity = newQty
+                _state.update { state ->
+                    state.copy(
+                        cart = state.cart.map { 
+                            if (it.product.id == productId) it.copy(quantity = newQty) else it 
+                        }
+                    )
+                }
                 recalculate()
             }
             is com.hesabi.app.domain.StockCheckResult.Insufficient ->
@@ -139,7 +187,13 @@ class SalesViewModel(app: HesabiApp) : ViewModel() {
         if (newQty <= 0) {
             removeFromCart(productId)
         } else {
-            item.quantity = newQty
+            _state.update { state ->
+                state.copy(
+                    cart = state.cart.map { 
+                        if (it.product.id == productId) it.copy(quantity = newQty) else it 
+                    }
+                )
+            }
             recalculate()
         }
     }
@@ -176,18 +230,38 @@ class SalesViewModel(app: HesabiApp) : ViewModel() {
         _state.update { it.copy(paymentMethod = method) }
     }
 
+    fun updatePaymentType(type: SalePaymentType) {
+        _state.update { 
+            it.copy(
+                paymentType = type,
+                customerId = if (type == SalePaymentType.CASH) null else it.customerId,
+                customerName = if (type == SalePaymentType.CASH) null else it.customerName
+            ) 
+        }
+        recalculate()
+    }
+
+    fun setCustomer(id: Long?, name: String?) {
+        _state.update { it.copy(customerId = id, customerName = name) }
+    }
+
     private fun recalculate() {
         val current = _state.value
-        val subtotal = SaleCalculator.calculateSubtotal(current.cart)
+        val subtotal = current.cart.sumOf { it.itemTotal() }
         val discount = parseMinorUnits(current.discountInput)
             .coerceAtLeast(0L)
             .coerceAtMost(subtotal)
         val totals = SaleCalculator.calculateFinal(subtotal, discount)
+        
+        val paid = parseMinorUnits(current.paidInput)
+        val remaining = if (current.paymentType == SalePaymentType.CREDIT) totals.final - paid else 0L
+
         _state.update {
             it.copy(
                 subtotal = totals.subtotal,
                 discount = totals.discount,
-                finalTotal = totals.final
+                finalTotal = totals.final,
+                remainingAmount = remaining.coerceAtLeast(0L)
             )
         }
     }
@@ -200,6 +274,11 @@ class SalesViewModel(app: HesabiApp) : ViewModel() {
         val current = _state.value
         if (current.cart.isEmpty() || current.isCheckingOut) return
 
+        if (current.paymentType == SalePaymentType.CREDIT && current.customerId == null) {
+            _state.update { it.copy(errorMessage = "يجب اختيار عميل للبيع الآجل") }
+            return
+        }
+
         _state.update { it.copy(isCheckingOut = true, errorMessage = null) }
 
         viewModelScope.launch {
@@ -211,7 +290,11 @@ class SalesViewModel(app: HesabiApp) : ViewModel() {
                 paymentMethod = current.paymentMethod
             )
 
-            when (val result = checkoutUseCase.execute(input)) {
+            when (val result = checkoutUseCase.execute(
+                input = input,
+                customerId = current.customerId,
+                paymentType = current.paymentType
+            )) {
                 is CheckoutResult.Success ->
                     _state.update {
                         it.copy(
@@ -222,6 +305,10 @@ class SalesViewModel(app: HesabiApp) : ViewModel() {
                             paidInput = "",
                             subtotal = 0L,
                             finalTotal = 0L,
+                            remainingAmount = 0L,
+                            customerId = null,
+                            customerName = null,
+                            paymentType = SalePaymentType.CASH,
                             lastInvoice = result.invoiceNumber,
                             checkoutSuccess = true
                         )

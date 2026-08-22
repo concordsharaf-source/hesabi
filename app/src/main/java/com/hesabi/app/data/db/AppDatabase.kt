@@ -13,6 +13,9 @@ import com.hesabi.app.data.dao.SaleReturnDao
 import com.hesabi.app.data.dao.StockMovementDao
 import com.hesabi.app.data.dao.StoreDao
 import com.hesabi.app.data.dao.SupplierDao
+import com.hesabi.app.data.dao.CustomerDao
+import com.hesabi.app.data.dao.CashMovementDao
+import com.hesabi.app.data.dao.CustomerTransactionDao
 import com.hesabi.app.domain.model.Expense
 import com.hesabi.app.domain.model.ExpenseType
 import com.hesabi.app.domain.model.MovementType
@@ -29,6 +32,16 @@ import com.hesabi.app.domain.model.SaleReturnItem
 import com.hesabi.app.domain.model.StockMovement
 import com.hesabi.app.domain.model.Store
 import com.hesabi.app.domain.model.Supplier
+import com.hesabi.app.domain.model.Customer
+import com.hesabi.app.domain.model.CashMovement
+import com.hesabi.app.domain.model.CustomerTransaction
+import com.hesabi.app.domain.model.CashMovementType
+import com.hesabi.app.domain.model.CustomerTransactionType
+import com.hesabi.app.domain.model.PurchasePaymentType
+import com.hesabi.app.domain.model.SalePaymentType
+import com.hesabi.app.domain.model.User
+import com.hesabi.app.domain.model.UserRole
+import com.hesabi.app.data.dao.UserDao
 
 @Database(
     entities = [
@@ -44,9 +57,13 @@ import com.hesabi.app.domain.model.Supplier
         PurchaseReturnItem::class,
         SaleReturn::class,
         SaleReturnItem::class,
-        Expense::class
+        Expense::class,
+        Customer::class,
+        CashMovement::class,
+        CustomerTransaction::class,
+        User::class
     ],
-    version = 2,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -61,6 +78,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun purchaseReturnDao(): PurchaseReturnDao
     abstract fun saleReturnDao(): SaleReturnDao
     abstract fun expenseDao(): ExpenseDao
+    abstract fun customerDao(): CustomerDao
+    abstract fun cashMovementDao(): CashMovementDao
+    abstract fun customerTransactionDao(): CustomerTransactionDao
+    abstract fun userDao(): UserDao
 }
 
 class Converters {
@@ -85,4 +106,39 @@ class Converters {
     @TypeConverter
     fun valueToExpenseType(value: String): ExpenseType =
         runCatching { ExpenseType.valueOf(value) }.getOrDefault(ExpenseType.GENERAL)
+
+    @TypeConverter
+    fun cashMovementTypeToValue(type: CashMovementType): String = type.name
+
+    @TypeConverter
+    fun valueToCashMovementType(value: String): CashMovementType =
+        runCatching { CashMovementType.valueOf(value) }.getOrDefault(CashMovementType.ADJUSTMENT)
+
+    @TypeConverter
+    fun customerTransactionTypeToValue(type: CustomerTransactionType): String = type.name
+
+    @TypeConverter
+    fun valueToCustomerTransactionType(value: String): CustomerTransactionType =
+        runCatching { CustomerTransactionType.valueOf(value) }.getOrDefault(CustomerTransactionType.SALE)
+
+    @TypeConverter
+    fun purchasePaymentTypeToValue(type: PurchasePaymentType): String = type.name
+
+    @TypeConverter
+    fun valueToPurchasePaymentType(value: String): PurchasePaymentType =
+        runCatching { PurchasePaymentType.valueOf(value) }.getOrDefault(PurchasePaymentType.CASH_BOX)
+
+    @TypeConverter
+    fun salePaymentTypeToValue(type: SalePaymentType): String = type.name
+
+    @TypeConverter
+    fun valueToSalePaymentType(value: String): SalePaymentType =
+        runCatching { SalePaymentType.valueOf(value) }.getOrDefault(SalePaymentType.CASH)
+
+    @TypeConverter
+    fun userRoleToValue(role: UserRole): String = role.name
+
+    @TypeConverter
+    fun valueToUserRole(value: String): UserRole =
+        runCatching { UserRole.valueOf(value) }.getOrDefault(UserRole.CASHIER)
 }

@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.hesabi.app.HesabiApp
 import com.hesabi.app.domain.PurchaseItemInput
 import com.hesabi.app.domain.PurchaseResult
+import com.hesabi.app.domain.model.PurchasePaymentType
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -29,6 +30,7 @@ data class PurchaseFormUiState(
     val items: List<DraftPurchaseItem> = emptyList(),
     val supplierId: Long? = null,
     val supplierName: String = "",
+    val paymentType: PurchasePaymentType = PurchasePaymentType.CASH_BOX,
     val note: String = "",
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
@@ -86,6 +88,10 @@ class PurchaseFormViewModel(app: HesabiApp) : ViewModel() {
         _state.update { it.copy(note = value) }
     }
 
+    fun updatePaymentType(type: PurchasePaymentType) {
+        _state.update { it.copy(paymentType = type) }
+    }
+
     fun save() {
         val current = _state.value
         val validItems = current.items.filter { it.quantity > 0 && it.unitPrice >= 0L }
@@ -93,6 +99,12 @@ class PurchaseFormViewModel(app: HesabiApp) : ViewModel() {
             _state.update { it.copy(errorMessage = "أضف بندًا واحدًا على الأقل بكمية وسعر") }
             return
         }
+
+        if (current.paymentType == PurchasePaymentType.DEBT && current.supplierId == null) {
+            _state.update { it.copy(errorMessage = "يجب اختيار مورد عند الدفع الآجل") }
+            return
+        }
+
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true, errorMessage = null) }
             val inputs = validItems.map {
@@ -105,7 +117,19 @@ class PurchaseFormViewModel(app: HesabiApp) : ViewModel() {
                     unitPrice = it.unitPrice
                 )
             }
-            when (val result = purchaseUseCase.execute(inputs, current.supplierId, current.note.ifBlank { null })) {
+            
+            val totalValue = validItems.sumOf { it.itemTotal }
+            val paid = if (current.paymentType == PurchasePaymentType.DEBT) 0L else totalValue
+            val remaining = totalValue - paid
+
+            when (val result = purchaseUseCase.execute(
+                items = inputs,
+                supplierId = current.supplierId,
+                note = current.note.ifBlank { null },
+                paidAmount = paid,
+                remaining = remaining,
+                paymentType = current.paymentType
+            )) {
                 is PurchaseResult.Success -> {
                     _state.update { it.copy(isSaving = false, isSaved = true) }
                 }

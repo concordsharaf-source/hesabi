@@ -18,7 +18,8 @@ sealed class ExpenseResult {
  * منطق المصروفات: إضافة/حذف/قائمة.
  */
 class ExpenseUseCase(
-    private val expenseDao: ExpenseDao
+    private val expenseDao: ExpenseDao,
+    private val cashMovementDao: com.hesabi.app.data.dao.CashMovementDao
 ) {
     private val mutex = Mutex()
 
@@ -27,7 +28,8 @@ class ExpenseUseCase(
         type: ExpenseType,
         description: String,
         notes: String?,
-        date: Long = System.currentTimeMillis()
+        date: Long = System.currentTimeMillis(),
+        isFromCashbox: Boolean = true
     ): ExpenseResult {
         return mutex.withLock {
             if (description.isBlank()) {
@@ -41,9 +43,23 @@ class ExpenseUseCase(
                 type = type,
                 description = description.trim(),
                 date = date,
-                notes = notes
+                notes = notes,
+                isFromCashbox = isFromCashbox
             )
             val id = expenseDao.insert(expense)
+            
+            // تسجيل حركة الصندوق إذا كان المصروف من الصندوق
+            if (isFromCashbox) {
+                cashMovementDao.insert(
+                    com.hesabi.app.domain.model.CashMovement(
+                        amount = -amount,
+                        type = com.hesabi.app.domain.model.CashMovementType.EXPENSE,
+                        referenceId = id,
+                        description = "مصروف: $description"
+                    )
+                )
+            }
+            
             ExpenseResult.Success(expense.copy(id = id))
         }
     }

@@ -8,6 +8,7 @@ import com.hesabi.app.domain.model.MovementType
 import com.hesabi.app.domain.model.PaymentMethod
 import com.hesabi.app.domain.model.Sale
 import com.hesabi.app.domain.model.SaleItem
+import com.hesabi.app.domain.model.SalePaymentType
 import com.hesabi.app.domain.model.StockMovement
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -46,12 +47,18 @@ data class CheckoutInput(
 class CheckoutUseCase(
     private val productDao: ProductDao,
     private val saleDao: SaleDao,
-    private val movementDao: StockMovementDao
+    private val movementDao: StockMovementDao,
+    private val cashMovementDao: com.hesabi.app.data.dao.CashMovementDao,
+    private val customerTransactionDao: com.hesabi.app.data.dao.CustomerTransactionDao
 ) {
 
     private val checkoutMutex = Mutex()
 
-    suspend fun execute(input: CheckoutInput): CheckoutResult {
+    suspend fun execute(
+        input: CheckoutInput,
+        customerId: Long? = null,
+        paymentType: SalePaymentType = SalePaymentType.CASH
+    ): CheckoutResult {
         return checkoutMutex.withLock {
             // 1. التحقق من وجود المنتجات
             if (input.items.isEmpty()) {
@@ -99,13 +106,15 @@ class CheckoutUseCase(
             val saleId = saleDao.insert(
                 Sale(
                     invoiceNumber = invoiceNumber,
+                    customerId = customerId,
                     date = now,
                     subtotal = totals.subtotal,
                     discount = totals.discount,
                     total = totals.final,
                     paidAmount = paid,
                     remaining = remaining,
-                    paymentMethod = input.paymentMethod
+                    paymentMethod = input.paymentMethod,
+                    paymentType = paymentType
                 )
             )
 
@@ -158,18 +167,49 @@ class CheckoutUseCase(
                 // 6. حفظ حركات المخزون
                 movementDao.insertAll(movements)
 
+                // 7. تسجيل حركة الصندوق إذا كان هناك دفع نقدي
+                if (paid > 0) {
+                    cashMovementDao.insert(
+                        com.hesabi.app.domain.model.CashMovement(
+                            amount = paid,
+                            type = com.hesabi.app.domain.model.CashMovementType.SALE,
+                            description = "فاتورة بيع $invoiceNumber",
+                            referenceId = saleId,
+                            date = now
+                        )
+                    )
+                }
+
+                // 8. تسجيل دين العميل إذا كان هناك متبقي
+                if (remaining > 0 && customerId != null) {
+                    customerTransactionDao.insert(
+                        com.hesabi.app.domain.model.CustomerTransaction(
+                            customerId = customerId,
+                            type = com.hesabi.app.domain.model.CustomerTransactionType.SALE,
+                            amount = totals.final,
+                            paid = paid,
+                            remaining = remaining,
+                            referenceId = saleId,
+                            date = now,
+                            notes = "فاتورة بيع $invoiceNumber"
+                        )
+                    )
+                }
+
                 val savedSale = saleDao.getById(saleId)
                     ?: return@withLock CheckoutResult.Success(
                         Sale(
                             id = saleId,
                             invoiceNumber = invoiceNumber,
+                            customerId = customerId,
                             date = now,
                             subtotal = totals.subtotal,
                             discount = totals.discount,
                             total = totals.final,
                             paidAmount = paid,
                             remaining = remaining,
-                            paymentMethod = input.paymentMethod
+                            paymentMethod = input.paymentMethod,
+                            paymentType = paymentType
                         ),
                         invoiceNumber
                     )

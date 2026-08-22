@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.QrCodeScanner
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -49,6 +50,7 @@ import com.hesabi.app.HesabiApp
 import com.hesabi.app.PreselectedState
 import com.hesabi.app.domain.model.Product
 import com.hesabi.app.domain.model.Supplier
+import com.hesabi.app.domain.model.PurchasePaymentType
 import com.hesabi.app.ui.common.HesabiTopBar
 import com.hesabi.app.util.formatMoney
 import kotlinx.coroutines.launch
@@ -58,8 +60,10 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun PurchaseFormScreen(
+    onBarcodeScan: () -> Unit,
     onSaved: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    navController: androidx.navigation.NavHostController
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
     val viewModel: PurchaseFormViewModel = viewModel(factory = PurchaseFormViewModelFactory(app))
@@ -67,8 +71,6 @@ fun PurchaseFormScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    var showProductPicker by remember { mutableStateOf(false) }
-    var showSupplierPicker by remember { mutableStateOf(false) }
     var products by remember { mutableStateOf<List<Product>>(emptyList()) }
     var suppliers by remember { mutableStateOf<List<Supplier>>(emptyList()) }
 
@@ -96,32 +98,96 @@ fun PurchaseFormScreen(
         if (state.isSaved) onSaved()
     }
 
-    if (showProductPicker) {
-        ProductPickerDialog(
-            products = products,
-            onSelect = { product ->
+    // مراقبة نتيجة مسح الباركود
+    val barcodeResult = navController.currentBackStackEntry
+        ?.savedStateHandle
+        ?.get<String>("barcode")
+    LaunchedEffect(barcodeResult) {
+        barcodeResult?.let { code ->
+            // البحث عن المنتج وإضافته تلقائياً
+            val found = products.find { p -> p.barcode == code }
+            if (found != null) {
                 viewModel.addItem(
                     DraftPurchaseItem(
-                        productId = product.id,
-                        productName = product.name,
-                        barcode = if (product.barcode.isNullOrBlank()) null else product.barcode,
-                        quantity = 0.0,
-                        unit = product.unit,
-                        unitPrice = product.purchasePrice
+                        productId = found.id,
+                        productName = found.name,
+                        barcode = found.barcode,
+                        quantity = 1.0,
+                        unit = found.unit,
+                        unitPrice = found.purchasePrice
                     )
                 )
-                showProductPicker = false
-            },
-            onDismiss = { showProductPicker = false }
-        )
+            } else {
+                // إذا لم يوجد، يمكن مستقبلاً فتح نافذة إضافة منتج جديد أو عرض تنبيه
+            }
+            navController.currentBackStackEntry?.savedStateHandle?.remove<String>("barcode")
+        }
     }
 
-    if (showSupplierPicker) {
-        SupplierPickerDialog(
-            suppliers = suppliers,
-            onSelect = { viewModel.setSupplier(it.id, it.name); showSupplierPicker = false },
-            onDismiss = { showSupplierPicker = false }
-        )
+    // إدارة النوافذ المنبثقة بشكل حصري لمنع التكرار
+    var activeDialog by remember { mutableStateOf<PurchaseDialog?>(null) }
+    
+    when (activeDialog) {
+        PurchaseDialog.PRODUCT_PICKER -> {
+            ProductPickerDialog(
+                products = products,
+                onSelect = { product ->
+                    viewModel.addItem(
+                        DraftPurchaseItem(
+                            productId = product.id,
+                            productName = product.name,
+                            barcode = if (product.barcode.isNullOrBlank()) null else product.barcode,
+                            quantity = 0.0,
+                            unit = product.unit,
+                            unitPrice = product.purchasePrice
+                        )
+                    )
+                    activeDialog = null
+                },
+                onBarcodeScan = {
+                    activeDialog = null
+                    navController.navigate("barcode/purchase_add")
+                },
+                onDismiss = { activeDialog = null }
+            )
+        }
+        PurchaseDialog.SUPPLIER_PICKER -> {
+            SupplierPickerDialog(
+                suppliers = suppliers,
+                onSelect = { viewModel.setSupplier(it.id, it.name); activeDialog = null },
+                onDismiss = { activeDialog = null }
+            )
+        }
+        PurchaseDialog.PAYMENT_TYPE_PICKER -> {
+            androidx.compose.material3.AlertDialog(
+                onDismissRequest = { activeDialog = null },
+                title = { Text("مصدر المبلغ", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+                text = {
+                    Column {
+                        PurchasePaymentType.entries.forEach { type ->
+                            TextButton(
+                                onClick = { 
+                                    viewModel.updatePaymentType(type)
+                                    activeDialog = null 
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                val label = when(type) {
+                                    PurchasePaymentType.CASH_BOX -> "من الصندوق"
+                                    PurchasePaymentType.CASH_OUTSIDE -> "خارج الصندوق (مال شخصي)"
+                                    PurchasePaymentType.DEBT -> "آجل (دين للمورد)"
+                                }
+                                Text(label, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.End)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { activeDialog = null }) { Text("إلغاء") }
+                }
+            )
+        }
+        null -> {}
     }
 
     Scaffold(
@@ -137,13 +203,42 @@ fun PurchaseFormScreen(
         ) {
             Spacer(Modifier.height(12.dp))
             // اختيار المورد
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedButton(
+                    onClick = { onBarcodeScan() },
+                    modifier = Modifier.weight(0.3f)
+                ) {
+                    Icon(Icons.Rounded.QrCodeScanner, contentDescription = "مسح باركود")
+                }
+                OutlinedButton(
+                    onClick = { activeDialog = PurchaseDialog.SUPPLIER_PICKER },
+                    modifier = Modifier.weight(0.7f)
+                ) {
+                    Text(
+                        if (state.supplierName.isBlank()) "المورد (اختياري)"
+                        else "المورد: ${state.supplierName}",
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+
+            // اختيار نوع الدفع
             OutlinedButton(
-                onClick = { showSupplierPicker = true },
+                onClick = { activeDialog = PurchaseDialog.PAYMENT_TYPE_PICKER },
                 modifier = Modifier.fillMaxWidth()
             ) {
+                val paymentLabel = when(state.paymentType) {
+                    PurchasePaymentType.CASH_BOX -> "من الصندوق"
+                    PurchasePaymentType.CASH_OUTSIDE -> "خارج الصندوق"
+                    PurchasePaymentType.DEBT -> "آجل (دين)"
+                }
                 Text(
-                    if (state.supplierName.isBlank()) "المورد (اختياري)"
-                    else "المورد: ${state.supplierName}",
+                    "مصدر المبلغ: $paymentLabel",
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Center
                 )
@@ -166,7 +261,7 @@ fun PurchaseFormScreen(
                 Spacer(Modifier.height(8.dp))
             }
             OutlinedButton(
-                onClick = { showProductPicker = true },
+                onClick = { activeDialog = PurchaseDialog.PRODUCT_PICKER },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = !state.isSaving
             ) {
@@ -231,6 +326,10 @@ fun PurchaseFormScreen(
     }
 }
 
+private enum class PurchaseDialog {
+    PRODUCT_PICKER, SUPPLIER_PICKER, PAYMENT_TYPE_PICKER
+}
+
 @Composable
 private fun PurchaseItemRow(
     item: DraftPurchaseItem,
@@ -292,6 +391,7 @@ private fun PurchaseItemRow(
 private fun ProductPickerDialog(
     products: List<Product>,
     onSelect: (Product) -> Unit,
+    onBarcodeScan: () -> Unit,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
@@ -302,23 +402,40 @@ private fun ProductPickerDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(320.dp)
-                    .verticalScroll(rememberScrollState())
             ) {
-                if (products.isEmpty()) {
-                    Text("لا توجد منتجات — أضف منتجات أولًا من شاشة المنتجات",
-                        modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+                OutlinedButton(
+                    onClick = onBarcodeScan,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Rounded.QrCodeScanner, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text("مسح باركود")
                 }
-                products.forEach { product ->
-                    TextButton(
-                        onClick = { onSelect(product) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                Spacer(Modifier.height(8.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    if (products.isEmpty()) {
                         Text(
-                            "${product.name}${if (product.barcode.isNullOrBlank()) "" else " (${product.barcode})"}",
-                            style = MaterialTheme.typography.bodyLarge,
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.End
+                            "لا توجد منتجات — أضف منتجات أولًا من شاشة المنتجات",
+                            modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center
                         )
+                    }
+                    products.forEach { product ->
+                        TextButton(
+                            onClick = { onSelect(product) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                "${product.name}${if (product.barcode.isNullOrBlank()) "" else " (${product.barcode})"}",
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.fillMaxWidth(),
+                                textAlign = TextAlign.End
+                            )
+                        }
                     }
                 }
             }

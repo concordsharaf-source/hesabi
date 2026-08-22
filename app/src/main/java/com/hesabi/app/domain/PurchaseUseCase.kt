@@ -6,7 +6,12 @@ import com.hesabi.app.data.dao.StockMovementDao
 import com.hesabi.app.domain.model.MovementType
 import com.hesabi.app.domain.model.Product
 import com.hesabi.app.domain.model.Purchase
+import com.hesabi.app.data.dao.CashMovementDao
+import com.hesabi.app.data.dao.SupplierDao
+import com.hesabi.app.domain.model.CashMovement
+import com.hesabi.app.domain.model.CashMovementType
 import com.hesabi.app.domain.model.PurchaseItem
+import com.hesabi.app.domain.model.PurchasePaymentType
 import com.hesabi.app.domain.model.StockMovement
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -44,14 +49,19 @@ data class PurchaseItemInput(
 class PurchaseUseCase(
     private val productDao: ProductDao,
     private val purchaseDao: PurchaseDao,
-    private val movementDao: StockMovementDao
+    private val movementDao: StockMovementDao,
+    private val cashMovementDao: CashMovementDao,
+    private val supplierDao: SupplierDao
 ) {
     private val mutex = Mutex()
 
     suspend fun execute(
         items: List<PurchaseItemInput>,
         supplierId: Long?,
-        note: String?
+        note: String?,
+        paidAmount: Long = 0L,
+        remaining: Long = 0L,
+        paymentType: PurchasePaymentType = PurchasePaymentType.CASH_BOX
     ): PurchaseResult {
         return mutex.withLock {
             val validItems = items.filter { it.quantity > 0 && it.unitPrice >= 0L }
@@ -82,7 +92,7 @@ class PurchaseUseCase(
 
             // إنشاء فاتورة الشراء
             val invoiceNumber = String.format("PUR-%06d", purchaseDao.maxInvoiceSequence() + 1)
-            val subtotal = validItems.sumOf { it.unitPrice * it.quantity.toLong() }
+            val subtotal = validItems.sumOf { (it.unitPrice * it.quantity).toLong() }
 
             val purchaseId = purchaseDao.insert(
                 Purchase(
@@ -91,6 +101,9 @@ class PurchaseUseCase(
                     date = now,
                     subtotal = subtotal,
                     total = subtotal,
+                    paidAmount = paidAmount,
+                    remaining = remaining,
+                    paymentType = paymentType,
                     note = note
                 )
             )
@@ -109,7 +122,7 @@ class PurchaseUseCase(
                                 unitPrice = item.unitPrice,
                                 quantity = item.quantity,
                                 unit = item.unit,
-                                itemTotal = item.unitPrice * item.quantity.toLong()
+                                itemTotal = (item.unitPrice * item.quantity).toLong()
                             )
                         )
                     )
@@ -119,9 +132,9 @@ class PurchaseUseCase(
                         val oldQty = existingProduct.quantity
                         val newQty = oldQty + item.quantity
                         val newAverageCost = if (newQty > 0) {
-                            val totalCost = (existingProduct.purchasePrice * oldQty.toLong()) +
-                                (item.unitPrice * item.quantity.toLong())
-                            (totalCost / newQty.toLong())
+                            val totalCost = (existingProduct.purchasePrice * oldQty).toLong() +
+                                (item.unitPrice * item.quantity).toLong()
+                            (totalCost / newQty).toLong()
                         } else 0L
 
                         val updatedProduct = existingProduct.copy(
@@ -149,6 +162,26 @@ class PurchaseUseCase(
                     }
                 }
                 movementDao.insertAll(movements)
+
+                // 4. تسجيل حركة الصندوق إذا كان الدفع من الصندوق
+                if (paymentType == PurchasePaymentType.CASH_BOX && paidAmount > 0) {
+                    cashMovementDao.insert(
+                        CashMovement(
+                            amount = -paidAmount,
+                            type = CashMovementType.PURCHASE,
+                            description = "فاتورة شراء $invoiceNumber",
+                            referenceId = purchaseId,
+                            date = now
+                        )
+                    )
+                }
+
+                // 5. تسجيل دين المورد إذا كان هناك متبقي
+                if (remaining > 0 && supplierId != null) {
+                    // سجل في كشف حساب المورد (سيتم إضافة جدول supplier_transactions لاحقاً إذا لزم الأمر، 
+                    // حالياً نعتمد على جدول المشتريات نفسه لعرض الديون)
+                }
+
                 val saved = purchaseDao.getById(purchaseId)
                 return@withLock if (saved != null) {
                     PurchaseResult.Success(saved, invoiceNumber)
@@ -161,6 +194,9 @@ class PurchaseUseCase(
                             date = now,
                             subtotal = subtotal,
                             total = subtotal,
+                            paidAmount = paidAmount,
+                            remaining = remaining,
+                            paymentType = paymentType,
                             note = note
                         ),
                         invoiceNumber

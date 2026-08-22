@@ -27,10 +27,11 @@ data class Purchase(
     val invoiceNumber: String,
     val supplierId: Long? = null,
     val date: Long = System.currentTimeMillis(),
-    /** الإجمالي قبل أي تسوية بوحدة العملة الصغرى */
     val subtotal: Long = 0L,
-    /** الإجمالي النهائي بوحدة العملة الصغرى */
     val total: Long = 0L,
+    val paidAmount: Long = 0L,
+    val remaining: Long = 0L,
+    val paymentType: PurchasePaymentType = PurchasePaymentType.CASH_BOX,
     val note: String? = null,
     val isDeleted: Boolean = false
 )
@@ -41,7 +42,7 @@ data class Purchase(
  */
 @Entity(
     tableName = "purchase_items",
-    indices = [Index(value = ["purchaseId"])],
+    indices = [Index(value = ["purchaseId"]), Index(value = ["productId"])],
     foreignKeys = [
         ForeignKey(
             entity = Purchase::class,

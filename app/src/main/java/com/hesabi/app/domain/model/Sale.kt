@@ -11,13 +11,13 @@ import androidx.room.PrimaryKey
  */
 @Entity(
     tableName = "sales",
-    indices = [Index(value = ["invoiceNumber"]), Index(value = ["date"])],
+    indices = [Index(value = ["invoiceNumber"]), Index(value = ["date"]), Index(value = ["customerId"])],
     foreignKeys = [
         ForeignKey(
-            entity = Product::class,
+            entity = Customer::class,
             parentColumns = ["id"],
-            childColumns = ["productId"],
-            onDelete = ForeignKey.SET_NULL // الحفاظ على الفاتورة عند حذف المنتج (Soft Delete)
+            childColumns = ["customerId"],
+            onDelete = ForeignKey.SET_NULL
         )
     ]
 )
@@ -25,20 +25,15 @@ data class Sale(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val invoiceNumber: String,
-    val productId: Long? = null,
-    /** تاريخ الفاتورة بـ Epoch millis */
+    val customerId: Long? = null,
     val date: Long = System.currentTimeMillis(),
-    /** الإجمالي قبل الخصم بوحدة العملة الصغرى */
     val subtotal: Long = 0L,
-    /** الخصم بوحدة العملة الصغرى */
     val discount: Long = 0L,
-    /** الإجمالي النهائي بعد الخصم */
     val total: Long = 0L,
-    /** المبلغ المدفوع */
     val paidAmount: Long = 0L,
-    /** المتبقي */
     val remaining: Long = 0L,
     val paymentMethod: PaymentMethod = PaymentMethod.CASH,
+    val paymentType: SalePaymentType = SalePaymentType.CASH,
     val isDeleted: Boolean = false
 )
 
@@ -53,7 +48,7 @@ enum class PaymentMethod(val label: String) {
  */
 @Entity(
     tableName = "sale_items",
-    indices = [Index(value = ["saleId"])],
+    indices = [Index(value = ["saleId"]), Index(value = ["productId"])],
     foreignKeys = [
         ForeignKey(
             entity = Sale::class,
