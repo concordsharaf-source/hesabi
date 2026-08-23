@@ -60,6 +60,15 @@ test("يربط خيار البقاء وكل عناصر إغلاق النافذة
   assert.match(app, /querySelectorAll\("\[data-dialog-close\]"\)\.forEach\(\(button\) => button\.addEventListener\("click", closeDialog\)\)/);
 });
 
+test("يضيف رابط اتصال آمنًا لعملاء وموردين لديهم هاتف فقط", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /const phoneHref = \(phone\)/);
+  assert.match(app, /tel:\$\{raw\.startsWith\("\+"\)/);
+  assert.match(app, /phoneCallButton\(supplier\.phone, supplier\.name\)/);
+  assert.match(app, /phoneCallButton\(customer\.phone, customer\.name\)/);
+  assert.match(app, /return href \? `<a class="icon-button icon-button--call"/);
+});
+
 test("يضع كشف حساب العميل بياناته في بطاقة واضحة بخط عربي مناسب للطباعة", () => {
   const html = renderCustomerAccountHtml({
     account: { customer: { name: "أحمد العميل", phone: "777123456", address: "صنعاء" }, totalSales: 80, totalPaid: 40, balance: 40, transactions: [] },

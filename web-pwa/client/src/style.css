@@ -37,6 +37,8 @@ h1,h2,h3,strong { letter-spacing:-.02em; }
 .button--icon-text { white-space:nowrap; }
 .icon-button { display:grid; place-items:center; flex:0 0 auto; width:38px; height:38px; border-radius:10px; color:var(--green-deep); background:transparent; transition:background .16s var(--ease-out), transform .16s var(--ease-out); }
 .icon-button:hover { background:var(--green-pale); }
+.icon-button--call { color:var(--green-deep); background:var(--green-pale); }
+.icon-button--call:hover { color:#fff; background:var(--green); }
 .text-button { display:inline-flex; align-items:center; gap:4px; padding:3px 0; color:var(--green); background:none; font-size:12px; font-weight:800; }
 .text-button--danger { color:var(--danger); }
 .daily-ribbon { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:15px 16px; margin-bottom:16px; border:1px solid rgba(31,107,89,.13); background:rgba(255,255,250,.55); backdrop-filter:blur(9px); border-radius:15px; box-shadow:var(--shadow-soft); }
