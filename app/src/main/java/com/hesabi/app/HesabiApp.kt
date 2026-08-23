@@ -56,6 +56,8 @@ class HesabiApp : Application() {
         private set
     lateinit var customerTransactionDao: com.hesabi.app.data.dao.CustomerTransactionDao
         private set
+    lateinit var supplierTransactionDao: com.hesabi.app.data.dao.SupplierTransactionDao
+        private set
 
     // المرحلة الثانية: الموردون، المشتريات، المرتجعات، المصروفات، الأرباح
     lateinit var purchaseRepository: PurchaseRepository
@@ -98,6 +100,7 @@ class HesabiApp : Application() {
         customerDao = db.customerDao()
         cashMovementDao = db.cashMovementDao()
         customerTransactionDao = db.customerTransactionDao()
+        supplierTransactionDao = db.supplierTransactionDao()
 
         purchaseRepository = PurchaseRepository(
             db.supplierDao(),
@@ -111,7 +114,8 @@ class HesabiApp : Application() {
             db.purchaseDao(),
             db.stockMovementDao(),
             db.cashMovementDao(),
-            db.supplierDao()
+            db.supplierDao(),
+            db.supplierTransactionDao()
         )
         purchaseReturnUseCase = PurchaseReturnUseCase(
             db.purchaseDao(), db.purchaseReturnDao(), db.productDao(), db.stockMovementDao()

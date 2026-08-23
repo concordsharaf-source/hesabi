@@ -93,6 +93,43 @@ data class CustomerTransaction(
 )
 
 /**
+ * نوع حركة حساب المورد.
+ */
+enum class SupplierTransactionType {
+    PURCHASE,   // شراء آجل (يزيد الدين للمورد)
+    PAYMENT,    // تسديد دفعة للمورد (ينقص الدين)
+    RETURN      // مرتجع مشتريات (ينقص الدين)
+}
+
+/**
+ * سجل ديون ودفعات الموردين.
+ */
+@Entity(
+    tableName = "supplier_transactions",
+    indices = [Index(value = ["supplierId"]), Index(value = ["date"])],
+    foreignKeys = [
+        ForeignKey(
+            entity = Supplier::class,
+            parentColumns = ["id"],
+            childColumns = ["supplierId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ]
+)
+data class SupplierTransaction(
+    @PrimaryKey(autoGenerate = true)
+    val id: Long = 0,
+    val supplierId: Long,
+    val type: SupplierTransactionType,
+    val amount: Long,    // المبلغ الكلي للعملية
+    val paid: Long,      // المبلغ المدفوع
+    val remaining: Long, // المتبقي (الدين للمورد)
+    val date: Long = System.currentTimeMillis(),
+    val referenceId: Long? = null, // معرّف فاتورة الشراء
+    val notes: String? = null
+)
+
+/**
  * نوع دفع المشتريات.
  */
 enum class PurchasePaymentType {

@@ -356,35 +356,43 @@ private fun PurchaseItemRow(
                         tint = MaterialTheme.colorScheme.error)
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 OutlinedTextField(
-                    value = item.quantity.toString(),
-                    onValueChange = { text ->
-                        val qty = text.toDoubleOrNull() ?: 0.0
+                    value = if (item.quantity == 0.0) "" else item.quantity.toString(),
+                    onValueChange = {
+                        val qty = it.toDoubleOrNull() ?: 0.0
                         onUpdate(item.copy(quantity = qty))
                     },
                     label = { Text("الكمية") },
                     modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true
                 )
                 OutlinedTextField(
-                    value = if (item.unitPrice > 0L) (item.unitPrice / 100.0).toString() else "",
-                    onValueChange = { text ->
-                        val price = (text.toDoubleOrNull() ?: 0.0).let { (it * 100).toLong() }
+                    value = if (item.unitPrice == 0L) "" else item.unitPrice.toString(),
+                    onValueChange = {
+                        val price = it.toLongOrNull() ?: 0L
                         onUpdate(item.copy(unitPrice = price))
                     },
-                    label = { Text("سعر الشراء") },
-                    modifier = Modifier.weight(1f),
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                    label = { Text("سعر الشراء ($currencySymbol)") },
+                    modifier = Modifier.weight(1.5f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
                 )
             }
-            Text(
-                "الإجمالي: ${item.itemTotal.formatMoney(currencySymbol)}",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Spacer(Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(
+                    "الإجمالي: ${(item.unitPrice * item.quantity).toLong().formatMoney(currencySymbol)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    "الوحدة: ${item.unit}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
+
         }
     }
 }

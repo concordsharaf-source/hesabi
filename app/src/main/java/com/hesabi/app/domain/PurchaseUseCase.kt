@@ -51,7 +51,8 @@ class PurchaseUseCase(
     private val purchaseDao: PurchaseDao,
     private val movementDao: StockMovementDao,
     private val cashMovementDao: CashMovementDao,
-    private val supplierDao: SupplierDao
+    private val supplierDao: SupplierDao,
+    private val supplierTransactionDao: com.hesabi.app.data.dao.SupplierTransactionDao
 ) {
     private val mutex = Mutex()
 
@@ -178,8 +179,18 @@ class PurchaseUseCase(
 
                 // 5. تسجيل دين المورد إذا كان هناك متبقي
                 if (remaining > 0 && supplierId != null) {
-                    // سجل في كشف حساب المورد (سيتم إضافة جدول supplier_transactions لاحقاً إذا لزم الأمر، 
-                    // حالياً نعتمد على جدول المشتريات نفسه لعرض الديون)
+                    supplierTransactionDao.insert(
+                        com.hesabi.app.domain.model.SupplierTransaction(
+                            supplierId = supplierId,
+                            type = com.hesabi.app.domain.model.SupplierTransactionType.PURCHASE,
+                            amount = subtotal,
+                            paid = paidAmount,
+                            remaining = remaining,
+                            referenceId = purchaseId,
+                            date = now,
+                            notes = "فاتورة شراء $invoiceNumber"
+                        )
+                    )
                 }
 
                 val saved = purchaseDao.getById(purchaseId)

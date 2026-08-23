@@ -8,6 +8,7 @@ import androidx.room.Update
 import com.hesabi.app.domain.model.CashMovement
 import com.hesabi.app.domain.model.Customer
 import com.hesabi.app.domain.model.CustomerTransaction
+import com.hesabi.app.domain.model.SupplierTransaction
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -68,4 +69,19 @@ interface CustomerTransactionDao {
 
     @Query("SELECT COALESCE(SUM(remaining), 0) FROM customer_transactions")
     fun observeTotalDebts(): Flow<Long>
+}
+
+@Dao
+interface SupplierTransactionDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(transaction: SupplierTransaction): Long
+
+    @Query("SELECT * FROM supplier_transactions WHERE supplierId = :supplierId ORDER BY date DESC")
+    fun observeBySupplier(supplierId: Long): Flow<List<SupplierTransaction>>
+
+    @Query("SELECT COALESCE(SUM(remaining), 0) FROM supplier_transactions WHERE supplierId = :supplierId")
+    fun observeSupplierDebt(supplierId: Long): Flow<Long>
+
+    @Query("SELECT COALESCE(SUM(remaining), 0) FROM supplier_transactions")
+    fun observeTotalSupplierDebts(): Flow<Long>
 }

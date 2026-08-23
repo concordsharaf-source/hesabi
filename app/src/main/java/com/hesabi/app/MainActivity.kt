@@ -96,6 +96,8 @@ object Routes {
     const val EXPENSE_ADD = "expenses/add"
     const val REPORTS = "reports"
     const val CUSTOMERS = "customers"
+    const val CUSTOMER_DETAIL = "customers/{customerId}"
+    const val SUPPLIER_DETAIL = "suppliers/{supplierId}"
     const val USERS = "users"
     const val LOGIN = "login"
 
@@ -155,6 +157,29 @@ private fun HesabiNavHost(startRoute: String) {
 
         composable(Routes.CUSTOMERS) {
             com.hesabi.app.ui.customers.CustomerManagementScreen(
+                onCustomerClick = { id -> navController.navigate("customers/$id") },
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.CUSTOMER_DETAIL,
+            arguments = listOf(navArgument("customerId") { type = NavType.LongType })
+        ) { entry ->
+            val customerId = entry.arguments?.getLong("customerId") ?: 0L
+            com.hesabi.app.ui.customers.CustomerDetailScreen(
+                customerId = customerId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Routes.SUPPLIER_DETAIL,
+            arguments = listOf(navArgument("supplierId") { type = NavType.LongType })
+        ) { entry ->
+            val supplierId = entry.arguments?.getLong("supplierId") ?: 0L
+            com.hesabi.app.ui.suppliers.SupplierDetailScreen(
+                supplierId = supplierId,
                 onBack = { navController.popBackStack() }
             )
         }
@@ -254,8 +279,7 @@ private fun HesabiNavHost(startRoute: String) {
                 onAddSupplier = { navController.navigate(Routes.SUPPLIER_ADD) },
                 onEditSupplier = { id -> navController.navigate("suppliers/edit/$id") },
                 onSupplierClick = { id ->
-                    PreselectedState.setSupplierId(id)
-                    navController.navigate(Routes.PURCHASE_ADD)
+                    navController.navigate("suppliers/$id")
                 },
                 onBack = { navController.popBackStack() }
             )

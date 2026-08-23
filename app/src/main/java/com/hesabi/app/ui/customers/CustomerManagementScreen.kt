@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomerManagementScreen(
+    onCustomerClick: (Long) -> Unit,
     onBack: () -> Unit
 ) {
     val app = androidx.compose.ui.platform.LocalContext.current.applicationContext as HesabiApp
@@ -44,9 +45,13 @@ fun CustomerManagementScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             items(customers) { customer ->
-                CustomerItemRow(customer = customer, onDelete = {
-                    scope.launch { customerDao.update(customer.copy(isDeleted = true)) }
-                })
+                CustomerItemRow(
+                    customer = customer,
+                    onClick = { onCustomerClick(customer.id) },
+                    onDelete = {
+                        scope.launch { customerDao.update(customer.copy(isDeleted = true)) }
+                    }
+                )
             }
         }
     }
@@ -70,9 +75,13 @@ fun CustomerManagementScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun CustomerItemRow(customer: Customer, onDelete: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+private fun CustomerItemRow(customer: Customer, onClick: () -> Unit, onDelete: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick
+    ) {
         Row(
             modifier = Modifier.padding(16.dp),
             verticalAlignment = Alignment.CenterVertically

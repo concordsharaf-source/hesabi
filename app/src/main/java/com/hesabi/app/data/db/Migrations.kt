@@ -246,3 +246,27 @@ val MIGRATION_3_4 = object : Migration(3, 4) {
         }
     }
 }
+
+/**
+ * مهاجرة 4 → 5 — إضافة سجل معاملات الموردين.
+ */
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("""
+            CREATE TABLE IF NOT EXISTS `supplier_transactions` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `supplierId` INTEGER NOT NULL,
+                `type` TEXT NOT NULL,
+                `amount` INTEGER NOT NULL,
+                `paid` INTEGER NOT NULL,
+                `remaining` INTEGER NOT NULL,
+                `date` INTEGER NOT NULL,
+                `referenceId` INTEGER,
+                `notes` TEXT,
+                FOREIGN KEY(`supplierId`) REFERENCES `suppliers`(`id`) ON DELETE CASCADE
+            )
+        """.trimIndent())
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_supplier_transactions_supplierId` ON `supplier_transactions` (`supplierId`)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS `index_supplier_transactions_date` ON `supplier_transactions` (`date`)")
+    }
+}

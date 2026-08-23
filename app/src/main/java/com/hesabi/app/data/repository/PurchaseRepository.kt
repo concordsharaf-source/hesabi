@@ -19,7 +19,7 @@ import kotlinx.coroutines.flow.Flow
  * مستودع المشتريات والموردين والمصروفات والمرتجعات — المرحلة الثانية.
  */
 class PurchaseRepository(
-    private val supplierDao: SupplierDao,
+    val supplierDao: SupplierDao,
     private val purchaseDao: PurchaseDao,
     private val purchaseReturnDao: PurchaseReturnDao,
     private val saleReturnDao: SaleReturnDao,

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.rounded.Payments
 import androidx.compose.material.icons.rounded.People
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.TrendingUp
+import androidx.compose.material.icons.rounded.AccountBalanceWallet
 import androidx.compose.material.icons.automirrored.rounded.ReceiptLong
 import androidx.compose.material.icons.rounded.ShoppingCart
 import androidx.compose.material.icons.rounded.Storefront
@@ -197,6 +198,14 @@ fun HomeScreen(
                         else
                             MaterialTheme.colorScheme.error,
                         isWarning = state.todayNetProfit < 0L
+                    )
+                    StatCard(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.AccountBalanceWallet,
+                        title = "ديون الموردين",
+                        value = state.totalSupplierDebts.formatMoney(state.currencySymbol),
+                        tint = MaterialTheme.colorScheme.error,
+                        isWarning = state.totalSupplierDebts > 0L
                     )
                 }
             }

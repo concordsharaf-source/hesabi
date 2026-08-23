@@ -35,8 +35,10 @@ import com.hesabi.app.domain.model.Supplier
 import com.hesabi.app.domain.model.Customer
 import com.hesabi.app.domain.model.CashMovement
 import com.hesabi.app.domain.model.CustomerTransaction
+import com.hesabi.app.domain.model.SupplierTransaction
 import com.hesabi.app.domain.model.CashMovementType
 import com.hesabi.app.domain.model.CustomerTransactionType
+import com.hesabi.app.domain.model.SupplierTransactionType
 import com.hesabi.app.domain.model.PurchasePaymentType
 import com.hesabi.app.domain.model.SalePaymentType
 import com.hesabi.app.domain.model.User
@@ -58,12 +60,13 @@ import com.hesabi.app.data.dao.UserDao
         SaleReturn::class,
         SaleReturnItem::class,
         Expense::class,
-        Customer::class,
-        CashMovement::class,
-        CustomerTransaction::class,
-        User::class
-    ],
-    version = 4,
+	        Customer::class,
+	        CashMovement::class,
+	        CustomerTransaction::class,
+	        SupplierTransaction::class,
+	        User::class
+	    ],
+	    version = 5,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -81,6 +84,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun customerDao(): CustomerDao
     abstract fun cashMovementDao(): CashMovementDao
     abstract fun customerTransactionDao(): CustomerTransactionDao
+    abstract fun supplierTransactionDao(): com.hesabi.app.data.dao.SupplierTransactionDao
     abstract fun userDao(): UserDao
 }
 
@@ -120,6 +124,13 @@ class Converters {
     @TypeConverter
     fun valueToCustomerTransactionType(value: String): CustomerTransactionType =
         runCatching { CustomerTransactionType.valueOf(value) }.getOrDefault(CustomerTransactionType.SALE)
+
+    @TypeConverter
+    fun supplierTransactionTypeToValue(type: SupplierTransactionType): String = type.name
+
+    @TypeConverter
+    fun valueToSupplierTransactionType(value: String): SupplierTransactionType =
+        runCatching { SupplierTransactionType.valueOf(value) }.getOrDefault(SupplierTransactionType.PURCHASE)
 
     @TypeConverter
     fun purchasePaymentTypeToValue(type: PurchasePaymentType): String = type.name

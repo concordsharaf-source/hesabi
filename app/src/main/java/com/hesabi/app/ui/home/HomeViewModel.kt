@@ -30,7 +30,9 @@ data class HomeUiState(
     val todayNetPurchases: Long = 0L,
     val todayExpenses: Long = 0L,
     val todayNetProfit: Long = 0L,
-    val userRole: UserRole = UserRole.ADMIN // افتراضي أدمن حتى نطبق تسجيل الدخول
+    val totalDebts: Long = 0L,
+    val totalSupplierDebts: Long = 0L,
+    val userRole: UserRole = UserRole.ADMIN
 )
 
 /**
@@ -78,7 +80,9 @@ class HomeViewModel(app: HesabiApp) : ViewModel() {
         trigger,
         storeHolder,
         itemsInRange,
-        authUseCase.currentUser
+        authUseCase.currentUser,
+        app.customerTransactionDao.observeTotalDebts(),
+        app.supplierTransactionDao.observeTotalSupplierDebts()
     ) { values: Array<Any?> ->
         @Suppress("UNCHECKED_CAST")
         val products = values[0] as List<com.hesabi.app.domain.model.Product>
@@ -111,6 +115,8 @@ class HomeViewModel(app: HesabiApp) : ViewModel() {
         // صافي الربح اليومي التقديري: إجمالي الفواتير − تكلفة بنود فواتير اليوم − المصروفات
         val todayCostOfSales = todayItems.sumOf { it.costPrice * it.quantity.toLong() }
         val todayNetProfit = todayTotal - todayCostOfSales - todayExpenseTotal
+        val totalDebts = values[9] as Long
+        val totalSupplierDebts = values[10] as Long
         HomeUiState(
             store = store,
             todaySalesTotal = todayTotal,
@@ -122,6 +128,8 @@ class HomeViewModel(app: HesabiApp) : ViewModel() {
             todayNetPurchases = todayNetPurchases,
             todayExpenses = todayExpenseTotal,
             todayNetProfit = todayNetProfit,
+            totalDebts = totalDebts,
+            totalSupplierDebts = totalSupplierDebts,
             userRole = currentUser?.role ?: UserRole.CASHIER
         )
     }.stateIn(
