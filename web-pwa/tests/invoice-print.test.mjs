@@ -88,6 +88,19 @@ test("يعرض المبالغ الصحيحة من دون أصفار عشرية �
   assert.match(app, /format\(roundMoney\(value\)\)/);
 });
 
+test("تتيح صفحة دفعات الموردين اختيار المورد المستحق وتسوية رصيده وطريقة الدفع", async () => {
+  const [app, permissions] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/permissions.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /data-action="new-supplier-payment"/);
+  assert.match(app, /function openSupplierPaymentDialog\(supplierId = ""\)/);
+  assert.match(app, /id="supplier-payment-supplier" name="supplierId" required/);
+  assert.match(app, /id="supplier-payment-balance"/);
+  assert.match(app, /db\.registerSupplierPayment\(\{ supplierId: values\.supplierId \|\| selectedId/);
+  assert.match(permissions, /"new-supplier-payment"/);
+});
+
 test("يفصل عنوان ووصف الصندوق عن أزراره على شاشات الهاتف الصغيرة", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
