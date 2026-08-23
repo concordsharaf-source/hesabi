@@ -110,7 +110,7 @@ function drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDate
   const mm = 12;
   const width = 210 * mm;
   const rows = account.transactions || [];
-  const height = Math.max(297 * mm, (126 + Math.max(1, rows.length) * 15) * mm);
+  const height = Math.max(297 * mm, (140 + Math.max(1, rows.length) * 16) * mm);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -131,26 +131,26 @@ function drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDate
   };
   const line = (fromX, fromY, toX, toY, color = "#d9e0d7", widthPx = 2) => { context.strokeStyle = color; context.lineWidth = widthPx; context.beginPath(); context.moveTo(fromX, fromY); context.lineTo(toX, toY); context.stroke(); };
   let y = 19 * mm;
-  text(storeName || "حسابي", right, y, "right", 52, 700, "rtl", "#174c3f");
+  text(storeName || "حسابي", right, y, "right", 62, 700, "rtl", "#174c3f");
   y += 9 * mm;
-  text("كشف حساب مديونية عميل", right, y, "right", 31, 600, "rtl", "#52645b");
+  text("كشف حساب مديونية عميل", right, y, "right", 38, 600, "rtl", "#52645b");
   y += 10 * mm;
-  text(`تاريخ الإنشاء: ${formatDateTime(new Date().toISOString())}`, right, y, "right", 22, 400, "rtl", "#52645b");
+  text(`تاريخ الإنشاء: ${formatDateTime(new Date().toISOString())}`, right, y, "right", 26, 400, "rtl", "#52645b");
   y += 11 * mm;
 
   const cardTop = y - 6 * mm;
   const hasPhone = Boolean(account.customer?.phone);
   const hasAddress = Boolean(account.customer?.address);
-  const cardHeight = (hasPhone && hasAddress ? 44 : hasPhone || hasAddress ? 35 : 27) * mm;
+  const cardHeight = (hasPhone && hasAddress ? 50 : hasPhone || hasAddress ? 39 : 30) * mm;
   context.fillStyle = "#edf6f0";
   context.strokeStyle = "#1f6b59";
   context.lineWidth = 3;
   context.beginPath();
   context.roundRect(left, cardTop, right - left, cardHeight, 12);
   context.fill(); context.stroke();
-  text("بيانات العميل", right - 5 * mm, y + 2 * mm, "right", 33, 700, "rtl", "#174c3f");
-  y += 11 * mm;
-  const detail = (label, value, ltr = false) => { text(label, right - 5 * mm, y, "right", 25, 600, "rtl", "#52645b"); text(value, left + 5 * mm, y, "left", 27, 700, ltr ? "ltr" : "rtl"); y += 8.5 * mm; };
+  text("بيانات العميل", right - 5 * mm, y + 2 * mm, "right", 38, 700, "rtl", "#174c3f");
+  y += 12 * mm;
+  const detail = (label, value, ltr = false) => { text(label, right - 5 * mm, y, "right", 30, 600, "rtl", "#52645b"); text(value, left + 5 * mm, y, "left", 34, 700, ltr ? "ltr" : "rtl"); y += 10 * mm; };
   detail("الاسم", account.customer?.name || "");
   if (hasPhone) detail("الهاتف", account.customer.phone, true);
   if (hasAddress) detail("العنوان", account.customer.address);
@@ -165,29 +165,29 @@ function drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDate
   const boxWidth = (right - left - boxGap * 2) / 3;
   summary.forEach(([label, value, background, color], index) => {
     const x = right - (index + 1) * boxWidth - index * boxGap;
-    context.fillStyle = background; context.strokeStyle = background === "#1f6b59" ? "#1f6b59" : "#d9e0d7"; context.lineWidth = 2; context.beginPath(); context.roundRect(x, y, boxWidth, 25 * mm, 10); context.fill(); context.stroke();
-    text(label, x + boxWidth - 4 * mm, y + 8 * mm, "right", 21, 600, "rtl", color);
-    text(value, x + boxWidth - 4 * mm, y + 17 * mm, "right", 28, 700, "rtl", color);
+    context.fillStyle = background; context.strokeStyle = background === "#1f6b59" ? "#1f6b59" : "#d9e0d7"; context.lineWidth = 2; context.beginPath(); context.roundRect(x, y, boxWidth, 29 * mm, 10); context.fill(); context.stroke();
+    text(label, x + boxWidth - 4 * mm, y + 9 * mm, "right", 25, 600, "rtl", color);
+    text(value, x + boxWidth - 4 * mm, y + 20 * mm, "right", 34, 700, "rtl", color);
   });
-  y += 37 * mm;
-  text("تفاصيل العمليات", right, y, "right", 34, 700, "rtl", "#174c3f");
+  y += 41 * mm;
+  text("تفاصيل العمليات", right, y, "right", 40, 700, "rtl", "#174c3f");
   y += 9 * mm;
   const columns = [right, 151 * mm, 105 * mm, 59 * mm, left];
   context.fillStyle = "#f4f6f1"; context.fillRect(left, y - 6 * mm, right - left, 12 * mm);
-  ["العملية", "التاريخ", "المرجع", "القيمة", "الرصيد بعد العملية"].forEach((label, index) => text(label, columns[index] - (index ? 3 * mm : 0), y, index === 4 ? "left" : "right", 19, 700, "rtl", "#52645b"));
-  y += 11 * mm;
-  if (!rows.length) { text("لا توجد عمليات مسجلة.", right, y, "right", 25, 400, "rtl", "#52645b"); y += 12 * mm; }
+  ["العملية", "التاريخ", "المرجع", "القيمة", "الرصيد بعد العملية"].forEach((label, index) => text(label, columns[index] - (index ? 3 * mm : 0), y, index === 4 ? "left" : "right", 23, 700, "rtl", "#52645b"));
+  y += 12 * mm;
+  if (!rows.length) { text("لا توجد عمليات مسجلة.", right, y, "right", 30, 400, "rtl", "#52645b"); y += 14 * mm; }
   rows.forEach((transaction) => {
-    text(transaction.typeLabel || transaction.type || "", columns[0], y, "right", 21, 700);
-    text(formatDateTime(transaction.date), columns[1], y, "right", 17, 400, "rtl", "#52645b");
-    text(transaction.invoiceNumber || "—", columns[2], y, "right", 19, 600, "ltr", "#52645b");
-    text(formatMoney(transaction.amount), columns[3], y, "right", 20, 700, "ltr", Number(transaction.amount) < 0 ? "#a74340" : "#172e27");
-    text(formatMoney(transaction.remainingAmount), columns[4], y, "left", 20, 700, "ltr");
-    y += 9 * mm;
-    line(left, y - 4.5 * mm, right, y - 4.5 * mm);
+    text(transaction.typeLabel || transaction.type || "", columns[0], y, "right", 26, 700);
+    text(formatDateTime(transaction.date), columns[1], y, "right", 20, 400, "rtl", "#52645b");
+    text(transaction.invoiceNumber || "—", columns[2], y, "right", 22, 600, "ltr", "#52645b");
+    text(formatMoney(transaction.amount), columns[3], y, "right", 24, 700, "ltr", Number(transaction.amount) < 0 ? "#a74340" : "#172e27");
+    text(formatMoney(transaction.remainingAmount), columns[4], y, "left", 24, 700, "ltr");
+    y += 10 * mm;
+    line(left, y - 5 * mm, right, y - 5 * mm);
   });
   y += 7 * mm;
-  text("هذا الكشف صادر من حسابي للاستخدام التشغيلي.", width / 2, y, "center", 19, 400, "rtl", "#52645b");
+  text("هذا الكشف صادر من حسابي للاستخدام التشغيلي.", width / 2, y, "center", 23, 400, "rtl", "#52645b");
   return canvas;
 }
 
