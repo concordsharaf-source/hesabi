@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { renderThermalInvoiceHtml } from "../client/src/js/invoice-print.js";
 
 const escapeHtml = (value = "") => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
@@ -24,4 +25,16 @@ test("ينشئ قالب الطباعة الحرارية 80 مم وفيه الف�
   assert.match(html, /أحمد العميل/);
   assert.match(html, /777123456/);
   assert.match(html, /صنعاء/);
+});
+
+test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الدقة بدل صورة نص قد تتداخل حروفها", async () => {
+  const [pdfExport, app] = await Promise.all([
+    readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(pdfExport, /HesabiArabicPdf/);
+  assert.match(pdfExport, /drawThermalInvoiceCanvas/);
+  assert.match(pdfExport, /context\.direction = "rtl"/);
+  assert.match(app, /shareOrDownloadInvoicePdf/);
+  assert.match(app, /shareInvoice\(invoice\)/);
 });

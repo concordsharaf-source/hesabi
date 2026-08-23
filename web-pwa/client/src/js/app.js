@@ -7,7 +7,7 @@ import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBacku
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { getExitGuardAction, leaveAfterExitConfirmation } from "./navigation-guard.js";
-import { createPdfFileFromHtml, printHtmlDocument, shareOrDownloadPdf } from "./pdf-export.js";
+import { createPdfFileFromHtml, printHtmlDocument, shareOrDownloadInvoicePdf, shareOrDownloadPdf } from "./pdf-export.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 import { isNewContinuousBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 
@@ -814,7 +814,8 @@ async function copyTextForSharing(text) {
 
 async function shareInvoice(invoice) {
   try {
-    const result = await shareOrDownloadPdf({ html: thermalInvoiceHtml(invoice), filename: `${invoice.invoiceNumber}.pdf`, title: `فاتورة ${invoice.invoiceNumber}`, page: "thermal" });
+    const customer = invoice.customerId ? state.customers.find((entry) => entry.id === invoice.customerId) : null;
+    const result = await shareOrDownloadInvoicePdf({ invoice, customer, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatAmount: amount, formatDateTime: dateTime, paymentLabel: paymentChannelLabel(invoice), filename: `${invoice.invoiceNumber}.pdf`, title: `فاتورة ${invoice.invoiceNumber}` });
     showToast(result === "shared" ? "تمت مشاركة ملف الفاتورة PDF" : "تم تنزيل ملف الفاتورة PDF للمشاركة");
   } catch (error) { if (error?.name !== "AbortError") showToast("تعذر إنشاء ملف PDF للفواتير الآن.", "error"); }
 }
