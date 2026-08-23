@@ -32,7 +32,9 @@ export const ACCOUNT_ROLES = [
   { id: "cashier", label: "كاشير" },
 ];
 
-export const EXPENSE_CATEGORIES = ["إيجار", "كهرباء", "ماء", "إنترنت", "رواتب", "نقل", "صيانة", "مشتريات", "تسويق", "مصروفات أخرى"];
+export const DAILY_EXPENSE_CATEGORIES = ["أكل وشرب", "مواصلات", "وقود", "صيانة طارئة", "لوازم تشغيل", "تسويق يومي", "مصروفات يومية أخرى"];
+export const MONTHLY_EXPENSE_CATEGORIES = ["إيجار", "كهرباء", "ماء", "إنترنت", "رواتب", "اشتراكات", "مصروفات شهرية أخرى"];
+export const EXPENSE_CATEGORIES = [...DAILY_EXPENSE_CATEGORIES, ...MONTHLY_EXPENSE_CATEGORIES];
 
 export const NAV_ITEMS = [
   { id: "dashboard", label: "الرئيسية", icon: "grid" },

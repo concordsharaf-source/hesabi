@@ -158,3 +158,11 @@ label { font-size:15px; }
 [data-theme="dark"] img { filter:none !important; mix-blend-mode:normal !important; }
 .purchase-search-control { display:flex; align-items:stretch; gap:8px; }.purchase-search-control input { min-width:0; flex:1; }.purchase-search-control .icon-button { flex:0 0 46px; min-height:46px; color:#fff; background:var(--green); border-color:var(--green); }
 .confirm-dialog { max-width:480px; }.confirm-dialog .dialog__subtext { max-width:36ch; }
+.is-negative,
+.metric-card.is-negative strong,
+.report-card strong.is-negative,
+.report-card h2.is-negative,
+.report-card__final strong.is-negative { color:var(--danger) !important; }
+.expense-period-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }.expense-period-grid .entity-list { margin:0; }.expense-period-grid .panel__head small { color:var(--muted); font-size:10px; }
+.report-export-options { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:9px; }
+@media (max-width:680px) { .expense-period-grid,.report-export-options { grid-template-columns:1fr; } }

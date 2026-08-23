@@ -92,4 +92,20 @@ export const isWithinDateRange = (value, from, to) => {
   return (!from || key >= from) && (!to || key <= to);
 };
 
+/** يحسب الحصة المعترف بها من مصروف شهري في فترة محددة، دون إدخال الشهر نفسه مرتين. */
+export const calculateMonthlyExpenseAllocation = ({ amount = 0, date = dateKey(), from = "", to = "" } = {}) => {
+  const month = String(date || dateKey()).slice(0, 7);
+  if (!/^\d{4}-\d{2}$/.test(month)) return 0;
+  const [year, monthNumber] = month.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(year, monthNumber, 0)).getUTCDate();
+  const monthStart = `${month}-01`;
+  const monthEnd = `${month}-${String(daysInMonth).padStart(2, "0")}`;
+  const rangeStart = from && from > monthStart ? from : monthStart;
+  const rangeEnd = to && to < monthEnd ? to : monthEnd;
+  if (rangeStart > rangeEnd) return 0;
+  const asDay = (key) => Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)));
+  const coveredDays = Math.round((asDay(rangeEnd) - asDay(rangeStart)) / 86400000) + 1;
+  return roundMoney(Math.max(0, toNumber(amount)) * coveredDays / daysInMonth);
+};
+
 export const nowIso = () => new Date().toISOString();
