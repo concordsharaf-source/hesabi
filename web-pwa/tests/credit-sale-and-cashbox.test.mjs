@@ -21,3 +21,13 @@ test("البيع الآجل يفرض صفرًا كدفعة أولى وتبقى �
   assert.equal(cashbox.closingBalance, 0);
   await db.resetAllData();
 });
+
+test("تعرض لوحة التحكم الداخل النقدي اليومي بدل رصيد الصندوق التراكمي", async () => {
+  await db.resetAllData();
+  const product = await db.createProduct({ name: "منتج نقدي", unit: "حبة", purchasePrice: 25, salePrice: 90, quantity: 2, minimumStock: 0 });
+  await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], discount: 0, paidAmount: 90, paymentMethod: "نقدي" });
+  const dashboard = await db.getDashboard();
+  assert.equal(dashboard.todayCashIn, 90);
+  assert.equal(dashboard.cashBalance, 90);
+  await db.resetAllData();
+});

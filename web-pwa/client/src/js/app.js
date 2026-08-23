@@ -186,7 +186,7 @@ function dashboardMarkup() {
     ${metricCard("تحويلات اليوم", money(transfers.total), "transfer", transfers.count ? `${amount(transfers.count)} تحصيل بتحويل` : "لا توجد تحويلات اليوم", transfers.total)}
     ${metricCard("دفعات اليوم", money(dashboard.todayCustomerPayments), "wallet", "تسديد ديون سابقة")}
     ${metricCard("مستحقات الموردين", money(dashboard.supplierDebt), "truck", "شراء آجل غير مسدد")}
-    ${metricCard("رصيد الصندوق", money(dashboard.cashBalance), "wallet", "نقد متاح حاليًا", dashboard.cashBalance)}
+    ${metricCard("الداخل للصندوق", money(dashboard.todayCashIn), "wallet", "نقد وارد اليوم فقط", dashboard.todayCashIn)}
   </section>
   <section class="dashboard-split">
     <article class="panel panel--low-stock"><div class="panel__head"><div><span class="eyebrow">تنبيه تشغيلي</span><h2>مخزون يحتاج انتباهك</h2></div><button class="text-button" data-action="navigate" data-view="inventory">عرض المخزون ${icon("arrow", 16)}</button></div>
@@ -315,14 +315,17 @@ function purchasesMarkup() {
   <section class="panel invoice-list">${state.purchases.length ? state.purchases.map((purchase) => `<button class="invoice-row" data-action="open-purchase" data-id="${purchase.id}"><div class="invoice-row__mark invoice-row__mark--purchase">${icon("truck", 20)}</div><div class="invoice-row__main"><strong>${purchase.invoiceNumber}</strong><small>${escapeHtml(purchase.supplierName)} · ${dateTime(purchase.date)}</small></div><strong>${money(purchase.total)}</strong>${icon("arrow", 18)}</button>`).join("") : emptyState("لا توجد فواتير شراء", "سجّل أول فاتورة شراء لزيادة المخزون، مع المورد أو بدونه.", "new-purchase")}</section>`;
 }
 
+function currentMonthDateRange() { const now = new Date(); const year = now.getFullYear(); const month = now.getMonth(); const pad = (value) => String(value).padStart(2, "0"); return { from: `${year}-${pad(month + 1)}-01`, to: `${year}-${pad(new Date(year, month + 1, 0).getDate())}` }; }
+
 function expensesMarkup() {
-  const matches = state.expenses.filter((expense) => (!state.expenseQuery || [expense.category, expense.description, expense.notes].some((value) => value?.toLocaleLowerCase("ar").includes(state.expenseQuery.toLocaleLowerCase("ar")))) && (!state.expenseFrom || expense.date >= state.expenseFrom) && (!state.expenseTo || expense.date <= state.expenseTo));
+  const defaultRange = currentMonthDateRange(); const expenseFrom = state.expenseFrom || defaultRange.from; const expenseTo = state.expenseTo || defaultRange.to;
+  const matches = state.expenses.filter((expense) => (!state.expenseQuery || [expense.category, expense.description, expense.notes].some((value) => value?.toLocaleLowerCase("ar").includes(state.expenseQuery.toLocaleLowerCase("ar")))) && expense.date >= expenseFrom && expense.date <= expenseTo);
   const dailyExpenses = matches.filter((expense) => expense.periodType !== "monthly");
   const monthlyExpenses = matches.filter((expense) => expense.periodType === "monthly");
   const total = matches.reduce((sum, expense) => sum + toNumber(expense.amount), 0);
   const expenseRows = (items, periodType) => items.length ? items.map((expense) => `<article class="entity-row"><div class="entity-row__icon entity-row__icon--expense">${icon(periodType === "monthly" ? "calendar" : "wallet", 20)}</div><div class="entity-row__main"><strong>${escapeHtml(expense.category)}</strong><small>${escapeHtml(expense.description || "بلا وصف")} · ${expense.date}${periodType === "monthly" ? " · يوزع على أيام الشهر" : ""}</small></div><strong class="entity-row__amount">${money(expense.amount)}</strong><div class="entity-row__actions"><button class="icon-button" aria-label="تعديل المصروف" data-action="edit-expense" data-id="${expense.id}">${icon("edit", 18)}</button><button class="icon-button icon-button--danger" aria-label="حذف المصروف" data-action="delete-expense" data-id="${expense.id}">${icon("trash", 18)}</button></div></article>`).join("") : `<div class="inline-empty">لا توجد مصروفات ${periodType === "monthly" ? "شهرية" : "يومية"} ضمن الفترة.</div>`;
   return `${topbarMarkup("المصروفات", "سجّل المصروفات لتظهر في صافي الربح والتقارير.", `<button class="button button--primary" data-action="new-expense">${icon("plus", 18)}<span>إضافة مصروف</span></button>`)}
-  <section class="toolbar toolbar--filter"><label class="search-field">${icon("search", 19)}<input id="expense-search" autocomplete="off" placeholder="ابحث في المصروفات..." value="${escapeHtml(state.expenseQuery)}" /></label><form id="expense-filter" class="date-filter"><input name="from" type="date" value="${state.expenseFrom}" /><input name="to" type="date" value="${state.expenseTo}" /></form></section>
+  <section class="toolbar toolbar--filter"><label class="search-field">${icon("search", 19)}<input id="expense-search" autocomplete="off" placeholder="ابحث في المصروفات..." value="${escapeHtml(state.expenseQuery)}" /></label><form id="expense-filter" class="date-filter"><input name="from" type="date" value="${expenseFrom}" /><input name="to" type="date" value="${expenseTo}" /></form><small class="filter-note">النطاق الافتراضي: الشهر الحالي. يمكنك تحديد أي يوم أو فترة يدويًا.</small></section>
   <section class="inventory-summary"><div><span>قيمة السجلات ضمن الفترة</span><strong>${money(total)}</strong></div><div><span>مصروفات يومية</span><strong>${amount(dailyExpenses.length)} عملية</strong></div><div><span>مصروفات شهرية</span><strong>${amount(monthlyExpenses.length)} عملية</strong></div></section>
   <section class="expense-period-grid"><section class="panel entity-list"><div class="panel__head"><div><span class="eyebrow">تشغيل يومي</span><h2>مصروفات يومية</h2></div><small>مثل الأكل والشرب والمواصلات</small></div>${expenseRows(dailyExpenses, "daily")}</section><section class="panel entity-list"><div class="panel__head"><div><span class="eyebrow">التزام شهري</span><h2>مصروفات شهرية</h2></div><small>مثل الإيجار والكهرباء والماء</small></div>${expenseRows(monthlyExpenses, "monthly")}</section></section>`;
 }
@@ -918,7 +921,7 @@ async function openPurchaseDialog(purchaseIdOrDraft = null) {
   };
   const addPurchaseProduct = (product) => { if (!product || lines.some((line) => line.productId === product.id)) { showToast("المنتج موجود بالفعل في فاتورة الشراء.", "error"); return false; } lines.push(makePurchaseLine(product)); search.value = ""; renderResults(); renderLines(); return true; };
   const renderResults = (query = "") => { const normalized = query.trim().toLocaleLowerCase("ar"); const matches = state.products.filter((product) => !normalized || [product.name, product.barcode, product.internalCode].some((value) => value?.toLocaleLowerCase("ar").includes(normalized))).slice(0, 6); results.innerHTML = normalized ? (matches.length ? matches.map((product) => `<button type="button" data-add-purchase-product="${product.id}"><span><strong>${escapeHtml(product.name)}</strong><small dir="auto">${escapeHtml(product.barcode || product.internalCode || "دون رمز")}</small></span><span>${money(product.purchasePrice)} للحبة</span>${icon("plus", 16)}</button>`).join("") : `<p>لا يوجد منتج مطابق.</p>`) : ""; results.querySelectorAll("[data-add-purchase-product]").forEach((button) => button.addEventListener("click", () => addPurchaseProduct(state.products.find((item) => item.id === button.dataset.addPurchaseProduct)))); };
-  const openPurchaseScanner = () => openScannerOverlay({ title: "مسح باركود للشراء", description: "ضع الباركود داخل الإطار لإضافة المنتج إلى فاتورة الشراء. يمكنك دائمًا البحث بالاسم أو إدخال الرمز يدويًا.", unsupportedMessage: "استخدم خانة البحث أعلى الفاتورة لإدخال الباركود يدويًا أو أعد المحاولة بعد منح إذن الكاميرا.", manualMode: null, onManualEntry: () => { closeScannerDialog(); search.focus(); }, onDetected: async (code) => { const product = await db.findProductByBarcode(code); if (!product) { closeScannerDialog(); search.value = code; renderResults(code); showToast("لم نجد هذا الباركود. يمكنك البحث اليدوي أو إضافة منتج جديد.", "error"); return true; } const added = addPurchaseProduct(product); if (added) showToast(`أُضيف ${product.name} إلى فاتورة الشراء`); return true; } });
+  const openPurchaseScanner = () => openScannerOverlay({ title: "مسح باركود للشراء", description: "ضع الباركود داخل الإطار لإضافة المنتج إلى فاتورة الشراء. يمكنك دائمًا البحث بالاسم أو الكود الداخلي.", unsupportedMessage: "استخدم خانة البحث أعلى الفاتورة للبحث بالاسم أو الكود الداخلي، أو أعد المحاولة بعد منح إذن الكاميرا.", manualMode: null, onManualEntry: () => { closeScannerDialog(); search.focus(); }, onDetected: async (code) => { const product = await db.findProductByBarcode(code); if (!product) { closeScannerDialog(); search.value = code; renderResults(code); showToast("لم نجد هذا الباركود. ابحث بالكود الداخلي أو أضف منتجًا جديدًا.", "error"); return true; } const added = addPurchaseProduct(product); if (added) showToast(`أُضيف ${product.name} إلى فاتورة الشراء`); return true; } });
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); search.addEventListener("input", (event) => renderResults(event.target.value)); overlay.querySelector("#purchase-scan-product").addEventListener("click", openPurchaseScanner); overlay.querySelector("#purchase-new-product").addEventListener("click", () => openPurchaseProductDialog(getDraft())); form.querySelectorAll("[name=paymentType]").forEach((input) => input.addEventListener("change", () => syncPurchase({ resetPaid: form.paymentType.value === "آجل" }))); paidInput.addEventListener("input", () => syncPurchase()); renderLines();
   form.addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(form)); await db.createPurchase({ ...values, items: lines }); await refresh(); closeDialog(); state.view = "purchases"; render(); showToast("تم حفظ فاتورة الشراء وزيادة المخزون"); } catch (error) { showToast(error.message, "error"); } });
 }
@@ -959,14 +962,27 @@ function openStockHistoryDialog(productId = "") {
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
 }
 
+async function openScannedProduct(product, mode) {
+  closeScannerDialog(); closeDialog();
+  if (mode === "sale") { addToCart(product.id); showToast(`أُضيف ${product.name} إلى السلة`); } else openProductDialog(product);
+  return true;
+}
+
+async function findInternalCode(code, mode, { keepScannerOpen = false } = {}) {
+  const product = await db.findProductByInternalCode(code);
+  if (product) return openScannedProduct(product, mode);
+  if (!keepScannerOpen) showToast("لم نجد هذا الكود الداخلي. تحقق منه أو أعد المسح.", "error");
+  return false;
+}
+
 async function findBarcode(code, mode) {
   const product = await db.findProductByBarcode(code);
-  if (product) { closeScannerDialog(); closeDialog(); if (mode === "sale") { addToCart(product.id); showToast(`أُضيف ${product.name} إلى السلة`); } else openProductDialog(product); return true; }
+  if (product) return openScannedProduct(product, mode);
   closeScannerDialog();
   closeDialog();
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">نتيجة المسح</span><h2>المنتج غير موجود</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><p class="dialog__subtext">لم نجد باركود <strong>${escapeHtml(code)}</strong> في المنتجات المحفوظة. يمكنك إدخال رمز آخر أو إعادة المسح.</p><form id="unknown-barcode-form" class="manual-barcode"><input name="barcode" required dir="ltr" inputmode="numeric" autocomplete="off" value="${escapeHtml(code)}" aria-label="إدخال الباركود يدويًا" /><button class="button button--secondary" type="submit">بحث بالرمز</button></form><div class="dialog__actions"><button class="button button--secondary" id="retry-unknown-barcode" type="button">${icon("scan", 17)} إعادة المسح</button><button class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" id="create-from-barcode">إنشاء منتج ${icon("plus", 17)}</button></div>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">نتيجة المسح</span><h2>الباركود غير مسجل</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><p class="dialog__subtext">لم نجد الباركود <strong>${escapeHtml(code)}</strong>. ابحث بالكود الداخلي للمنتج أو أعد المسح.</p><form id="unknown-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" aria-label="البحث بالكود الداخلي" /><button class="button button--secondary" type="submit">بحث بالكود الداخلي</button></form><div class="dialog__actions"><button class="button button--secondary" id="retry-unknown-barcode" type="button">${icon("scan", 17)} إعادة المسح</button><button class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" id="create-from-barcode">إنشاء منتج ${icon("plus", 17)}</button></div>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
-  overlay.querySelector("#unknown-barcode-form").addEventListener("submit", (event) => { event.preventDefault(); findBarcode(new FormData(event.currentTarget).get("barcode"), mode); });
+  overlay.querySelector("#unknown-barcode-form").addEventListener("submit", (event) => { event.preventDefault(); findInternalCode(new FormData(event.currentTarget).get("internalCode"), mode); });
   overlay.querySelector("#retry-unknown-barcode").addEventListener("click", () => { closeDialog(); openScanner(mode); });
   overlay.querySelector("#create-from-barcode").addEventListener("click", () => openProductDialog(null, code));
   return false;
@@ -1052,8 +1068,8 @@ function renderUnsupportedScanner(overlay, message, manualMode, onManualEntry) {
   stopScanner();
   const content = overlay.querySelector("#scanner-content");
   overlay.querySelector("#scanner-retry").hidden = false;
-  content.innerHTML = `<div class="scanner-notice scanner-notice--neutral">${icon("alert", 20)}<div><strong>ماسح الباركود غير مدعوم على هذا المتصفح</strong><span>${message}</span></div></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="barcode" required dir="ltr" inputmode="numeric" autocomplete="off" placeholder="أدخل الباركود يدويًا" autofocus /><button class="button button--primary" type="submit">بحث</button></form>` : onManualEntry ? `<button id="scanner-manual-entry" class="button button--primary button--wide" type="button">إدخال الباركود يدويًا</button>` : ""}`;
-  content.querySelector("#manual-barcode-form")?.addEventListener("submit", (event) => { event.preventDefault(); findBarcode(new FormData(event.currentTarget).get("barcode"), manualMode); });
+  content.innerHTML = `<div class="scanner-notice scanner-notice--neutral">${icon("alert", 20)}<div><strong>ماسح الباركود غير مدعوم على هذا المتصفح</strong><span>${message}</span></div></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" autofocus /><button class="button button--primary" type="submit">بحث بالكود الداخلي</button></form>` : onManualEntry ? `<button id="scanner-manual-entry" class="button button--primary button--wide" type="button">البحث بالكود الداخلي</button>` : ""}`;
+  content.querySelector("#manual-barcode-form")?.addEventListener("submit", (event) => { event.preventDefault(); findInternalCode(new FormData(event.currentTarget).get("internalCode"), manualMode, { keepScannerOpen: true }); });
   content.querySelector("#scanner-manual-entry")?.addEventListener("click", onManualEntry);
 }
 
@@ -1063,8 +1079,8 @@ async function startCameraScanner(overlay, onDetected, unsupportedMessage, manua
   const content = overlay.querySelector("#scanner-content");
   const retry = overlay.querySelector("#scanner-retry");
   retry.hidden = false;
-  content.innerHTML = `<div class="scanner-box"><video id="scanner-video" autoplay muted playsinline></video><div class="scanner-box__guide"><span>ضع الباركود داخل الإطار</span></div></div><div id="scanner-status" class="scanner-status">${icon("scan", 16)}<span>وجّه الكاميرا نحو الباركود</span></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="barcode" required dir="ltr" inputmode="numeric" autocomplete="off" placeholder="أدخل الباركود يدويًا" /><button class="button button--secondary" type="submit">بحث بالرمز</button></form>` : ""}`;
-  content.querySelector("#manual-barcode-form")?.addEventListener("submit", (event) => { event.preventDefault(); findBarcode(new FormData(event.currentTarget).get("barcode"), manualMode); });
+  content.innerHTML = `<div class="scanner-box"><video id="scanner-video" autoplay muted playsinline></video><div class="scanner-box__guide"><span>ضع الباركود داخل الإطار</span></div></div><div id="scanner-status" class="scanner-status">${icon("scan", 16)}<span>وجّه الكاميرا نحو الباركود</span></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" /><button class="button button--secondary" type="submit">بحث بالكود الداخلي</button></form>` : ""}`;
+  content.querySelector("#manual-barcode-form")?.addEventListener("submit", (event) => { event.preventDefault(); findInternalCode(new FormData(event.currentTarget).get("internalCode"), manualMode, { keepScannerOpen: true }); });
   try {
     let stream;
     try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }); }
@@ -1109,8 +1125,8 @@ async function startCameraScanner(overlay, onDetected, unsupportedMessage, manua
     };
     session.frame = requestAnimationFrame(scanFrame);
   } catch (error) {
-    content.innerHTML = `<div class="scanner-notice scanner-notice--error">${icon("alert", 20)}<div><strong>تعذر فتح الكاميرا</strong><span>تحقق من الإذن، ثم أعد المحاولة، أو استخدم الإدخال اليدوي.</span></div></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="barcode" required dir="ltr" inputmode="numeric" placeholder="أدخل الباركود يدويًا" autofocus /><button class="button button--primary" type="submit">بحث</button></form>` : onManualEntry ? `<button id="scanner-manual-entry" class="button button--primary button--wide" type="button">إدخال الباركود يدويًا</button>` : ""}`;
-    content.querySelector("#manual-barcode-form")?.addEventListener("submit", (event) => { event.preventDefault(); findBarcode(new FormData(event.currentTarget).get("barcode"), manualMode); });
+    content.innerHTML = `<div class="scanner-notice scanner-notice--error">${icon("alert", 20)}<div><strong>تعذر فتح الكاميرا</strong><span>تحقق من الإذن، ثم أعد المحاولة، أو ابحث بالكود الداخلي.</span></div></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" autofocus /><button class="button button--primary" type="submit">بحث بالكود الداخلي</button></form>` : onManualEntry ? `<button id="scanner-manual-entry" class="button button--primary button--wide" type="button">البحث بالكود الداخلي</button>` : ""}`;
+    content.querySelector("#manual-barcode-form")?.addEventListener("submit", (event) => { event.preventDefault(); findInternalCode(new FormData(event.currentTarget).get("internalCode"), manualMode, { keepScannerOpen: true }); });
     content.querySelector("#scanner-manual-entry")?.addEventListener("click", onManualEntry);
   }
 }
@@ -1144,7 +1160,7 @@ function openScanner(mode) {
   openScannerOverlay({
     title: continuous ? "مسح منتجات متواصل" : "وجّه الكاميرا نحو الباركود",
     description: continuous ? "أضف عدة منتجات إلى السلة في جلسة واحدة، ثم اختر «إنهاء المسح» عند الانتهاء." : "سنفتح المنتج المسجل مباشرة أو نقترح إنشاء منتج جديد عند عدم العثور عليه.",
-    unsupportedMessage: "يمكنك إدخال الباركود يدويًا أو الضغط على إعادة المحاولة بعد منح إذن الكاميرا.",
+    unsupportedMessage: "يمكنك البحث بالكود الداخلي أو الضغط على إعادة المحاولة بعد منح إذن الكاميرا.",
     manualMode: mode,
     onManualEntry: () => {
       const manualForm = document.querySelector("#scanner-backdrop #manual-barcode-form");

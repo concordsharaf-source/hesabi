@@ -21,3 +21,12 @@ test("شراء كرتون يحدث مخزون الحبات وسعر المنتج
   assert.deepEqual(saved.items.map(({ packageUnit, packageQuantity, unitsPerPackage, packageCost, quantity, unitCost, total, salePrice }) => ({ packageUnit, packageQuantity, unitsPerPackage, packageCost, quantity, unitCost, total, salePrice })), [{ packageUnit: "كرتون", packageQuantity: 2, unitsPerPackage: 24, packageCost: 1200, quantity: 48, unitCost: 50, total: 2400, salePrice: 65 }]);
   await db.resetAllData();
 });
+
+test("يجد المنتج بالكود الداخلي دون الاعتماد على الباركود", async () => {
+  await db.resetAllData();
+  const product = await db.createProduct({ name: "منتج كود داخلي", internalCode: "INT-440", unit: "حبة", purchasePrice: 10, salePrice: 20, quantity: 1, minimumStock: 0 });
+  const found = await db.findProductByInternalCode(" INT-440 ");
+  assert.equal(found?.id, product.id);
+  assert.equal(await db.findProductByInternalCode("INT-NOT-FOUND"), null);
+  await db.resetAllData();
+});
