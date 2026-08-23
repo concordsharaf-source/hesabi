@@ -4,6 +4,7 @@ import { ACCOUNT_ROLES, BUSINESS_TYPES, CURRENCIES, DEFAULT_CURRENCY_CODE, EXPEN
 import { db } from "./database.js";
 import { calculateSaleTotals, calculateTransferCollections, dateKey, roundMoney, stockStatus, toNumber } from "./domain.js";
 import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
+import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 
 const icon = (name, size = 20) => {
@@ -710,9 +711,7 @@ async function shareInvoice(invoice) {
 function printInvoiceThermal(invoice) {
   const popup = window.open("", "hesabi-thermal-invoice", "width=420,height=720");
   if (!popup) { showToast("السماح بالنوافذ المنبثقة مطلوب للطباعة الحرارية.", "error"); return; }
-  const rows = invoice.items.map((item) => `<tr><td>${escapeHtml(item.productName)}<br><small>${amount(item.quantity)} ${escapeHtml(item.unit)} × ${money(item.unitPrice)}</small></td><td>${money(item.total)}</td></tr>`).join("");
-  const remaining = invoice.paymentType === "آجل" ? `<div><span>المتبقي</span><strong>${money(invoice.remainingAmount)}</strong></div>` : "";
-  popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(invoice.invoiceNumber)}</title><style>@page{size:80mm auto;margin:4mm}*{box-sizing:border-box}body{width:72mm;margin:0 auto;color:#111;font-family:Tahoma,Arial,sans-serif;font-size:12px}h1,h2,p{margin:0;text-align:center}h1{font-size:18px}h2{margin-top:5px;font-size:14px}.muted{margin-top:4px;color:#555;font-size:10px}.rule{border:0;border-top:1px dashed #333;margin:8px 0}table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px dashed #bbb;vertical-align:top}td:last-child{text-align:left;white-space:nowrap}small{color:#444;font-size:10px}.summary div{display:flex;justify-content:space-between;gap:8px;padding:3px 0}.summary .final{margin-top:4px;padding-top:6px;border-top:1px solid #111;font-size:14px}.footer{margin-top:11px;text-align:center;font-size:10px;color:#555}</style></head><body><h1>${escapeHtml(state.settings?.storeName || "حسابي")}</h1><h2>فاتورة بيع ${escapeHtml(invoice.invoiceNumber)}</h2><p class="muted">${escapeHtml(dateTime(invoice.date))}</p><hr class="rule"><table><tbody>${rows}</tbody></table><hr class="rule"><section class="summary"><div><span>الإجمالي قبل الخصم</span><strong>${money(invoice.subtotal)}</strong></div><div><span>الخصم</span><strong>${money(invoice.discount)}</strong></div><div class="final"><span>الإجمالي</span><strong>${money(invoice.total)}</strong></div><div><span>طريقة السداد</span><strong>${paymentChannelLabel(invoice)}</strong></div><div><span>المدفوع</span><strong>${money(invoice.paidAmount)}</strong></div>${remaining}</section><p class="footer">شكرًا لتعاملكم معنا</p></body></html>`);
+  popup.document.write(renderThermalInvoiceHtml({ invoice, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml, paymentLabel: paymentChannelLabel(invoice) }));
   popup.document.close(); popup.focus(); window.setTimeout(() => popup.print(), 180);
 }
 
