@@ -1,4 +1,4 @@
-const CACHE_NAME = "hesabi-pwa-v5";
+const CACHE_NAME = "hesabi-pwa-v6";
 const SCOPE_PATH = new URL(self.registration.scope).pathname;
 const APP_SHELL = [SCOPE_PATH, `${SCOPE_PATH}manifest.json`, `${SCOPE_PATH}service-worker.js`];
 

@@ -95,8 +95,9 @@ test("يفصل عنوان ووصف الصندوق عن أزراره على شا�
   ]);
   assert.match(app, /"topbar--cashbox"/);
   assert.match(app, /function topbarMarkup\(title, description, action = "", modifierClass = ""\)/);
-  assert.match(styles, /\.topbar--cashbox \{ display:grid; grid-template-columns:minmax\(0,1fr\); gap:12px; \}/);
+  assert.match(styles, /\.workspace > \.topbar\.topbar--cashbox \{ display:flex !important; flex-direction:column !important; align-items:stretch !important; gap:12px !important; \}/);
   assert.match(styles, /\.topbar--cashbox \.topbar__description \{ max-width:100%; overflow-wrap:normal; word-break:normal; line-height:1\.7; \}/);
+  assert.match(styles, /\.workspace > \.topbar\.topbar--cashbox>div:first-child \{ flex:0 0 auto !important; width:100% !important; min-width:0 !important; \}/);
 });
 
 test("يضع كشف حساب العميل بياناته في بطاقة واضحة بخط عربي مناسب للطباعة", () => {

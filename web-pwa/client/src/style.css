@@ -150,6 +150,7 @@ label { font-size:15px; }
 .scanner-session-note { padding:10px 11px; margin:-4px 0 12px; color:#174c3f; background:var(--green-pale); border:1px solid rgba(31,107,89,.34); border-radius:11px; font-size:12px; font-weight:800; line-height:1.7; }
 [data-theme="dark"] .scanner-session-note { color:#e8fff0; background:#244b3d; border-color:#79b899; }
 @media (max-width:599px) { .topbar h1 { font-size:31px; }.metric-card { min-height:126px; }.metric-card strong { font-size:19px; }.dialog__head h2 { font-size:23px; }.scanner-dialog__actions .button { min-height:48px; }.bottom-nav .nav-item { font-size:11px; }.cart-line__detail strong,.cart-line>strong { font-size:15px; }.cart-line__detail small { font-size:12px; } }
+@media (max-width:599px) { .workspace > .topbar.topbar--cashbox { display:flex !important; flex-direction:column !important; align-items:stretch !important; gap:12px !important; }.workspace > .topbar.topbar--cashbox>div:first-child { flex:0 0 auto !important; width:100% !important; min-width:0 !important; }.workspace > .topbar.topbar--cashbox>.topbar__actions { justify-content:flex-start !important; width:100% !important; } }
 
 /* مدخلات العبوات في المشتريات: كل المخزون يبقى بوحدة البيع الأساسية، بينما تبقى العبوة مرئية في الفاتورة. */
 .purchase-line--pack { grid-template-columns:minmax(150px,1.15fr) repeat(3,minmax(92px,1fr)) auto auto; align-items:end; }
