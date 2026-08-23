@@ -820,7 +820,8 @@ async function shareInvoice(invoice) {
 }
 
 function thermalInvoiceHtml(invoice) {
-  return renderThermalInvoiceHtml({ invoice, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml, paymentLabel: paymentChannelLabel(invoice) });
+  const customer = invoice.customerId ? state.customers.find((item) => item.id === invoice.customerId) || null : null;
+  return renderThermalInvoiceHtml({ invoice, customer, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml, paymentLabel: paymentChannelLabel(invoice) });
 }
 
 function printInvoiceThermal(invoice) {
