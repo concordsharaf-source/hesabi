@@ -54,6 +54,12 @@ test("يدعم البحث المباشر برقم الفاتورة ويعرض ع
   assert.match(app, /amountLatin\(dashboard\.todayInvoiceCount\)/);
 });
 
+test("يربط خيار البقاء وكل عناصر إغلاق النافذة بدالة الإغلاق الموحدة", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /data-dialog-close>البقاء في التطبيق/);
+  assert.match(app, /querySelectorAll\("\[data-dialog-close\]"\)\.forEach\(\(button\) => button\.addEventListener\("click", closeDialog\)\)/);
+});
+
 test("يضع كشف حساب العميل بياناته في بطاقة واضحة بخط عربي مناسب للطباعة", () => {
   const html = renderCustomerAccountHtml({
     account: { customer: { name: "أحمد العميل", phone: "777123456", address: "صنعاء" }, totalSales: 80, totalPaid: 40, balance: 40, transactions: [] },

@@ -591,7 +591,7 @@ function openDialog(content) {
   overlay.addEventListener("click", (event) => { if (event.target === overlay) closeDialog(); });
   document.body.appendChild(overlay);
   requestAnimationFrame(() => overlay.classList.add("is-open"));
-  overlay.querySelector("[data-dialog-close]")?.addEventListener("click", closeDialog);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   return overlay;
 }
 
