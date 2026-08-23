@@ -44,7 +44,7 @@ const icon = (name, size = 20) => {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ""}</svg>`;
 };
 
-const state = { view: "dashboard", settings: null, accounts: [], currentUser: null, products: [], sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
+const state = { view: "dashboard", settings: null, accounts: [], currentUser: null, products: [], sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
 let root;
 let exitGuardInstalled = false;
 let exitAllowed = false;
@@ -58,6 +58,7 @@ const money = (value) => {
 };
 const signedMoney = (value) => `<strong class="${toNumber(value) < 0 ? "is-negative" : ""}">${money(value)}</strong>`;
 const amount = (value) => new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 2 }).format(toNumber(value));
+const amountLatin = (value) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2, useGrouping: false }).format(toNumber(value));
 const dateTime = (value) => new Intl.DateTimeFormat("ar-SA", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[character]);
 const paymentChannelLabel = (invoice) => invoice?.paymentType === "آجل" ? "دين" : invoice?.paymentMethod === "تحويل" ? "تحويل" : "كاش";
@@ -179,9 +180,9 @@ function dashboardMarkup() {
     ${metricCard("مشتريات اليوم", money(dashboard.todayPurchases), "truck", "توريد محفوظ", dashboard.todayPurchases)}
     ${metricCard("مصروفات اليوم", money(dashboard.todayExpenses), "wallet", "تؤثر على صافي الربح", dashboard.todayExpenses)}
     ${metricCard("أرباح اليوم", money(dashboard.todayProfit), "chart", "صافي بعد التكلفة والمصروفات", dashboard.todayProfit)}
-    ${metricCard("المنتجات", amount(dashboard.productCount), "package", "منتجات فعّالة")}
+    ${metricCard("المنتجات", amountLatin(dashboard.productCount), "package", "منتجات فعّالة")}
     ${metricCard("قيمة المخزون", money(dashboard.inventoryValue), "layers", "وفق سعر الشراء")}
-    ${metricCard("فواتير اليوم", amount(dashboard.todayInvoiceCount), "receipt", "عملية بيع محفوظة")}
+    ${metricCard("فواتير اليوم", amountLatin(dashboard.todayInvoiceCount), "receipt", "عملية بيع محفوظة")}
     ${metricCard("ديون العملاء", money(dashboard.customerDebt), "users", "رصيد مستحق")}
     ${metricCard("تحويلات اليوم", money(transfers.total), "transfer", transfers.count ? `${amount(transfers.count)} تحصيل بتحويل` : "لا توجد تحويلات اليوم", transfers.total)}
     ${metricCard("دفعات اليوم", money(dashboard.todayCustomerPayments), "wallet", "تسديد ديون سابقة")}
@@ -265,8 +266,11 @@ function cartLine(line) {
 }
 
 function invoicesMarkup() {
+  const query = state.invoiceQuery.trim().toLocaleUpperCase("en");
+  const invoices = state.sales.filter((sale) => !query || String(sale.invoiceNumber || "").toLocaleUpperCase("en").includes(query));
   return `${topbarMarkup("الفواتير", "كل فاتورة محفوظة مع منتجاتها وحركات خصم المخزون.")}
-  <section class="panel invoice-list">${state.sales.length ? state.sales.map((sale) => `<button class="invoice-row" data-action="open-invoice" data-id="${sale.id}"><div class="invoice-row__mark">${icon("receipt", 20)}</div><div class="invoice-row__main"><strong>${sale.invoiceNumber}</strong><small>${dateTime(sale.date)} · ${paymentChannelLabel(sale)} · ${escapeHtml(sale.paymentStatus || "مدفوعة")}${sale.customerName ? ` · ${escapeHtml(sale.customerName)}` : ""}</small></div><strong>${money(sale.total)}</strong>${icon("arrow", 18)}</button>`).join("") : emptyState("لا توجد فواتير حتى الآن", "أتم أول عملية بيع لتظهر تفاصيلها هنا.", "sales")}</section>`;
+  <section class="toolbar invoice-search-toolbar"><label class="search-field">${icon("search", 19)}<input id="invoice-search" dir="ltr" inputmode="search" autocomplete="off" placeholder="ابحث برقم الفاتورة مثل INV-000005" value="${escapeHtml(state.invoiceQuery)}" /></label></section>
+  <section class="panel invoice-list">${state.sales.length ? invoices.length ? invoices.map((sale) => `<button class="invoice-row" data-action="open-invoice" data-id="${sale.id}"><div class="invoice-row__mark">${icon("receipt", 20)}</div><div class="invoice-row__main"><strong>${sale.invoiceNumber}</strong><small>${dateTime(sale.date)} · ${paymentChannelLabel(sale)} · ${escapeHtml(sale.paymentStatus || "مدفوعة")}${sale.customerName ? ` · ${escapeHtml(sale.customerName)}` : ""}</small></div><strong>${money(sale.total)}</strong>${icon("arrow", 18)}</button>`).join("") : `<div class="inline-empty">لا توجد فاتورة مطابقة للرقم «${escapeHtml(state.invoiceQuery)}».</div>` : emptyState("لا توجد فواتير حتى الآن", "أتم أول عملية بيع لتظهر تفاصيلها هنا.", "sales")}</section>`;
 }
 
 function suppliersMarkup() {
@@ -431,6 +435,7 @@ function bindEvents() {
   bindSearchInput("#product-search", "productQuery");
   bindSearchInput("#sale-search", "saleQuery");
   root.querySelector("#sale-search")?.addEventListener("keydown", async (event) => { if (event.key === "Enter" && event.target.value.trim()) await findBarcode(event.target.value.trim(), "sale"); });
+  bindSearchInput("#invoice-search", "invoiceQuery");
   bindSearchInput("#supplier-search", "supplierQuery");
   bindSearchInput("#customer-search", "customerQuery");
   bindSearchInput("#payment-search", "paymentQuery");
@@ -814,8 +819,9 @@ async function copyTextForSharing(text) {
 
 async function shareInvoice(invoice) {
   try {
-    const customer = invoice.customerId ? state.customers.find((entry) => entry.id === invoice.customerId) : null;
-    const result = await shareOrDownloadInvoicePdf({ invoice, customer, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatAmount: amount, formatDateTime: dateTime, paymentLabel: paymentChannelLabel(invoice), filename: `${invoice.invoiceNumber}.pdf`, title: `فاتورة ${invoice.invoiceNumber}` });
+    const customer = invoice.customerId ? state.customers.find((entry) => entry.id === invoice.customerId) || await db.getCustomer(invoice.customerId) : null;
+    const invoiceWithCustomer = customer && !invoice.customerName ? { ...invoice, customerName: customer.name } : invoice;
+    const result = await shareOrDownloadInvoicePdf({ invoice: invoiceWithCustomer, customer, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatAmount: amount, formatDateTime: dateTime, paymentLabel: paymentChannelLabel(invoiceWithCustomer), filename: `${invoice.invoiceNumber}.pdf`, title: `فاتورة ${invoice.invoiceNumber}` });
     showToast(result === "shared" ? "تمت مشاركة ملف الفاتورة PDF" : "تم تنزيل ملف الفاتورة PDF للمشاركة");
   } catch (error) { if (error?.name !== "AbortError") showToast("تعذر إنشاء ملف PDF للفواتير الآن.", "error"); }
 }

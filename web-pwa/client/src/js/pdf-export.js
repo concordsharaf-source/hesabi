@@ -6,7 +6,7 @@ let canvasArabicFontPromise;
 
 async function loadCanvasArabicFont() {
   if (!canvasArabicFontPromise) {
-    canvasArabicFontPromise = new FontFace("HesabiArabicPdf", `url(${PDF_ARABIC_FONT_URL})`).load().then((font) => {
+    canvasArabicFontPromise = new FontFace("HesabiArabicPdf", `url(${PDF_ARABIC_FONT_URL})`, { style: "normal", weight: "100 900", display: "block" }).load().then((font) => {
       document.fonts.add(font);
       return font;
     });
@@ -65,7 +65,7 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, formatMoney, f
   const text = (value, x, align = "right", size = 28, weight = 400, direction = "rtl") => {
     context.direction = direction;
     context.textAlign = align;
-    context.font = `${weight} ${size}px "HesabiArabicPdf", "Cairo", Tahoma, Arial, sans-serif`;
+    context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
     context.fillText(String(value ?? ""), x, y);
   };
   const divider = () => {

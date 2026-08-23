@@ -14,7 +14,7 @@ test("يتضمن ملف PWA هوية ونطاقًا وأيقونات صالحة 
 
 test("لا يربط عامل الخدمة تخزينه الابتدائي بمسار خاص بنطاق Manus", async () => {
   const worker = await readFile(new URL("../client/public/service-worker.js", import.meta.url), "utf8");
-  assert.match(worker, /hesabi-pwa-v3/);
+  assert.match(worker, /hesabi-pwa-v4/);
   assert.doesNotMatch(worker, /manus-storage/);
   assert.match(worker, /event\.request\.mode === "navigate"/);
   assert.match(worker, /fetch\(event\.request\)/);

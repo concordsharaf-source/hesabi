@@ -33,8 +33,19 @@ test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الد
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
   ]);
   assert.match(pdfExport, /HesabiArabicPdf/);
+  assert.match(pdfExport, /weight: "100 900"/);
   assert.match(pdfExport, /drawThermalInvoiceCanvas/);
   assert.match(pdfExport, /context\.direction = "rtl"/);
   assert.match(app, /shareOrDownloadInvoicePdf/);
   assert.match(app, /shareInvoice\(invoice\)/);
+  assert.match(app, /await db\.getCustomer\(invoice\.customerId\)/);
+});
+
+test("يدعم البحث المباشر برقم الفاتورة ويعرض عددي المنتجات والفواتير بأرقام إنجليزية في الرئيسية", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /invoiceQuery: ""/);
+  assert.match(app, /id="invoice-search"/);
+  assert.match(app, /bindSearchInput\("#invoice-search", "invoiceQuery"\)/);
+  assert.match(app, /amountLatin\(dashboard\.productCount\)/);
+  assert.match(app, /amountLatin\(dashboard\.todayInvoiceCount\)/);
 });
