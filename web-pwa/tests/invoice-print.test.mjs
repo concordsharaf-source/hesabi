@@ -88,6 +88,17 @@ test("يعرض المبالغ الصحيحة من دون أصفار عشرية �
   assert.match(app, /format\(roundMoney\(value\)\)/);
 });
 
+test("يفصل عنوان ووصف الصندوق عن أزراره على شاشات الهاتف الصغيرة", async () => {
+  const [app, styles] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /"topbar--cashbox"/);
+  assert.match(app, /function topbarMarkup\(title, description, action = "", modifierClass = ""\)/);
+  assert.match(styles, /\.topbar--cashbox \{ display:grid; grid-template-columns:minmax\(0,1fr\); gap:12px; \}/);
+  assert.match(styles, /\.topbar--cashbox \.topbar__description \{ max-width:100%; overflow-wrap:normal; word-break:normal; line-height:1\.7; \}/);
+});
+
 test("يضع كشف حساب العميل بياناته في بطاقة واضحة بخط عربي مناسب للطباعة", () => {
   const html = renderCustomerAccountHtml({
     account: { customer: { name: "أحمد العميل", phone: "777123456", address: "صنعاء" }, totalSales: 80, totalPaid: 40, balance: 40, transactions: [] },
