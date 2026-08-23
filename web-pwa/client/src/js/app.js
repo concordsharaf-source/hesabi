@@ -5,7 +5,9 @@ import { db } from "./database.js";
 import { calculateSaleTotals, calculateTransferCollections, dateKey, roundMoney, stockStatus, toNumber } from "./domain.js";
 import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
+import { isSecondBackPress } from "./navigation-guard.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
+import { isNewContinuousBarcode } from "./scanner-session.js";
 
 const icon = (name, size = 20) => {
   const paths = {
@@ -41,6 +43,7 @@ const icon = (name, size = 20) => {
 
 const state = { view: "dashboard", settings: null, accounts: [], currentUser: null, products: [], sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
 let root;
+let exitGuardInstalled = false;
 const roleLabel = (role) => ACCOUNT_ROLES.find((item) => item.id === role)?.label || "كاشير";
 const adminOnlyMessage = () => showToast("هذه العملية متاحة لحساب الأدمن فقط.", "error");
 
@@ -65,6 +68,32 @@ function showToast(message, type = "success") {
   host.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add("toast--visible"));
   window.setTimeout(() => { toast.classList.remove("toast--visible"); window.setTimeout(() => toast.remove(), 200); }, 3300);
+}
+
+function installExitGuard() {
+  if (exitGuardInstalled) return;
+  exitGuardInstalled = true;
+  let armedUntil = 0;
+  let allowExit = false;
+  const guardState = () => ({ ...(history.state || {}), hesabiExitGuard: true });
+  history.pushState(guardState(), "", window.location.href);
+  window.addEventListener("popstate", () => {
+    if (allowExit) return;
+    if (document.querySelector("#scanner-backdrop") || document.querySelector("#dialog-backdrop")) {
+      closeDialog();
+      history.pushState(guardState(), "", window.location.href);
+      showToast("أُغلقت النافذة. اضغط رجوع مرة أخرى للخروج.", "error");
+      return;
+    }
+    if (isSecondBackPress(armedUntil)) {
+      allowExit = true;
+      history.back();
+      return;
+    }
+    armedUntil = Date.now() + 2200;
+    history.pushState(guardState(), "", window.location.href);
+    showToast("اضغط زر الرجوع مرة أخرى خلال ثانيتين للخروج.", "error");
+  });
 }
 
 function formatStatus(product) {
@@ -444,13 +473,14 @@ async function handleAction(event) {
 
 function addToCart(productId) {
   const product = state.products.find((item) => item.id === productId);
-  if (!product) return;
+  if (!product) return false;
   const existing = state.cart.find((item) => item.productId === productId);
-  if (existing && existing.quantity >= product.quantity) { showToast("الكمية المتوفرة غير كافية", "error"); return; }
+  if (existing && existing.quantity >= product.quantity) { showToast("الكمية المتوفرة غير كافية", "error"); return false; }
   if (existing) existing.quantity += 1;
   else state.cart.push({ productId: product.id, name: product.name, unitPrice: product.salePrice, quantity: 1 });
   state.saleQuery = "";
   render();
+  return true;
 }
 
 function changeCart(productId, delta) {
@@ -828,12 +858,13 @@ function openStockHistoryDialog(productId = "") {
 
 async function findBarcode(code, mode) {
   const product = await db.findProductByBarcode(code);
-  if (product) { closeScannerDialog(); closeDialog(); if (mode === "sale") { addToCart(product.id); showToast(`أُضيف ${product.name} إلى السلة`); } else openProductDialog(product); return; }
+  if (product) { closeScannerDialog(); closeDialog(); if (mode === "sale") { addToCart(product.id); showToast(`أُضيف ${product.name} إلى السلة`); } else openProductDialog(product); return true; }
   closeScannerDialog();
   closeDialog();
   const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">نتيجة المسح</span><h2>المنتج غير موجود</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><p class="dialog__subtext">لم نجد باركود <strong>${escapeHtml(code)}</strong> في المنتجات المحفوظة.</p><div class="dialog__actions"><button class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" id="create-from-barcode">إنشاء منتج ${icon("plus", 17)}</button></div>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelector("#create-from-barcode").addEventListener("click", () => openProductDialog(null, code));
+  return false;
 }
 
 function setBarcodeFeedback(element, message, tone = "neutral") {
@@ -858,8 +889,8 @@ async function getBarcodeFormats() {
   return formats.length ? formats : requested;
 }
 
-function scannerDialogMarkup(title, description) {
-  return `<section class="scanner-dialog" role="dialog" aria-modal="true" aria-labelledby="scanner-title"><div class="dialog__head"><div><span class="eyebrow">ماسح الباركود</span><h2 id="scanner-title">${title}</h2></div><button class="icon-button" id="scanner-close" aria-label="إغلاق">${icon("close", 20)}</button></div><p class="dialog__subtext">${description}</p><div id="scanner-content"></div><div class="scanner-dialog__actions"><button id="scanner-retry" class="button button--secondary" type="button">${icon("scan", 16)} إعادة المحاولة</button><button id="scanner-close-bottom" class="button button--primary" type="button">إغلاق</button></div></section>`;
+function scannerDialogMarkup(title, description, continuous = false) {
+  return `<section class="scanner-dialog" role="dialog" aria-modal="true" aria-labelledby="scanner-title"><div class="dialog__head"><div><span class="eyebrow">ماسح الباركود</span><h2 id="scanner-title">${title}</h2></div><button class="icon-button" id="scanner-close" aria-label="${continuous ? "إنهاء المسح" : "إغلاق"}">${icon("close", 20)}</button></div><p class="dialog__subtext">${description}</p>${continuous ? `<p class="scanner-session-note">المسح المتواصل مفعّل: أبعد الرمز عن الإطار بعد إضافته ثم امسح المنتج التالي.</p>` : ""}<div id="scanner-content"></div><div class="scanner-dialog__actions"><button id="scanner-retry" class="button button--secondary" type="button">${icon("scan", 16)} إعادة المحاولة</button><button id="scanner-close-bottom" class="button button--primary" type="button">${continuous ? "إنهاء المسح" : "إغلاق"}</button></div></section>`;
 }
 
 function closeScannerDialog() {
@@ -896,20 +927,20 @@ function playScannerSuccessSound() {
   } catch { /* لا يؤثر غياب الصوت في مسار المسح أو الإدخال اليدوي. */ }
 }
 
-function openScannerOverlay({ title, description, onDetected, unsupportedMessage, manualMode, onManualEntry = null }) {
+function openScannerOverlay({ title, description, onDetected, unsupportedMessage, manualMode, onManualEntry = null, continuous = false }) {
   closeScannerDialog();
   primeScannerSuccessSound();
   const overlay = document.createElement("div");
   overlay.id = "scanner-backdrop";
   overlay.className = "scanner-backdrop";
-  overlay.innerHTML = scannerDialogMarkup(title, description);
+  overlay.innerHTML = scannerDialogMarkup(title, description, continuous);
   overlay.addEventListener("click", (event) => { if (event.target === overlay) closeScannerDialog(); });
   document.body.appendChild(overlay);
   requestAnimationFrame(() => overlay.classList.add("is-open"));
   overlay.querySelector("#scanner-close").addEventListener("click", closeScannerDialog);
   overlay.querySelector("#scanner-close-bottom").addEventListener("click", closeScannerDialog);
-  overlay.querySelector("#scanner-retry").addEventListener("click", () => startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry));
-  startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry);
+  overlay.querySelector("#scanner-retry").addEventListener("click", () => startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry, continuous));
+  startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry, continuous);
 }
 
 function renderUnsupportedScanner(overlay, message, manualMode, onManualEntry) {
@@ -921,7 +952,7 @@ function renderUnsupportedScanner(overlay, message, manualMode, onManualEntry) {
   content.querySelector("#scanner-manual-entry")?.addEventListener("click", onManualEntry);
 }
 
-async function startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry = null) {
+async function startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry = null, continuous = false) {
   if (!hasBarcodeScannerSupport()) { renderUnsupportedScanner(overlay, unsupportedMessage, manualMode, onManualEntry); return; }
   stopScanner();
   const content = overlay.querySelector("#scanner-content");
@@ -936,21 +967,29 @@ async function startCameraScanner(overlay, onDetected, unsupportedMessage, manua
     video.srcObject = stream;
     await video.play();
     const detector = new window.BarcodeDetector({ formats: await getBarcodeFormats() });
-    const session = { stream, frame: null, reading: false, overlay };
+    const session = { stream, frame: null, reading: false, overlay, continuous, lastCode: "" };
     state.scanner = session;
     const scanFrame = async () => {
       if (state.scanner !== session || !overlay.isConnected) return;
       if (!session.reading && video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
         try {
           const codes = await detector.detect(video);
-          if (codes[0]?.rawValue) {
+          const code = codes[0]?.rawValue?.trim();
+          if (code) {
+            if (continuous && !isNewContinuousBarcode(session.lastCode, code)) { session.frame = requestAnimationFrame(scanFrame); return; }
             session.reading = true;
             playScannerSuccessSound();
-            stopScanner();
-            const closeAfterRead = await onDetected(codes[0].rawValue.trim(), overlay);
+            if (!continuous) stopScanner();
+            const closeAfterRead = await onDetected(code, overlay, { continuous });
+            if (continuous && closeAfterRead === false && state.scanner === session && overlay.isConnected) {
+              session.lastCode = code;
+              session.reading = false;
+              session.frame = requestAnimationFrame(scanFrame);
+              return;
+            }
             if (closeAfterRead !== false) closeScannerDialog();
             return;
-          }
+          } else if (continuous) session.lastCode = "";
         } catch (error) { console.warn("تعذر تحليل الباركود", error); }
       }
       if (state.scanner === session) session.frame = requestAnimationFrame(scanFrame);
@@ -988,12 +1027,24 @@ function openProductBarcodeScanner({ barcodeInput, barcodeFeedback, product }) {
 }
 
 function openScanner(mode) {
+  const continuous = mode === "sale";
   openScannerOverlay({
-    title: "وجّه الكاميرا نحو الباركود",
-    description: "سنفتح المنتج المسجل مباشرة أو نقترح إنشاء منتج جديد عند عدم العثور عليه.",
+    title: continuous ? "مسح منتجات متواصل" : "وجّه الكاميرا نحو الباركود",
+    description: continuous ? "أضف عدة منتجات إلى السلة في جلسة واحدة، ثم اختر «إنهاء المسح» عند الانتهاء." : "سنفتح المنتج المسجل مباشرة أو نقترح إنشاء منتج جديد عند عدم العثور عليه.",
     unsupportedMessage: "يمكنك إدخال الباركود يدويًا للبحث دون توقف التطبيق.",
     manualMode: mode,
-    onDetected: async (code) => { await findBarcode(code, mode); return true; },
+    continuous,
+    onDetected: async (code, overlay, options) => {
+      if (!options.continuous) { await findBarcode(code, mode); return true; }
+      const product = await db.findProductByBarcode(code);
+      if (!product) { await findBarcode(code, mode); return true; }
+      const added = addToCart(product.id);
+      const status = overlay.querySelector("#scanner-status");
+      status.innerHTML = `${icon(added ? "check" : "alert", 16)}<span>${added ? `أُضيف ${escapeHtml(product.name)}. امسح المنتج التالي.` : `تعذر إضافة ${escapeHtml(product.name)} بسبب حد المخزون.`}</span>`;
+      status.dataset.tone = added ? "success" : "error";
+      if (added) { notifyBarcodeRead(); showToast(`أُضيف ${product.name} إلى السلة`); }
+      return false;
+    },
   });
 }
 
@@ -1006,5 +1057,5 @@ function stopScanner() {
 
 export async function bootApp(target) {
   root = target;
-  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); } catch (error) { root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>${escapeHtml(error.message)}</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
+  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); installExitGuard(); } catch (error) { root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>${escapeHtml(error.message)}</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }
