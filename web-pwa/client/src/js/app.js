@@ -7,7 +7,7 @@ import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBacku
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { getExitGuardAction, leaveAfterExitConfirmation } from "./navigation-guard.js";
-import { createPdfFileFromHtml, printHtmlDocument, shareOrDownloadInvoicePdf, shareOrDownloadPdf } from "./pdf-export.js";
+import { createPdfFileFromHtml, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf } from "./pdf-export.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 import { isNewContinuousBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 
@@ -873,7 +873,7 @@ async function openCustomerAccountDialog(customerId) {
   overlay.querySelector("#record-customer-payment")?.addEventListener("click", () => { closeDialog(); openCustomerPaymentDialog(account.customer.id); });
   const accountHtml = () => renderCustomerAccountHtml({ account: printAccount, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatDateTime: dateTime, escapeHtml });
   overlay.querySelector("#print-customer-account").addEventListener("click", () => { if (!printHtmlDocument({ html: accountHtml(), target: "hesabi-customer-account", features: "width=900,height=760" })) showToast("السماح بالنوافذ المنبثقة مطلوب للطباعة.", "error"); });
-  overlay.querySelector("#share-customer-account").addEventListener("click", async () => { try { const result = await shareOrDownloadPdf({ html: accountHtml(), filename: `كشف-حساب-${account.customer.name}.pdf`, title: `كشف حساب ${account.customer.name}` }); showToast(result === "shared" ? "تمت مشاركة كشف الحساب PDF" : "تم تنزيل كشف الحساب PDF للمشاركة"); } catch (error) { if (error?.name !== "AbortError") showToast("تعذر إنشاء PDF لكشف الحساب.", "error"); } });
+  overlay.querySelector("#share-customer-account").addEventListener("click", async () => { try { const result = await shareOrDownloadCustomerAccountPdf({ account: printAccount, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatDateTime: dateTime, filename: `كشف-حساب-${account.customer.name}.pdf`, title: `كشف حساب ${account.customer.name}` }); showToast(result === "shared" ? "تمت مشاركة كشف الحساب PDF" : "تم تنزيل كشف الحساب PDF للمشاركة"); } catch (error) { if (error?.name !== "AbortError") showToast("تعذر إنشاء PDF لكشف الحساب.", "error"); } });
 }
 
 async function openCustomerPaymentDialog(customerId) {

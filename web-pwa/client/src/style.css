@@ -168,3 +168,10 @@ label { font-size:15px; }
 @media (max-width:680px) { .expense-period-grid,.report-export-options { grid-template-columns:1fr; } }
 .sales-scanner-fab { position:fixed; z-index:31; left:max(16px, env(safe-area-inset-left)); bottom:calc(86px + env(safe-area-inset-bottom)); display:inline-flex; align-items:center; justify-content:center; gap:7px; min-width:58px; height:52px; padding:0 14px; color:#fff; background:var(--green); border:2px solid rgba(255,255,255,.9); border-radius:999px; box-shadow:0 10px 24px rgba(23,76,63,.36); font-size:12px; font-weight:800; transition:transform .16s var(--ease-out),background .16s var(--ease-out); }.sales-scanner-fab:hover { background:var(--green-deep); }.sales-scanner-fab:active { transform:scale(.95); }.sales-scanner-fab svg { flex:0 0 auto; }
 @media (min-width:861px) { .sales-scanner-fab { bottom:24px; } }
+
+/* تحافظ إجراءات الفواتير وحسابات العملاء على حدود النافذة في الشاشات الضيقة. */
+.dialog__actions { flex-wrap:wrap; min-width:0; }
+.dialog__actions .button { min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+.invoice-detail,.account-summary,.payment-receipt { min-width:0; }
+.invoice-detail>div,.payment-receipt div { min-width:0; }
+@media (max-width:599px) { .dialog__actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); width:100%; }.dialog__actions .button { width:100%; min-height:48px; padding-inline:8px; }.dialog__actions .icon-button { justify-self:end; }.dialog__head { min-width:0; }.dialog__head>div { min-width:0; }.dialog__head h2,.dialog__subtext { overflow-wrap:anywhere; }.account-summary { grid-template-columns:1fr; }.invoice-detail>div { align-items:flex-start; }.invoice-detail>div strong { max-width:58%; overflow-wrap:anywhere; text-align:left; } }

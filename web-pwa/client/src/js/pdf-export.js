@@ -106,6 +106,108 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, formatMoney, f
   return canvas;
 }
 
+function drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDateTime }) {
+  const mm = 12;
+  const width = 210 * mm;
+  const rows = account.transactions || [];
+  const height = Math.max(297 * mm, (126 + Math.max(1, rows.length) * 15) * mm);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.fillStyle = "#172e27";
+  context.direction = "rtl";
+  context.textBaseline = "middle";
+  const right = 196 * mm;
+  const left = 14 * mm;
+  const text = (value, x, y, align = "right", size = 28, weight = 400, direction = "rtl", color = "#172e27") => {
+    context.direction = direction;
+    context.textAlign = align;
+    context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
+    context.fillStyle = color;
+    context.fillText(String(value ?? ""), x, y);
+  };
+  const line = (fromX, fromY, toX, toY, color = "#d9e0d7", widthPx = 2) => { context.strokeStyle = color; context.lineWidth = widthPx; context.beginPath(); context.moveTo(fromX, fromY); context.lineTo(toX, toY); context.stroke(); };
+  let y = 19 * mm;
+  text(storeName || "حسابي", right, y, "right", 52, 700, "rtl", "#174c3f");
+  y += 9 * mm;
+  text("كشف حساب مديونية عميل", right, y, "right", 31, 600, "rtl", "#52645b");
+  y += 10 * mm;
+  text(`تاريخ الإنشاء: ${formatDateTime(new Date().toISOString())}`, right, y, "right", 22, 400, "rtl", "#52645b");
+  y += 11 * mm;
+
+  const cardTop = y - 6 * mm;
+  const hasPhone = Boolean(account.customer?.phone);
+  const hasAddress = Boolean(account.customer?.address);
+  const cardHeight = (hasPhone && hasAddress ? 44 : hasPhone || hasAddress ? 35 : 27) * mm;
+  context.fillStyle = "#edf6f0";
+  context.strokeStyle = "#1f6b59";
+  context.lineWidth = 3;
+  context.beginPath();
+  context.roundRect(left, cardTop, right - left, cardHeight, 12);
+  context.fill(); context.stroke();
+  text("بيانات العميل", right - 5 * mm, y + 2 * mm, "right", 33, 700, "rtl", "#174c3f");
+  y += 11 * mm;
+  const detail = (label, value, ltr = false) => { text(label, right - 5 * mm, y, "right", 25, 600, "rtl", "#52645b"); text(value, left + 5 * mm, y, "left", 27, 700, ltr ? "ltr" : "rtl"); y += 8.5 * mm; };
+  detail("الاسم", account.customer?.name || "");
+  if (hasPhone) detail("الهاتف", account.customer.phone, true);
+  if (hasAddress) detail("العنوان", account.customer.address);
+  y = cardTop + cardHeight + 13 * mm;
+
+  const summary = [
+    ["إجمالي المبيعات الآجلة", formatMoney(account.totalSales), "#f4f6f1", "#172e27"],
+    ["إجمالي المسدد", formatMoney(account.totalPaid), "#f4f6f1", "#172e27"],
+    ["الرصيد المستحق", formatMoney(account.balance), "#1f6b59", "#ffffff"],
+  ];
+  const boxGap = 4 * mm;
+  const boxWidth = (right - left - boxGap * 2) / 3;
+  summary.forEach(([label, value, background, color], index) => {
+    const x = right - (index + 1) * boxWidth - index * boxGap;
+    context.fillStyle = background; context.strokeStyle = background === "#1f6b59" ? "#1f6b59" : "#d9e0d7"; context.lineWidth = 2; context.beginPath(); context.roundRect(x, y, boxWidth, 25 * mm, 10); context.fill(); context.stroke();
+    text(label, x + boxWidth - 4 * mm, y + 8 * mm, "right", 21, 600, "rtl", color);
+    text(value, x + boxWidth - 4 * mm, y + 17 * mm, "right", 28, 700, "rtl", color);
+  });
+  y += 37 * mm;
+  text("تفاصيل العمليات", right, y, "right", 34, 700, "rtl", "#174c3f");
+  y += 9 * mm;
+  const columns = [right, 151 * mm, 105 * mm, 59 * mm, left];
+  context.fillStyle = "#f4f6f1"; context.fillRect(left, y - 6 * mm, right - left, 12 * mm);
+  ["العملية", "التاريخ", "المرجع", "القيمة", "الرصيد بعد العملية"].forEach((label, index) => text(label, columns[index] - (index ? 3 * mm : 0), y, index === 4 ? "left" : "right", 19, 700, "rtl", "#52645b"));
+  y += 11 * mm;
+  if (!rows.length) { text("لا توجد عمليات مسجلة.", right, y, "right", 25, 400, "rtl", "#52645b"); y += 12 * mm; }
+  rows.forEach((transaction) => {
+    text(transaction.typeLabel || transaction.type || "", columns[0], y, "right", 21, 700);
+    text(formatDateTime(transaction.date), columns[1], y, "right", 17, 400, "rtl", "#52645b");
+    text(transaction.invoiceNumber || "—", columns[2], y, "right", 19, 600, "ltr", "#52645b");
+    text(formatMoney(transaction.amount), columns[3], y, "right", 20, 700, "ltr", Number(transaction.amount) < 0 ? "#a74340" : "#172e27");
+    text(formatMoney(transaction.remainingAmount), columns[4], y, "left", 20, 700, "ltr");
+    y += 9 * mm;
+    line(left, y - 4.5 * mm, right, y - 4.5 * mm);
+  });
+  y += 7 * mm;
+  text("هذا الكشف صادر من حسابي للاستخدام التشغيلي.", width / 2, y, "center", 19, 400, "rtl", "#52645b");
+  return canvas;
+}
+
+function createA4PdfFromCanvas(canvas) {
+  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait", compress: true });
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const pixelsPerMm = canvas.width / pageWidth;
+  const pageHeightPx = Math.max(1, Math.ceil(pageHeight * pixelsPerMm));
+  for (let offsetY = 0; offsetY < canvas.height; offsetY += pageHeightPx) {
+    if (offsetY) pdf.addPage();
+    const sliceHeight = Math.min(pageHeightPx, canvas.height - offsetY);
+    const slice = document.createElement("canvas");
+    slice.width = canvas.width; slice.height = sliceHeight;
+    slice.getContext("2d").drawImage(canvas, 0, offsetY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+    pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, pageWidth, sliceHeight / pixelsPerMm, undefined, "FAST");
+  }
+  return pdf;
+}
+
 export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
   const stage = createPdfStage(html, page);
   try {
@@ -142,8 +244,17 @@ export async function createThermalInvoicePdfFile({ invoice, customer, storeName
   return new File([blob], filename, { type: "application/pdf" });
 }
 
+export async function createCustomerAccountPdfFile({ account, storeName, formatMoney, formatDateTime, filename }) {
+  await loadCanvasArabicFont();
+  const pdf = createA4PdfFromCanvas(drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDateTime }));
+  const blob = pdf.output("blob");
+  if (!blob || blob.size < 800) throw new Error("تعذر إنشاء ملف PDF واضح لكشف الحساب.");
+  return new File([blob], filename, { type: "application/pdf" });
+}
+
 export async function shareOrDownloadPdf({ html, filename, title, page = "a4" }) { return fileOrDownload(await createPdfFileFromHtml({ html, filename, page }), title); }
 export async function shareOrDownloadInvoicePdf(options) { return fileOrDownload(await createThermalInvoicePdfFile(options), options.title); }
+export async function shareOrDownloadCustomerAccountPdf(options) { return fileOrDownload(await createCustomerAccountPdfFile(options), options.title); }
 
 export function printHtmlDocument({ html, target, features }) {
   const popup = window.open("", target, features);

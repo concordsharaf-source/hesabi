@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { renderThermalInvoiceHtml } from "../client/src/js/invoice-print.js";
+import { renderCustomerAccountHtml } from "../client/src/js/customer-account-print.js";
 
 const escapeHtml = (value = "") => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
 
@@ -35,10 +36,13 @@ test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الد
   assert.match(pdfExport, /HesabiArabicPdf/);
   assert.match(pdfExport, /weight: "100 900"/);
   assert.match(pdfExport, /drawThermalInvoiceCanvas/);
+  assert.match(pdfExport, /drawCustomerAccountCanvas/);
+  assert.match(pdfExport, /shareOrDownloadCustomerAccountPdf/);
   assert.match(pdfExport, /context\.direction = "rtl"/);
   assert.match(app, /shareOrDownloadInvoicePdf/);
   assert.match(app, /shareInvoice\(invoice\)/);
   assert.match(app, /await db\.getCustomer\(invoice\.customerId\)/);
+  assert.match(app, /shareOrDownloadCustomerAccountPdf\(/);
 });
 
 test("يدعم البحث المباشر برقم الفاتورة ويعرض عددي المنتجات والفواتير بأرقام إنجليزية في الرئيسية", async () => {
@@ -48,4 +52,17 @@ test("يدعم البحث المباشر برقم الفاتورة ويعرض ع
   assert.match(app, /bindSearchInput\("#invoice-search", "invoiceQuery"\)/);
   assert.match(app, /amountLatin\(dashboard\.productCount\)/);
   assert.match(app, /amountLatin\(dashboard\.todayInvoiceCount\)/);
+});
+
+test("يضع كشف حساب العميل بياناته في بطاقة واضحة بخط عربي مناسب للطباعة", () => {
+  const html = renderCustomerAccountHtml({
+    account: { customer: { name: "أحمد العميل", phone: "777123456", address: "صنعاء" }, totalSales: 80, totalPaid: 40, balance: 40, transactions: [] },
+    storeName: "بقالة الاختبار", formatMoney: (value) => `${value} ر.ي`, formatDateTime: () => "23 أغسطس 2026", escapeHtml,
+  });
+  assert.match(html, /بيانات العميل/);
+  assert.match(html, /أحمد العميل/);
+  assert.match(html, /777123456/);
+  assert.match(html, /صنعاء/);
+  assert.match(html, /customer-card/);
+  assert.match(html, /family=Cairo/);
 });
