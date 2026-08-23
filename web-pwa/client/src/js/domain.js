@@ -53,6 +53,20 @@ export const calculateCashBalance = ({
   return { inflows, outflows, closingBalance: roundMoney(inflows - outflows) };
 };
 
+/** يلخّص التحصيلات المسجلة عبر التحويل فقط، منفصلًا عن رصيد الصندوق النقدي. */
+export const calculateTransferCollections = ({ sales = [], customerPayments = [] } = {}) => {
+  const transferSales = sales.filter((item) => item.paymentMethod === "تحويل");
+  const transferDebtPayments = customerPayments.filter((item) => item.paymentMethod === "تحويل");
+  const salesAmount = roundMoney(transferSales.reduce((sum, item) => sum + toNumber(item.initialPaidAmount ?? item.paidAmount), 0));
+  const debtPaymentsAmount = roundMoney(transferDebtPayments.reduce((sum, item) => sum + toNumber(item.amount), 0));
+  return {
+    salesAmount,
+    debtPaymentsAmount,
+    total: roundMoney(salesAmount + debtPaymentsAmount),
+    count: transferSales.length + transferDebtPayments.length,
+  };
+};
+
 export const calculateProfit = ({ sales = 0, costOfGoods = 0, expenses = 0, salesReturns = 0, returnCosts = 0 }) => {
   const netSales = roundMoney(toNumber(sales) - toNumber(salesReturns));
   const netCostOfGoods = roundMoney(toNumber(costOfGoods) - toNumber(returnCosts));

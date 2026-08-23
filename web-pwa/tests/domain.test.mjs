@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { adjustmentDelta, calculateCashBalance, calculateProfit, calculateSaleTotals, canRegisterPayment, canReturn, canSell, invoiceNumber, paymentStatus, purchaseNumber, remainingAmount, stockStatus } from "../client/src/js/domain.js";
+import { adjustmentDelta, calculateCashBalance, calculateProfit, calculateSaleTotals, calculateTransferCollections, canRegisterPayment, canReturn, canSell, invoiceNumber, paymentStatus, purchaseNumber, remainingAmount, stockStatus } from "../client/src/js/domain.js";
 import { CURRENCIES, DEFAULT_CURRENCY_CODE } from "../client/src/js/constants.js";
 
 test("ينشئ تسلسل أرقام فواتير ثابتًا وغير مكرر", () => {
@@ -67,4 +67,12 @@ test("يرفض الدفعة الصفرية أو الأعلى من رصيد ال�
 
 test("يحسب الصندوق من الحركات النقدية الفعلية دون اعتبار الديون تحصيلًا", () => {
   assert.deepEqual(calculateCashBalance({ openingBalance: 100000, cashSales: 50000, customerPayments: 40000, cashPurchases: 30000, supplierPayments: 20000, expenses: 10000 }), { inflows: 190000, outflows: 60000, closingBalance: 130000 });
+});
+
+test("يلخص التحويلات دون خلطها بالصندوق النقدي أو الفواتير الكاش", () => {
+  const result = calculateTransferCollections({
+    sales: [{ paymentMethod: "تحويل", initialPaidAmount: 75 }, { paymentMethod: "نقدي", initialPaidAmount: 100 }, { paymentMethod: "تحويل", paidAmount: 25 }],
+    customerPayments: [{ paymentMethod: "تحويل", amount: 40 }, { paymentMethod: "نقدي", amount: 80 }],
+  });
+  assert.deepEqual(result, { salesAmount: 100, debtPaymentsAmount: 40, total: 140, count: 3 });
 });

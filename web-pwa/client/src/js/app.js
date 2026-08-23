@@ -2,7 +2,7 @@
 /* اتجاه التصميم: دفتر التاجر الهادئ — تفاعلات سريعة، RTL واضح، وماسح منتج لا يقطع سياق النموذج. */
 import { ACCOUNT_ROLES, BUSINESS_TYPES, CURRENCIES, DEFAULT_CURRENCY_CODE, EXPENSE_CATEGORIES, NAV_ITEMS, PAYMENT_METHODS, UNITS } from "./constants.js";
 import { db } from "./database.js";
-import { calculateSaleTotals, dateKey, roundMoney, stockStatus, toNumber } from "./domain.js";
+import { calculateSaleTotals, calculateTransferCollections, dateKey, roundMoney, stockStatus, toNumber } from "./domain.js";
 import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 
@@ -51,6 +51,7 @@ const money = (value) => {
 const amount = (value) => new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 2 }).format(toNumber(value));
 const dateTime = (value) => new Intl.DateTimeFormat("ar-SA", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[character]);
+const paymentChannelLabel = (invoice) => invoice?.paymentType === "آجل" ? "دين" : invoice?.paymentMethod === "تحويل" ? "تحويل" : "كاش";
 const assetBaseUrl = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage";
 const emptyImage = `${assetBaseUrl}/hesabi-empty-inventory_96623fe2.png`;
 const markImage = `${assetBaseUrl}/hesabi-mark_5cb0429a.png`;
@@ -73,6 +74,7 @@ function formatStatus(product) {
 async function refresh() {
   [state.products, state.sales, state.suppliers, state.supplierPayments, state.customers, state.customerPayments, state.purchases, state.expenses, state.stockMovements, state.cashMovements, state.cashbox, state.dashboard] = await Promise.all([db.listProducts(), db.listSales(), db.listSuppliers(), db.listSupplierPayments(), db.listCustomers(), db.listCustomerPayments(), db.listPurchases(), db.listExpenses(), db.listStockMovements(), db.listCashMovements({ from: state.cashFrom, to: state.cashTo }), db.getCashbox({ from: state.cashFrom, to: state.cashTo }), db.getDashboard()]);
   state.analytics = await db.getAnalytics({ from: state.reportFrom, to: state.reportTo });
+  state.todayTransfers = calculateTransferCollections({ sales: state.sales.filter((sale) => dateKey(sale.date) === dateKey()), customerPayments: state.customerPayments.filter((payment) => dateKey(payment.date) === dateKey()) });
 }
 
 function navMarkup() {
@@ -95,6 +97,7 @@ function topbarMarkup(title, description, action = "") {
 
 function dashboardMarkup() {
   const dashboard = state.dashboard;
+  const transfers = state.todayTransfers || { total: 0, count: 0 };
   const low = dashboard.lowStock.slice(0, 5);
   return `${topbarMarkup("نظرة على يومك", "تابع المبيعات والمخزون من سجل واحد واضح.", `<button class="button button--primary" data-action="navigate" data-view="sales">${icon("cart", 18)}<span>بيع جديد</span></button>`)}
   <section class="daily-ribbon"><div><span class="presence-dot"></span><strong>اليوم التشغيلي</strong><small>كل عملية تحفظ على هذا الجهاز تلقائيًا</small></div><div class="daily-ribbon__date">${new Intl.DateTimeFormat("ar-SA", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</div></section>
@@ -107,6 +110,7 @@ function dashboardMarkup() {
     ${metricCard("قيمة المخزون", money(dashboard.inventoryValue), "layers", "وفق سعر الشراء")}
     ${metricCard("فواتير اليوم", amount(dashboard.todayInvoiceCount), "receipt", "عملية بيع محفوظة")}
     ${metricCard("ديون العملاء", money(dashboard.customerDebt), "users", "رصيد مستحق")}
+    ${metricCard("تحويلات اليوم", money(transfers.total), "wallet", transfers.count ? `${amount(transfers.count)} تحصيل بتحويل` : "لا توجد تحويلات اليوم")}
     ${metricCard("دفعات اليوم", money(dashboard.todayCustomerPayments), "wallet", "تسديد ديون سابقة")}
     ${metricCard("مستحقات الموردين", money(dashboard.supplierDebt), "truck", "شراء آجل غير مسدد")}
     ${metricCard("رصيد الصندوق", money(dashboard.cashBalance), "wallet", "نقد متاح حاليًا")}
@@ -188,7 +192,7 @@ function cartLine(line) {
 
 function invoicesMarkup() {
   return `${topbarMarkup("الفواتير", "كل فاتورة محفوظة مع منتجاتها وحركات خصم المخزون.")}
-  <section class="panel invoice-list">${state.sales.length ? state.sales.map((sale) => `<button class="invoice-row" data-action="open-invoice" data-id="${sale.id}"><div class="invoice-row__mark">${icon("receipt", 20)}</div><div class="invoice-row__main"><strong>${sale.invoiceNumber}</strong><small>${dateTime(sale.date)} · ${escapeHtml(sale.paymentType || "نقدي")} · ${escapeHtml(sale.paymentStatus || "مدفوعة")}${sale.customerName ? ` · ${escapeHtml(sale.customerName)}` : ""}</small></div><strong>${money(sale.total)}</strong>${icon("arrow", 18)}</button>`).join("") : emptyState("لا توجد فواتير حتى الآن", "أتم أول عملية بيع لتظهر تفاصيلها هنا.", "sales")}</section>`;
+  <section class="panel invoice-list">${state.sales.length ? state.sales.map((sale) => `<button class="invoice-row" data-action="open-invoice" data-id="${sale.id}"><div class="invoice-row__mark">${icon("receipt", 20)}</div><div class="invoice-row__main"><strong>${sale.invoiceNumber}</strong><small>${dateTime(sale.date)} · ${paymentChannelLabel(sale)} · ${escapeHtml(sale.paymentStatus || "مدفوعة")}${sale.customerName ? ` · ${escapeHtml(sale.customerName)}` : ""}</small></div><strong>${money(sale.total)}</strong>${icon("arrow", 18)}</button>`).join("") : emptyState("لا توجد فواتير حتى الآن", "أتم أول عملية بيع لتظهر تفاصيلها هنا.", "sales")}</section>`;
 }
 
 function suppliersMarkup() {
@@ -679,6 +683,37 @@ async function openInvoiceDialog(saleId) {
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelector("#sale-return").addEventListener("click", () => { closeDialog(); openSaleReturnDialog(saleId); });
   overlay.querySelector("#open-invoice-customer")?.addEventListener("click", () => { closeDialog(); openCustomerAccountDialog(invoice.customerId); });
+  const channel = paymentChannelLabel(invoice);
+  overlay.querySelector(".dialog__subtext").textContent = `${dateTime(invoice.date)} · ${channel} · ${invoice.paymentStatus || "مدفوعة"}`;
+  overlay.querySelector(".invoice-detail").insertAdjacentHTML("beforeend", `<div><span>طريقة السداد</span><strong>${channel}</strong></div>${invoice.paymentType === "آجل" && toNumber(invoice.paidAmount) > 0 ? `<div><span>وسيلة الدفعة الأولى</span><strong>${invoice.paymentMethod === "تحويل" ? "تحويل" : "كاش"}</strong></div>` : ""}`);
+  overlay.querySelector(".dialog__actions").insertAdjacentHTML("afterbegin", `<button id="share-invoice" class="button button--secondary" type="button">مشاركة</button><button id="thermal-print-invoice" class="button button--secondary" type="button">طباعة حرارية</button>`);
+  overlay.querySelector("#share-invoice").addEventListener("click", () => shareInvoice(invoice));
+  overlay.querySelector("#thermal-print-invoice").addEventListener("click", () => printInvoiceThermal(invoice));
+}
+
+function invoiceShareText(invoice) {
+  const lines = invoice.items.map((item) => `- ${item.productName}: ${amount(item.quantity)} ${item.unit} × ${money(item.unitPrice)} = ${money(item.total)}`).join("\n");
+  return `${state.settings?.storeName || "حسابي"}\nفاتورة ${invoice.invoiceNumber}\n${dateTime(invoice.date)}\nطريقة السداد: ${paymentChannelLabel(invoice)}\n${lines}\nالإجمالي: ${money(invoice.total)}\nالمدفوع: ${money(invoice.paidAmount)}${invoice.paymentType === "آجل" ? `\nالمتبقي: ${money(invoice.remainingAmount)}` : ""}`;
+}
+
+async function copyTextForSharing(text) {
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+  const area = Object.assign(document.createElement("textarea"), { value: text }); area.style.position = "fixed"; area.style.opacity = "0"; document.body.appendChild(area); area.select(); document.execCommand("copy"); area.remove();
+}
+
+async function shareInvoice(invoice) {
+  const text = invoiceShareText(invoice);
+  try { if (navigator.share) await navigator.share({ title: `فاتورة ${invoice.invoiceNumber}`, text }); else { await copyTextForSharing(text); showToast("تم نسخ الفاتورة للمشاركة"); } }
+  catch (error) { if (error?.name !== "AbortError") { try { await copyTextForSharing(text); showToast("تم نسخ الفاتورة للمشاركة"); } catch { showToast("تعذرت مشاركة الفاتورة الآن.", "error"); } } }
+}
+
+function printInvoiceThermal(invoice) {
+  const popup = window.open("", "hesabi-thermal-invoice", "width=420,height=720");
+  if (!popup) { showToast("السماح بالنوافذ المنبثقة مطلوب للطباعة الحرارية.", "error"); return; }
+  const rows = invoice.items.map((item) => `<tr><td>${escapeHtml(item.productName)}<br><small>${amount(item.quantity)} ${escapeHtml(item.unit)} × ${money(item.unitPrice)}</small></td><td>${money(item.total)}</td></tr>`).join("");
+  const remaining = invoice.paymentType === "آجل" ? `<div><span>المتبقي</span><strong>${money(invoice.remainingAmount)}</strong></div>` : "";
+  popup.document.write(`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(invoice.invoiceNumber)}</title><style>@page{size:80mm auto;margin:4mm}*{box-sizing:border-box}body{width:72mm;margin:0 auto;color:#111;font-family:Tahoma,Arial,sans-serif;font-size:12px}h1,h2,p{margin:0;text-align:center}h1{font-size:18px}h2{margin-top:5px;font-size:14px}.muted{margin-top:4px;color:#555;font-size:10px}.rule{border:0;border-top:1px dashed #333;margin:8px 0}table{width:100%;border-collapse:collapse}td{padding:6px 0;border-bottom:1px dashed #bbb;vertical-align:top}td:last-child{text-align:left;white-space:nowrap}small{color:#444;font-size:10px}.summary div{display:flex;justify-content:space-between;gap:8px;padding:3px 0}.summary .final{margin-top:4px;padding-top:6px;border-top:1px solid #111;font-size:14px}.footer{margin-top:11px;text-align:center;font-size:10px;color:#555}</style></head><body><h1>${escapeHtml(state.settings?.storeName || "حسابي")}</h1><h2>فاتورة بيع ${escapeHtml(invoice.invoiceNumber)}</h2><p class="muted">${escapeHtml(dateTime(invoice.date))}</p><hr class="rule"><table><tbody>${rows}</tbody></table><hr class="rule"><section class="summary"><div><span>الإجمالي قبل الخصم</span><strong>${money(invoice.subtotal)}</strong></div><div><span>الخصم</span><strong>${money(invoice.discount)}</strong></div><div class="final"><span>الإجمالي</span><strong>${money(invoice.total)}</strong></div><div><span>طريقة السداد</span><strong>${paymentChannelLabel(invoice)}</strong></div><div><span>المدفوع</span><strong>${money(invoice.paidAmount)}</strong></div>${remaining}</section><p class="footer">شكرًا لتعاملكم معنا</p></body></html>`);
+  popup.document.close(); popup.focus(); window.setTimeout(() => popup.print(), 180);
 }
 
 function openSupplierDialog(supplier = null) {
@@ -719,13 +754,13 @@ async function openCustomerAccountDialog(customerId) {
 }
 
 async function openCustomerPaymentDialog(customerId) {
-  const account = await db.getCustomerAccount(customerId); if (!account) return; const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تسديد رصيد</span><h2>دفعة من ${escapeHtml(account.customer.name)}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="stock-before"><span>الرصيد الحالي</span><strong>${money(account.balance)}</strong></div><form id="customer-payment-form" class="form-grid"><label>المبلغ${quantityControlMarkup({ value: "", min: 0.01, step: "0.01", inputAttrs: "name=\"amount\" required autofocus" })}</label><label>التاريخ<input name="date" required type="date" value="${dateKey()}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl" placeholder="اختياري"></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ الدفعة ${icon("check", 17)}</button></div></form>`);
+  const account = await db.getCustomerAccount(customerId); if (!account) return; const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تسديد رصيد</span><h2>دفعة من ${escapeHtml(account.customer.name)}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="stock-before"><span>الرصيد الحالي</span><strong>${money(account.balance)}</strong></div><form id="customer-payment-form" class="form-grid"><label>المبلغ${quantityControlMarkup({ value: "", min: 0.01, step: "0.01", inputAttrs: "name=\"amount\" required autofocus" })}</label><label>طريقة التحصيل<select name="paymentMethod">${PAYMENT_METHODS.map((method) => `<option value="${method}">${method === "تحويل" ? "تحويل" : "كاش"}</option>`).join("")}</select></label><label>التاريخ<input name="date" required type="date" value="${dateKey()}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl" placeholder="اختياري"></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ الدفعة ${icon("check", 17)}</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); bindQuantityControl(overlay.querySelector(".quantity-control"), { min: 0.01, step: 0.01, onChange: () => {} });
   overlay.querySelector("#customer-payment-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); const payment = await db.registerCustomerPayment({ customerId, ...values }); await refresh(); closeDialog(); openPaymentReceipt(payment); } catch (error) { showToast(error.message, "error"); } });
 }
 
 function openPaymentReceipt(payment) {
-  const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">إيصال دفعة</span><h2>${escapeHtml(state.settings?.storeName || "حسابي")}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="payment-receipt" class="payment-receipt"><div><span>العميل</span><strong>${escapeHtml(payment.customerName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>العملة</span><strong>${escapeHtml(state.settings?.currency || "YER")}</strong></div></section><div class="dialog__actions"><button id="share-receipt" class="button button--secondary">مشاركة الإيصال</button><button id="print-receipt" class="button button--primary">طباعة إيصال</button></div>`);
+  const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">إيصال دفعة</span><h2>${escapeHtml(state.settings?.storeName || "حسابي")}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="payment-receipt" class="payment-receipt"><div><span>العميل</span><strong>${escapeHtml(payment.customerName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>طريقة التحصيل</span><strong>${payment.paymentMethod === "تحويل" ? "تحويل" : "كاش"}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>العملة</span><strong>${escapeHtml(state.settings?.currency || "YER")}</strong></div></section><div class="dialog__actions"><button id="share-receipt" class="button button--secondary">مشاركة الإيصال</button><button id="print-receipt" class="button button--primary">طباعة إيصال</button></div>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelector("#print-receipt").addEventListener("click", () => window.print());
   overlay.querySelector("#share-receipt").addEventListener("click", async () => { const text = `${state.settings?.storeName || "حسابي"}\nإيصال دفعة\nالعميل: ${payment.customerName}\nالمبلغ: ${money(payment.amount)}\nالرصيد بعد الدفع: ${money(payment.balanceAfter)}`; try { if (navigator.share) await navigator.share({ title: "إيصال دفعة", text }); else { await navigator.clipboard.writeText(text); showToast("تم نسخ الإيصال للمشاركة"); } } catch { showToast("تعذرت مشاركة الإيصال الآن.", "error"); } });
