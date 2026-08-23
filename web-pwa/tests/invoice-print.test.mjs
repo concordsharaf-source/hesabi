@@ -79,6 +79,12 @@ test("يدعم اختيار رقم من جهات الاتصال لحقلي ال�
   assert.match(app, /bindContactPicker\(overlay, "supplier-phone"\)/);
 });
 
+test("يعرض المبالغ الصحيحة من دون أصفار عشرية زائدة ويحتفظ بالكسور الفعلية", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /minimumFractionDigits: 0, maximumFractionDigits: 2/);
+  assert.match(app, /format\(roundMoney\(value\)\)/);
+});
+
 test("يضع كشف حساب العميل بياناته في بطاقة واضحة بخط عربي مناسب للطباعة", () => {
   const html = renderCustomerAccountHtml({
     account: { customer: { name: "أحمد العميل", phone: "777123456", address: "صنعاء" }, totalSales: 80, totalPaid: 40, balance: 40, transactions: [] },

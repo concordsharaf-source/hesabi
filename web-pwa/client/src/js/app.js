@@ -54,7 +54,7 @@ const adminOnlyMessage = () => showToast("هذه العملية متاحة لح�
 
 const money = (value) => {
   const currency = CURRENCIES.find((item) => item.code === (state.settings?.currency || DEFAULT_CURRENCY_CODE)) || CURRENCIES[0];
-  const formatted = new Intl.NumberFormat("ar", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(roundMoney(value));
+  const formatted = new Intl.NumberFormat("ar", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(roundMoney(value));
   return `${formatted} ${currency.symbol}`;
 };
 const signedMoney = (value) => `<strong class="${toNumber(value) < 0 ? "is-negative" : ""}">${money(value)}</strong>`;
