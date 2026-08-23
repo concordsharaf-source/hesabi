@@ -9,7 +9,7 @@
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "node --test tests/domain.test.mjs tests/permissions.test.mjs tests/pwa-config.test.mjs tests/session.test.mjs tests/firebase-config.test.mjs tests/cloud-backup.test.mjs tests/invoice-print.test.mjs tests/scanner-session.test.mjs tests/navigation-guard.test.mjs tests/package-purchase.test.mjs && vitest run",
+    "test": "node --test tests/domain.test.mjs tests/permissions.test.mjs tests/pwa-config.test.mjs tests/session.test.mjs tests/firebase-config.test.mjs tests/cloud-backup.test.mjs tests/invoice-print.test.mjs tests/scanner-session.test.mjs tests/navigation-guard.test.mjs tests/package-purchase.test.mjs tests/credit-sale-and-cashbox.test.mjs tests/customer-account-print.test.mjs && vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
@@ -58,6 +58,7 @@
     "express": "^4.21.2",
     "firebase": "^12.18.0",
     "framer-motion": "^12.23.22",
+    "html2pdf.js": "^0.14.0",
     "input-otp": "^1.4.2",
     "jose": "6.1.0",
     "lucide-react": "^0.453.0",

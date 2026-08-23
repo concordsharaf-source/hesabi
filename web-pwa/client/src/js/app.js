@@ -5,7 +5,9 @@ import { db } from "./database.js";
 import { calculatePackagePurchase, calculateSaleTotals, calculateTransferCollections, dateKey, roundMoney, stockStatus, toNumber } from "./domain.js";
 import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
+import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { getExitGuardAction, leaveAfterExitConfirmation } from "./navigation-guard.js";
+import { printHtmlDocument, shareOrDownloadPdf } from "./pdf-export.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 import { isNewContinuousBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 
@@ -32,6 +34,7 @@ const icon = (name, size = 20) => {
     users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
     truck: '<path d="M10 17h4V5H2v12h3M14 9h4l4 4v4h-3M5 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0ZM15 17a2 2 0 1 0 4 0 2 2 0 0 0-4 0Z"/>',
     wallet: '<path d="M20 7V6a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v8a2 2 0 0 1-2 2H5a3 3 0 0 1-3-3V7"/><path d="M16 14h2"/>',
+    transfer: '<path d="M4 7h13"/><path d="m13 3 4 4-4 4"/><path d="M20 17H7"/><path d="m11 13-4 4 4 4"/>',
     chart: '<path d="M4 19V5M4 19h16M8 16v-5M12 16V7M16 16v-8"/>',
     history: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="M12 7v5l3 2"/>',
     rotate: '<path d="M21 12a9 9 0 0 0-15.5-6.2L3 8M3 3v5h5M3 12a9 9 0 0 0 15.5 6.2L21 16m0 5v-5h-5"/>',
@@ -113,9 +116,25 @@ async function completeLocalLogout() {
   showToast("تم تسجيل الخروج.");
 }
 
+async function switchLocalUser() {
+  await db.clearPersistentSession();
+  state.currentUser = null;
+  state.cart = [];
+  state.view = "sales";
+  closeDialog();
+  render();
+  showToast("اختر المستخدم التالي لتسجيل الدخول.");
+}
+
 function openLogoutConfirmDialog() {
   const overlay = openDialog(`<div class="confirm-dialog"><div class="dialog__head"><div><span class="eyebrow">تأكيد تسجيل الخروج</span><h2>هل تريد تسجيل الخروج؟</h2><p class="dialog__subtext">لن تُحذف البيانات. ستحتاج فقط إلى إدخال رمز الدخول للمتابعة.</p></div><button class="icon-button" data-dialog-close aria-label="إلغاء">${icon("close", 20)}</button></div><div class="dialog__actions"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button id="confirm-local-logout" class="button button--danger" type="button">نعم، تسجيل الخروج</button></div></div>`);
   overlay.querySelector("#confirm-local-logout").addEventListener("click", () => void completeLocalLogout());
+}
+
+function openAccountSessionDialog() {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">الحساب الحالي</span><h2>${escapeHtml(state.currentUser?.name || "حسابي")}</h2><p class="dialog__subtext">يمكنك الانتقال إلى مستخدم آخر أو تسجيل الخروج من هذا الجهاز. تبقى بيانات المتجر محفوظة محليًا.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="dialog__actions"><button id="switch-local-user" class="button button--secondary" type="button">${icon("users", 17)} تبديل المستخدم</button><button id="open-local-logout-confirm" class="button button--danger" type="button">تسجيل الخروج</button></div>`);
+  overlay.querySelector("#switch-local-user").addEventListener("click", () => void switchLocalUser());
+  overlay.querySelector("#open-local-logout-confirm").addEventListener("click", openLogoutConfirmDialog);
 }
 
 function formatStatus(product) {
@@ -134,7 +153,7 @@ function navMarkup() {
   return `<aside class="sidebar">
     <div class="brand"><img src="${markImage}" alt="" /><div><strong>حسابي</strong><small>${escapeHtml(state.settings?.storeName || "متجرك")}</small></div></div>
     <div class="sidebar__label">تشغيل المتجر</div><nav>${items}</nav>
-    <div class="sidebar__account"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span><strong>${escapeHtml(state.currentUser?.name || "")}</strong><button class="text-button" data-action="logout">تسجيل الخروج</button></div>
+    <div class="sidebar__account"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span><strong>${escapeHtml(state.currentUser?.name || "")}</strong><button class="text-button" data-action="account-session">تبديل المستخدمين</button></div>
     <div class="sidebar__footer"><span class="presence-dot"></span><span>البيانات محفوظة محليًا</span></div>
   </aside>
   <nav class="bottom-nav" aria-label="التنقل الرئيسي">${items}</nav>`;
@@ -144,7 +163,7 @@ function applyTheme() { document.documentElement.dataset.theme = state.settings?
 function themeToggleMarkup() { const dark = state.settings?.theme === "dark"; return `<button class="icon-button theme-toggle" data-action="toggle-theme" aria-label="${dark ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن"}" title="${dark ? "الوضع الفاتح" : "الوضع الداكن"}">${icon(dark ? "sun" : "moon", 19)}</button>`; }
 
 function topbarMarkup(title, description, action = "") {
-  return `<header class="topbar"><div><p class="eyebrow">${escapeHtml(state.settings?.businessType || "إدارة المتجر")}</p><h1>${title}</h1>${description ? `<p class="topbar__description">${description}</p>` : ""}</div><div class="topbar__actions"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span>${action}${themeToggleMarkup()}<button class="icon-button logout-button" data-action="logout" aria-label="تسجيل الخروج" title="تسجيل الخروج">${icon("arrow", 18)}</button></div></header>`;
+  return `<header class="topbar"><div><p class="eyebrow">${escapeHtml(state.settings?.businessType || "إدارة المتجر")}</p><h1>${title}</h1>${description ? `<p class="topbar__description">${description}</p>` : ""}</div><div class="topbar__actions"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span>${action}${themeToggleMarkup()}<button class="icon-button" data-action="account-session" aria-label="تبديل المستخدمين أو تسجيل الخروج" title="تبديل المستخدمين أو تسجيل الخروج">${icon("users", 18)}</button></div></header>`;
 }
 
 function dashboardMarkup() {
@@ -206,7 +225,7 @@ function productsMarkup() {
   const query = state.productQuery.trim().toLocaleLowerCase("ar");
   const products = state.products.filter((product) => !query || [product.name, product.barcode, product.internalCode].some((value) => value?.toLocaleLowerCase("ar").includes(query)));
   return `${topbarMarkup("المنتجات", "ابحث بالاسم أو الباركود أو الكود الداخلي.", `<button class="button button--primary" data-action="new-product">${icon("plus", 18)}<span>إضافة منتج</span></button>`)}
-  <section class="toolbar"><label class="search-field">${icon("search", 19)}<input id="product-search" autocomplete="off" placeholder="ابحث عن منتج..." value="${escapeHtml(state.productQuery)}" /></label><button class="button button--secondary button--icon-text" data-action="open-scanner" data-mode="product">${icon("scan", 18)}<span>مسح باركود</span></button></section>
+  <section class="toolbar"><label class="search-field">${icon("search", 19)}<input id="product-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث عن منتج..." value="${escapeHtml(state.productQuery)}" /></label><button class="button button--secondary button--icon-text" data-action="open-scanner" data-mode="product">${icon("scan", 18)}<span>مسح باركود</span></button></section>
   <section class="panel product-table-panel">${products.length ? `<div class="table-wrap"><table><thead><tr><th>المنتج</th><th>السعر</th><th>المخزون</th><th>الحالة</th><th><span class="sr-only">إجراءات</span></th></tr></thead><tbody>${products.map(productRow).join("")}</tbody></table></div><div class="mobile-product-list">${products.map(productCard).join("")}</div>` : emptyState(query ? "لا توجد نتائج مطابقة" : "لم تضف منتجات بعد", query ? "جرّب اسمًا أو رمزًا آخر." : "أضف أول منتج ليظهر في قائمة التشغيل.")}</section>`;
 }
 
@@ -230,7 +249,7 @@ function salesMarkup() {
   const matches = state.products.filter((product) => !query || [product.name, product.barcode, product.internalCode].some((value) => value?.toLocaleLowerCase("ar").includes(query))).slice(0, 7);
   const totals = calculateSaleTotals(state.cart, 0);
   return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.")}
-  <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div>
+  <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div>
   <div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => `<button class="sale-product ${product.quantity <= 0 ? "is-disabled" : ""}" data-action="add-cart" data-id="${product.id}" ${product.quantity <= 0 ? "disabled" : ""}><div><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)} متاح</small></div><span>${money(product.salePrice)}</span><i>${icon("plus", 18)}</i></button>`).join("") : `<div class="no-match"><strong>لا توجد نتيجة</strong><span>تحقق من الاسم أو الباركود أو أضف منتجًا جديدًا.</span><button class="text-button" data-action="new-product">إنشاء منتج</button></div>`}</div></div>
   <aside class="cart-panel"><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div>${state.cart.length ? `<button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div>
   <div class="cart-lines">${state.cart.length ? state.cart.map(cartLine).join("") : `<div class="cart-empty">${icon("cart", 30)}<p>اختر منتجًا من القائمة لتبدأ البيع.</p></div>`}</div>
@@ -252,7 +271,7 @@ function suppliersMarkup() {
   const suppliers = state.suppliers.filter((supplier) => !query || [supplier.name, supplier.phone, supplier.address].some((value) => value?.toLocaleLowerCase("ar").includes(query)));
   const totalDue = suppliers.reduce((sum, supplier) => sum + toNumber(supplier.balance), 0);
   return `${topbarMarkup("الموردون", "تابع الأرصدة والشراء الآجل ودفعات الموردين في حساب واحد.", `<button class="button button--primary" data-action="new-supplier">${icon("plus", 18)}<span>إضافة مورد</span></button>`)}
-  <section class="toolbar"><label class="search-field">${icon("search", 19)}<input id="supplier-search" autocomplete="off" placeholder="ابحث باسم المورد أو رقم الهاتف..." value="${escapeHtml(state.supplierQuery)}" /></label></section>
+  <section class="toolbar"><label class="search-field">${icon("search", 19)}<input id="supplier-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث باسم المورد أو رقم الهاتف..." value="${escapeHtml(state.supplierQuery)}" /></label></section>
   <section class="inventory-summary"><div><span>مستحقات الموردين</span><strong>${money(totalDue)}</strong></div><div><span>الموردون النشطون</span><strong>${amount(suppliers.length)} مورد</strong></div></section>
   <section class="panel entity-list">${suppliers.length ? suppliers.map((supplier) => `<article class="entity-row"><button class="entity-row__icon" data-action="open-supplier-account" data-id="${supplier.id}" aria-label="حساب ${escapeHtml(supplier.name)}">${icon("users", 20)}</button><button class="entity-row__main entity-row__main--button" data-action="open-supplier-account" data-id="${supplier.id}"><strong>${escapeHtml(supplier.name)}</strong><small>${escapeHtml(supplier.phone || supplier.address || "لا توجد بيانات اتصال")}</small></button><strong class="entity-row__amount">${money(supplier.balance)}</strong><div class="entity-row__actions"><button class="icon-button" aria-label="تعديل ${escapeHtml(supplier.name)}" data-action="open-supplier" data-id="${supplier.id}">${icon("edit", 18)}</button><button class="icon-button icon-button--danger" aria-label="حذف ${escapeHtml(supplier.name)}" data-action="delete-supplier" data-id="${supplier.id}">${icon("trash", 18)}</button></div></article>`).join("") : emptyState(query ? "لا توجد نتائج مطابقة" : "لم تضف موردين بعد", query ? "جرّب اسمًا أو رقمًا آخر." : "أضف أول مورد لتبدأ تسجيل فواتير الشراء.", "new-supplier")}</section>`;
 }
@@ -272,7 +291,7 @@ function customersMarkup() {
   const customers = state.customers.filter((customer) => !query || [customer.name, customer.phone, customer.address].some((value) => value?.toLocaleLowerCase("ar").includes(query)));
   const totalDebt = customers.reduce((sum, customer) => sum + toNumber(customer.balance), 0);
   return `${topbarMarkup("العملاء", "تابع الأرصدة والبيع الآجل والدفعات في حساب واحد.", `<button class="button button--primary" data-action="new-customer">${icon("plus", 18)}<span>إضافة عميل</span></button>`)}
-  <section class="toolbar"><label class="search-field">${icon("search", 19)}<input id="customer-search" autocomplete="off" placeholder="ابحث باسم العميل أو رقم الهاتف..." value="${escapeHtml(state.customerQuery)}" /></label></section>
+  <section class="toolbar"><label class="search-field">${icon("search", 19)}<input id="customer-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث باسم العميل أو رقم الهاتف..." value="${escapeHtml(state.customerQuery)}" /></label></section>
   <section class="inventory-summary"><div><span>إجمالي الديون</span><strong>${money(totalDebt)}</strong></div><div><span>العملاء النشطون</span><strong>${amount(customers.length)} عميل</strong></div></section>
   <section class="panel entity-list">${customers.length ? customers.map((customer) => `<article class="entity-row"><button class="entity-row__icon" data-action="open-customer" data-id="${customer.id}" aria-label="حساب ${escapeHtml(customer.name)}">${icon("users", 20)}</button><button class="entity-row__main entity-row__main--button" data-action="open-customer" data-id="${customer.id}"><strong>${escapeHtml(customer.name)}</strong><small>${escapeHtml(customer.phone || customer.address || "لا توجد بيانات اتصال")}</small></button><strong class="entity-row__amount">${money(customer.balance)}</strong><div class="entity-row__actions"><button class="icon-button" aria-label="تعديل ${escapeHtml(customer.name)}" data-action="edit-customer" data-id="${customer.id}">${icon("edit", 18)}</button><button class="icon-button icon-button--danger" aria-label="حذف ${escapeHtml(customer.name)}" data-action="delete-customer" data-id="${customer.id}">${icon("trash", 18)}</button></div></article>`).join("") : emptyState(query ? "لا توجد نتائج مطابقة" : "لم تضف عملاء بعد", query ? "جرّب اسمًا أو رقمًا آخر." : "أضف أول عميل لتبدأ البيع الآجل وتسجيل الدفعات.", "new-customer")}</section>`;
 }
@@ -282,7 +301,7 @@ function customerPaymentsMarkup() {
   const payments = state.customerPayments.filter((payment) => (!query || [payment.customerName, payment.notes].some((value) => value?.toLocaleLowerCase("ar").includes(query))) && (!state.paymentFrom || dateKey(payment.date) >= state.paymentFrom) && (!state.paymentTo || dateKey(payment.date) <= state.paymentTo));
   const total = payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0);
   return `${topbarMarkup("دفعات العملاء", "دفعات تسدد دينًا سابقًا ولا تُعد مبيعات جديدة.")}
-  <section class="toolbar toolbar--filter"><label class="search-field">${icon("search", 19)}<input id="payment-search" autocomplete="off" placeholder="ابحث عن عميل أو ملاحظة..." value="${escapeHtml(state.paymentQuery)}" /></label><form id="payment-filter" class="date-filter"><input name="from" type="date" value="${state.paymentFrom}" /><input name="to" type="date" value="${state.paymentTo}" /></form></section>
+  <section class="toolbar toolbar--filter"><label class="search-field">${icon("search", 19)}<input id="payment-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث عن عميل أو ملاحظة..." value="${escapeHtml(state.paymentQuery)}" /></label><form id="payment-filter" class="date-filter"><input name="from" type="date" value="${state.paymentFrom}" /><input name="to" type="date" value="${state.paymentTo}" /></form></section>
   <section class="inventory-summary"><div><span>إجمالي الدفعات</span><strong>${money(total)}</strong></div><div><span>العمليات</span><strong>${amount(payments.length)} دفعة</strong></div></section>
   <section class="panel entity-list">${payments.length ? payments.map((payment) => `<article class="entity-row"><div class="entity-row__icon entity-row__icon--expense">${icon("wallet", 20)}</div><button class="entity-row__main entity-row__main--button" data-action="open-customer" data-id="${payment.customerId}"><strong>${escapeHtml(payment.customerName)}</strong><small>${payment.date} · ${escapeHtml(payment.notes || "تسديد رصيد")}</small></button><strong class="entity-row__amount">${money(payment.amount)}</strong></article>`).join("") : emptyState("لا توجد دفعات ضمن الفترة", "تسجل الدفعات من صفحة حساب العميل.", "customers")}</section>`;
 }
@@ -317,9 +336,10 @@ function reportsMarkup() {
 function cashboxMarkup() {
   const cash = state.cashbox || { openingBalance: 0, inflows: 0, outflows: 0, closingBalance: 0 };
   const movementLabel = { DEPOSIT: "إيداع في الصندوق", WITHDRAWAL: "سحب من الصندوق" };
-  return `${topbarMarkup("الصندوق", "رصيد نقدي محسوب من العمليات النقدية الفعلية وحركات الصندوق اليدوية.", `<div class="topbar__actions"><button class="button button--secondary" data-action="new-cash-withdrawal">سحب</button><button class="button button--primary" data-action="new-cash-deposit">${icon("plus", 18)}<span>إيداع</span></button></div>`)}
+  return `${topbarMarkup("الصندوق", "رصيد نقدي محسوب من العمليات النقدية الفعلية وحركات الصندوق اليدوية، ولا يشمل الحوالات.", `<div class="topbar__actions"><button class="button button--secondary" data-action="new-cash-withdrawal">سحب</button><button class="button button--primary" data-action="new-cash-deposit">${icon("plus", 18)}<span>إيداع</span></button></div>`)}
   <section class="toolbar toolbar--filter"><form id="cash-filter" class="date-filter"><label>من<input name="from" type="date" value="${state.cashFrom}" /></label><label>إلى<input name="to" type="date" value="${state.cashTo}" /></label></form></section>
   <section class="metric-grid metric-grid--reports">${metricCard("رصيد الافتتاح", money(cash.openingBalance), "wallet", "قبل بداية الفترة")}${metricCard("إجمالي الداخل", money(cash.inflows), "trend", "نقدي فقط")}${metricCard("إجمالي الخارج", money(cash.outflows), "wallet", "مصروفات وسداد وسحب")}${metricCard("الرصيد الحالي", money(cash.closingBalance), "chart", "بعد كل الحركات")}</section>
+  <section class="cash-transfer-note"><div>${icon("transfer", 20)}</div><div><strong>الحوالات خلال الفترة</strong><span>للمتابعة فقط ولا تدخل في رصيد الصندوق النقدي.</span></div><div><small>وارد تحويل</small><strong>${money(cash.transferIncoming)}</strong><small>صادر تحويل</small><strong>${money(cash.transferOutgoing)}</strong></div></section>
   <section class="report-grid"><article class="panel report-card"><span class="eyebrow">مصادر الداخل</span><div><span>مبيعات نقدية</span><strong>${money(cash.cashSales)}</strong></div><div><span>دفعات العملاء</span><strong>${money(cash.customerPayments)}</strong></div><div><span>إيداعات يدوية</span><strong>${money(cash.deposits)}</strong></div><div><span>مرتجعات شراء</span><strong>${money(cash.purchaseReturns)}</strong></div></article><article class="panel report-card"><span class="eyebrow">مصادر الخارج</span><div><span>مشتريات نقدية</span><strong>${money(cash.cashPurchases)}</strong></div><div><span>دفعات الموردين</span><strong>${money(cash.supplierPayments)}</strong></div><div><span>مصروفات</span><strong>${money(cash.expenses)}</strong></div><div><span>سحوبات يدوية</span><strong>${money(cash.withdrawals)}</strong></div></article><article class="panel report-card"><span class="eyebrow">حركات الصندوق اليدوية</span>${state.cashMovements.length ? state.cashMovements.map((movement) => `<div><span>${movementLabel[movement.type]}<small>${movement.date}${movement.notes ? ` · ${escapeHtml(movement.notes)}` : ""}</small></span><strong class="${movement.type === "WITHDRAWAL" ? "is-negative" : ""}">${movement.type === "WITHDRAWAL" ? "−" : "+"}${money(movement.amount)}</strong></div>`).join("") : `<p>لا توجد إيداعات أو سحوبات يدوية ضمن الفترة.</p>`}</article></section>`;
 }
 
@@ -374,23 +394,34 @@ function setupMarkup() {
   return `<main class="setup-page"><section class="setup-art"><div class="setup-art__brand"><img src="${markImage}" alt="" /><span class="brand-wordmark">حسابي</span><small>سجلّ المتجر اليومي</small></div><div class="setup-art__status"><span class="presence-dot"></span><span>نظامك المحلي جاهز للعمل دون اتصال</span></div><div class="setup-art__copy"><p class="eyebrow">سجل تشغيلي · المرحلة الأولى</p><h1>بيانات واضحة<br />لبداية يوم بيع منظّم.</h1><p>ستسجل هنا البيانات التي تظهر على الفواتير وتضبط عرض المخزون والمبيعات اليومية.</p><div class="setup-art__stamps"><span>المنتجات</span><span>المخزون</span><span>الفواتير</span></div></div><div class="setup-art__ledger-card"><span>خط سير اليوم</span><strong>منتج ← مخزون ← فاتورة</strong><i></i><i></i><i></i></div><img class="setup-art__image" src="${assetBaseUrl}/hesabi-setup-ledger_a7b0fae4.png" alt="رسم تعبيري لأدوات تنظيم المتجر" /></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-sheet__brand"><img src="${markImage}" alt="" /><div><strong>حسابي</strong><span>دفتر التاجر الهادئ</span></div><span class="setup-stamp">خطوة 1 من 1</span></div><div class="setup-form"><span class="eyebrow">سجل بداية العمل</span><h2>بيانات تُستخدم كل يوم</h2><p>أدخل اسم المتجر والنشاط والعملة. ستظهر هذه البيانات في الفواتير، وتُنظّم طريقة قراءة المخزون والمبيعات اليومية.</p><form id="setup-form"><label>اسم المتجر<input name="storeName" dir="rtl" required maxlength="60" placeholder="مثال: بقالة الواحة" autofocus /></label><label>نوع النشاط<select name="businessType" required>${BUSINESS_TYPES.map((type) => `<option value="${type}">${type}</option>`).join("")}</select></label><label>العملة<select name="currency" required>${CURRENCIES.map((currency) => `<option value="${currency.code}" ${currency.code === DEFAULT_CURRENCY_CODE ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><button class="button button--primary button--wide" type="submit">فتح سجل المتجر ${icon("arrow", 18)}</button></form><small class="offline-note"><span class="presence-dot"></span>يحفظ محليًا ويظل متاحًا بعد أول تحميل</small></div></div></section></main>`;
 }
 
+function bindSearchInput(selector, stateKey) {
+  root.querySelector(selector)?.addEventListener("input", (event) => {
+    const value = event.target.value;
+    state[stateKey] = value;
+    render();
+    const restored = root.querySelector(selector);
+    restored?.focus();
+    restored?.setSelectionRange(value.length, value.length);
+  });
+}
+
 function bindEvents() {
   root.querySelectorAll("[data-action]").forEach((element) => element.addEventListener("click", handleAction));
   root.querySelector("#setup-form")?.addEventListener("submit", handleSetup);
   root.querySelector("#login-form")?.addEventListener("submit", handleLogin);
   root.querySelector("#required-pin-form")?.addEventListener("submit", changeRequiredPin);
-  root.querySelector("#product-search")?.addEventListener("input", (event) => { state.productQuery = event.target.value; render(); root.querySelector("#product-search")?.focus(); });
-  root.querySelector("#sale-search")?.addEventListener("input", (event) => { state.saleQuery = event.target.value; render(); root.querySelector("#sale-search")?.focus(); });
+  bindSearchInput("#product-search", "productQuery");
+  bindSearchInput("#sale-search", "saleQuery");
   root.querySelector("#sale-search")?.addEventListener("keydown", async (event) => { if (event.key === "Enter" && event.target.value.trim()) await findBarcode(event.target.value.trim(), "sale"); });
-  root.querySelector("#supplier-search")?.addEventListener("input", (event) => { state.supplierQuery = event.target.value; render(); root.querySelector("#supplier-search")?.focus(); });
-  root.querySelector("#customer-search")?.addEventListener("input", (event) => { state.customerQuery = event.target.value; render(); root.querySelector("#customer-search")?.focus(); });
-  root.querySelector("#payment-search")?.addEventListener("input", (event) => { state.paymentQuery = event.target.value; render(); root.querySelector("#payment-search")?.focus(); });
+  bindSearchInput("#supplier-search", "supplierQuery");
+  bindSearchInput("#customer-search", "customerQuery");
+  bindSearchInput("#payment-search", "paymentQuery");
   root.querySelector("#payment-filter")?.addEventListener("change", (event) => { state.paymentFrom = event.currentTarget.querySelector("[name=from]").value; state.paymentTo = event.currentTarget.querySelector("[name=to]").value; render(); });
-  root.querySelector("#supplier-payment-search")?.addEventListener("input", (event) => { state.supplierPaymentQuery = event.target.value; render(); root.querySelector("#supplier-payment-search")?.focus(); });
+  bindSearchInput("#supplier-payment-search", "supplierPaymentQuery");
   root.querySelector("#supplier-payment-filter")?.addEventListener("change", (event) => { state.supplierPaymentFrom = event.currentTarget.querySelector("[name=from]").value; state.supplierPaymentTo = event.currentTarget.querySelector("[name=to]").value; render(); });
-  root.querySelector("#debt-search")?.addEventListener("input", (event) => { state.debtQuery = event.target.value; render(); root.querySelector("#debt-search")?.focus(); });
+  bindSearchInput("#debt-search", "debtQuery");
   root.querySelector("#debt-sort")?.addEventListener("change", (event) => { state.debtSort = event.target.value; render(); });
-  root.querySelector("#expense-search")?.addEventListener("input", (event) => { state.expenseQuery = event.target.value; render(); root.querySelector("#expense-search")?.focus(); });
+  bindSearchInput("#expense-search", "expenseQuery");
   root.querySelector("#expense-filter")?.addEventListener("change", (event) => { state.expenseFrom = event.currentTarget.querySelector("[name=from]").value; state.expenseTo = event.currentTarget.querySelector("[name=to]").value; render(); });
   root.querySelector("#report-filter")?.addEventListener("change", async (event) => { state.reportFrom = event.currentTarget.querySelector("[name=from]").value; state.reportTo = event.currentTarget.querySelector("[name=to]").value; state.analytics = await db.getAnalytics({ from: state.reportFrom, to: state.reportTo }); render(); });
   root.querySelector("#cash-filter")?.addEventListener("change", async (event) => { state.cashFrom = event.currentTarget.querySelector("[name=from]").value; state.cashTo = event.currentTarget.querySelector("[name=to]").value; await refresh(); render(); });
@@ -443,6 +474,7 @@ async function handleAction(event) {
   const id = event.currentTarget.dataset.id;
   if (action === "fill-login") { const input = root.querySelector("#login-form [name=username]"); if (input) { input.value = event.currentTarget.dataset.username; root.querySelector("#login-form [name=pin]")?.focus(); } return; }
   if (action === "logout") { openLogoutConfirmDialog(); return; }
+  if (action === "account-session") { openAccountSessionDialog(); return; }
   if (action === "navigate") { const view = event.currentTarget.dataset.view; if (!canAccessView(state.currentUser, view)) { adminOnlyMessage(); return; } state.view = view; render(); if (view === "settings" && isAdmin(state.currentUser)) void refreshCloudBackups({ quiet: true }); return; }
   if (!state.currentUser) { render(); return; }
   if (!canUseAction(state.currentUser, action, { mode: event.currentTarget.dataset.mode })) { adminOnlyMessage(); return; }
@@ -724,8 +756,9 @@ function openCheckoutDialog() {
   const setPaymentMethod = (method) => { form.paymentMethod.value = method; overlay.querySelectorAll("[data-sale-payment-method]").forEach((button) => button.classList.toggle("is-selected", button.dataset.salePaymentMethod === method)); };
   overlay.querySelectorAll("[data-sale-payment-method]").forEach((button) => button.addEventListener("click", () => setPaymentMethod(button.dataset.salePaymentMethod)));
   const totalsForForm = () => calculateSaleTotals(state.cart, form.discount.value);
-  const syncCheckout = ({ resetPaid = false } = {}) => { const totals = totalsForForm(); const isCredit = form.paymentType.value === "آجل"; paidInput.max = totals.total; if (!isCredit || resetPaid) paidInput.value = totals.total; if (toNumber(paidInput.value) > totals.total) paidInput.value = totals.total; const remaining = Math.max(0, totals.total - toNumber(paidInput.value)); overlay.querySelector("#checkout-total").textContent = money(totals.total); overlay.querySelector("#remaining-amount").textContent = money(remaining); overlay.querySelector("#payment-status").textContent = remaining === 0 ? "مدفوعة" : toNumber(paidInput.value) > 0 ? "مدفوعة جزئيًا — دين العميل المتبقي" : "غير مدفوعة — دين على العميل"; creditField.hidden = !isCredit; creditSummary.hidden = !isCredit; };
-  form.querySelectorAll("[name=paymentType]").forEach((input) => input.addEventListener("change", () => syncCheckout({ resetPaid: form.paymentType.value === "نقدي" }))); form.discount.addEventListener("input", () => syncCheckout({ resetPaid: form.paymentType.value === "نقدي" })); paidInput.addEventListener("input", () => syncCheckout());
+  const syncCheckout = () => { const totals = totalsForForm(); const isCredit = form.paymentType.value === "آجل"; paidInput.max = totals.total; paidInput.disabled = isCredit; paidInput.value = isCredit ? 0 : totals.total; const remaining = Math.max(0, totals.total - toNumber(paidInput.value)); overlay.querySelector("#checkout-total").textContent = money(totals.total); overlay.querySelector("#remaining-amount").textContent = money(remaining); overlay.querySelector("#payment-status").textContent = isCredit ? "غير مدفوعة — يُسجل التحصيل لاحقًا من حساب العميل" : "مدفوعة"; creditField.hidden = !isCredit; creditSummary.hidden = !isCredit; };
+  form.querySelectorAll("[name=paymentType]").forEach((input) => input.addEventListener("change", syncCheckout)); form.discount.addEventListener("input", syncCheckout);
+  syncCheckout();
   form.addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); try { const sale = await db.completeSale({ items: state.cart, ...values }); state.cart = []; await refresh(); closeDialog(); state.view = "invoices"; render(); showToast(sale.paymentType === "آجل" ? `حُفظت الفاتورة ${sale.invoiceNumber} وربطت بحساب العميل` : `تم حفظ الفاتورة ${sale.invoiceNumber} وخصم المخزون`); } catch (error) { showToast(error.message, "error"); } });
 }
 
@@ -739,7 +772,7 @@ async function openInvoiceDialog(saleId) {
   const channel = paymentChannelLabel(invoice);
   overlay.querySelector(".dialog__subtext").textContent = `${dateTime(invoice.date)} · ${channel} · ${invoice.paymentStatus || "مدفوعة"}`;
   overlay.querySelector(".invoice-detail").insertAdjacentHTML("beforeend", `<div><span>طريقة السداد</span><strong>${channel}</strong></div>${invoice.paymentType === "آجل" && toNumber(invoice.paidAmount) > 0 ? `<div><span>وسيلة الدفعة الأولى</span><strong>${invoice.paymentMethod === "تحويل" ? "تحويل" : "كاش"}</strong></div>` : ""}`);
-  overlay.querySelector(".dialog__actions").insertAdjacentHTML("afterbegin", `<button id="share-invoice" class="button button--secondary" type="button">مشاركة</button><button id="thermal-print-invoice" class="button button--secondary" type="button">طباعة حرارية</button>`);
+  overlay.querySelector(".dialog__actions").insertAdjacentHTML("afterbegin", `<button id="share-invoice" class="button button--secondary" type="button">مشاركة PDF</button><button id="thermal-print-invoice" class="button button--secondary" type="button">طباعة حرارية</button>`);
   overlay.querySelector("#share-invoice").addEventListener("click", () => shareInvoice(invoice));
   overlay.querySelector("#thermal-print-invoice").addEventListener("click", () => printInvoiceThermal(invoice));
 }
@@ -755,16 +788,18 @@ async function copyTextForSharing(text) {
 }
 
 async function shareInvoice(invoice) {
-  const text = invoiceShareText(invoice);
-  try { if (navigator.share) await navigator.share({ title: `فاتورة ${invoice.invoiceNumber}`, text }); else { await copyTextForSharing(text); showToast("تم نسخ الفاتورة للمشاركة"); } }
-  catch (error) { if (error?.name !== "AbortError") { try { await copyTextForSharing(text); showToast("تم نسخ الفاتورة للمشاركة"); } catch { showToast("تعذرت مشاركة الفاتورة الآن.", "error"); } } }
+  try {
+    const result = await shareOrDownloadPdf({ html: thermalInvoiceHtml(invoice), filename: `${invoice.invoiceNumber}.pdf`, title: `فاتورة ${invoice.invoiceNumber}`, page: "thermal" });
+    showToast(result === "shared" ? "تمت مشاركة ملف الفاتورة PDF" : "تم تنزيل ملف الفاتورة PDF للمشاركة");
+  } catch (error) { if (error?.name !== "AbortError") showToast("تعذر إنشاء ملف PDF للفواتير الآن.", "error"); }
+}
+
+function thermalInvoiceHtml(invoice) {
+  return renderThermalInvoiceHtml({ invoice, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml, paymentLabel: paymentChannelLabel(invoice) });
 }
 
 function printInvoiceThermal(invoice) {
-  const popup = window.open("", "hesabi-thermal-invoice", "width=420,height=720");
-  if (!popup) { showToast("السماح بالنوافذ المنبثقة مطلوب للطباعة الحرارية.", "error"); return; }
-  popup.document.write(renderThermalInvoiceHtml({ invoice, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml, paymentLabel: paymentChannelLabel(invoice) }));
-  popup.document.close(); popup.focus(); window.setTimeout(() => popup.print(), 180);
+  if (!printHtmlDocument({ html: thermalInvoiceHtml(invoice), target: "hesabi-thermal-invoice", features: "width=420,height=720" })) showToast("السماح بالنوافذ المنبثقة مطلوب للطباعة الحرارية.", "error");
 }
 
 function openSupplierDialog(supplier = null) {
@@ -799,9 +834,13 @@ async function deleteCustomer(customerId) { if (!window.confirm("هل تريد �
 
 async function openCustomerAccountDialog(customerId) {
   const account = await db.getCustomerAccount(customerId); if (!account) return; const typeLabel = { CREDIT_SALE: "بيع آجل", PAYMENT: "دفعة عميل", SALE_RETURN: "مرتجع بيع" };
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حساب العميل</span><h2>${escapeHtml(account.customer.name)}</h2><p class="dialog__subtext">${escapeHtml(account.customer.phone || account.customer.address || "لا توجد بيانات اتصال")}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section class="account-summary"><div><span>إجمالي المبيعات</span><strong>${money(account.totalSales)}</strong></div><div><span>إجمالي المدفوع</span><strong>${money(account.totalPaid)}</strong></div><div class="account-summary__balance"><span>الرصيد المستحق</span><strong>${money(account.balance)}</strong></div></section><div class="dialog__actions"><button id="record-customer-payment" class="button button--primary" data-action="record-customer-payment" data-id="${account.customer.id}" ${toNumber(account.balance) <= 0 ? "disabled" : ""}>تسجيل دفعة ${icon("wallet", 17)}</button><button class="button button--secondary" data-dialog-close>إغلاق</button></div><section class="account-transactions"><div class="section-caption"><span class="eyebrow">سجل الحساب</span><strong>العمليات المرتبطة</strong></div>${account.transactions.length ? account.transactions.map((transaction) => `<article><div><strong>${typeLabel[transaction.type] || transaction.type}</strong><small>${dateTime(transaction.date)}${transaction.invoiceNumber ? ` · ${escapeHtml(transaction.invoiceNumber)}` : ""}</small></div><div><strong class="${toNumber(transaction.amount) < 0 ? "is-negative" : ""}">${money(transaction.amount)}</strong><small>الرصيد: ${money(transaction.remainingAmount)}</small></div></article>`).join("") : `<div class="inline-empty">لا توجد عمليات على حساب هذا العميل.</div>`}</section>`);
+  const printAccount = { ...account, transactions: account.transactions.map((transaction) => ({ ...transaction, typeLabel: typeLabel[transaction.type] || transaction.type })) };
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حساب العميل</span><h2>${escapeHtml(account.customer.name)}</h2><p class="dialog__subtext">${escapeHtml(account.customer.phone || account.customer.address || "لا توجد بيانات اتصال")}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section class="account-summary"><div><span>إجمالي المبيعات</span><strong>${money(account.totalSales)}</strong></div><div><span>إجمالي المدفوع</span><strong>${money(account.totalPaid)}</strong></div><div class="account-summary__balance"><span>الرصيد المستحق</span><strong>${money(account.balance)}</strong></div></section><div class="dialog__actions"><button id="share-customer-account" class="button button--secondary" type="button">مشاركة PDF</button><button id="print-customer-account" class="button button--secondary" type="button">طباعة الحساب</button><button id="record-customer-payment" class="button button--primary" data-action="record-customer-payment" data-id="${account.customer.id}" ${toNumber(account.balance) <= 0 ? "disabled" : ""}>تسجيل دفعة ${icon("wallet", 17)}</button><button class="button button--secondary" data-dialog-close>إغلاق</button></div><section class="account-transactions"><div class="section-caption"><span class="eyebrow">سجل الحساب</span><strong>العمليات المرتبطة</strong></div>${account.transactions.length ? account.transactions.map((transaction) => `<article><div><strong>${typeLabel[transaction.type] || transaction.type}</strong><small>${dateTime(transaction.date)}${transaction.invoiceNumber ? ` · ${escapeHtml(transaction.invoiceNumber)}` : ""}</small></div><div><strong class="${toNumber(transaction.amount) < 0 ? "is-negative" : ""}">${money(transaction.amount)}</strong><small>الرصيد: ${money(transaction.remainingAmount)}</small></div></article>`).join("") : `<div class="inline-empty">لا توجد عمليات على حساب هذا العميل.</div>`}</section>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelector("#record-customer-payment")?.addEventListener("click", () => { closeDialog(); openCustomerPaymentDialog(account.customer.id); });
+  const accountHtml = () => renderCustomerAccountHtml({ account: printAccount, storeName: state.settings?.storeName || "حسابي", formatMoney: money, formatDateTime: dateTime, escapeHtml });
+  overlay.querySelector("#print-customer-account").addEventListener("click", () => { if (!printHtmlDocument({ html: accountHtml(), target: "hesabi-customer-account", features: "width=900,height=760" })) showToast("السماح بالنوافذ المنبثقة مطلوب للطباعة.", "error"); });
+  overlay.querySelector("#share-customer-account").addEventListener("click", async () => { try { const result = await shareOrDownloadPdf({ html: accountHtml(), filename: `كشف-حساب-${account.customer.name}.pdf`, title: `كشف حساب ${account.customer.name}` }); showToast(result === "shared" ? "تمت مشاركة كشف الحساب PDF" : "تم تنزيل كشف الحساب PDF للمشاركة"); } catch (error) { if (error?.name !== "AbortError") showToast("تعذر إنشاء PDF لكشف الحساب.", "error"); } });
 }
 
 async function openCustomerPaymentDialog(customerId) {
