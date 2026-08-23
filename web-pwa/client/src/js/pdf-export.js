@@ -1,7 +1,7 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
-const PDF_ARABIC_FONT_URL = "/manus-storage/NotoNaskhArabic-Regular_2c8d8205.ttf";
+const PDF_ARABIC_FONT_URL = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage/NotoNaskhArabic-Regular_2c8d8205.ttf";
 let canvasArabicFontPromise;
 
 async function loadCanvasArabicFont() {
