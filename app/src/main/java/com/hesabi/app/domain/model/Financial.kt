@@ -19,6 +19,7 @@ data class Customer(
     val phone: String? = null,
     val address: String? = null,
     val notes: String? = null,
+    val balance: Long = 0L,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false
@@ -165,9 +166,12 @@ data class User(
     @PrimaryKey(autoGenerate = true)
     val id: Long = 0,
     val username: String,
-    val passwordHash: String, // تخزين بسيط حالياً
+    val passwordHash: String,
+    val passwordSalt: String = "",
     val fullName: String,
     val role: UserRole = UserRole.CASHIER,
+    val mustChangePassword: Boolean = false,
     val isActive: Boolean = true,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )

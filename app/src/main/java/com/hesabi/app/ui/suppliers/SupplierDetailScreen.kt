@@ -107,30 +107,9 @@ fun SupplierDetailScreen(
             onDismiss = { showPaymentDialog = false },
             onConfirm = { amount, note ->
                 scope.launch {
-                    val now = System.currentTimeMillis()
-                    // 1. تسجيل حركة دفع في سجل المورد (تنقص الدين)
-                    transactionDao.insert(
-                        SupplierTransaction(
-                            supplierId = supplierId,
-                            type = SupplierTransactionType.PAYMENT,
-                            amount = amount,
-                            paid = amount,
-                            remaining = -amount,
-                            date = now,
-                            notes = note.ifBlank { "تسديد دفعة للمورد" }
-                        )
-                    )
-                    // 2. تسجيل حركة خروج من الصندوق
-                    cashMovementDao.insert(
-                        CashMovement(
-                            amount = -amount,
-                            type = CashMovementType.EXPENSE,
-                            description = "تسديد مورد: ${supplier?.name}",
-                            date = now,
-                            note = note
-                        )
-                    )
+                    app.paymentUseCase.recordSupplierPayment(supplierId, amount, note)
                     showPaymentDialog = false
+                    supplier = app.purchaseRepository.supplierDao.getById(supplierId)
                 }
             }
         )

@@ -128,6 +128,22 @@ fun SaleReturnScreen(
                     singleLine = true
                 )
                 Spacer(Modifier.height(12.dp))
+                if (state.sale?.customerId != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = state.refundFromCashbox,
+                            onCheckedChange = viewModel::onRefundFromCashboxChange
+                        )
+                        Text(
+                            "رد المبلغ نقداً من الصندوق (إلغاء التحديد يخصم من رصيد العميل)",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(

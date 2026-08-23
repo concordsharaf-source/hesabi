@@ -76,6 +76,19 @@ class HesabiApp : Application() {
         private set
     lateinit var authUseCase: com.hesabi.app.domain.AuthUseCase
         private set
+    lateinit var paymentUseCase: com.hesabi.app.domain.PaymentUseCase
+        private set
+    lateinit var professionalReturnUseCase: com.hesabi.app.domain.ReturnUseCase
+        private set
+    
+    lateinit var db: com.hesabi.app.data.db.AppDatabase
+        private set
+    
+    lateinit var stockMovementDao: com.hesabi.app.data.dao.StockMovementDao
+        private set
+    
+    lateinit var returnUseCase: com.hesabi.app.domain.ReturnUseCase
+        private set
 
     override fun onCreate() {
         super.onCreate()
@@ -92,7 +105,8 @@ class HesabiApp : Application() {
             db.saleDao(),
             db.stockMovementDao(),
             db.cashMovementDao(),
-            db.customerTransactionDao()
+            db.customerTransactionDao(),
+            db.customerDao()
         )
         movementDao = db.stockMovementDao()
         saleDao = db.saleDao()
@@ -133,6 +147,33 @@ class HesabiApp : Application() {
         )
         userRepository = com.hesabi.app.data.repository.UserRepository(db.userDao())
         authUseCase = com.hesabi.app.domain.AuthUseCase(userRepository)
+        
+        paymentUseCase = com.hesabi.app.domain.PaymentUseCase(
+            db = db,
+            customerDao = db.customerDao(),
+            customerTransactionDao = db.customerTransactionDao(),
+            supplierDao = db.supplierDao(),
+            supplierTransactionDao = db.supplierTransactionDao(),
+            cashMovementDao = db.cashMovementDao()
+        )
+
+        professionalReturnUseCase = com.hesabi.app.domain.ReturnUseCase(
+            db = db,
+            saleDao = db.saleDao(),
+            saleReturnDao = db.saleReturnDao(),
+            purchaseDao = db.purchaseDao(),
+            purchaseReturnDao = db.purchaseReturnDao(),
+            productDao = db.productDao(),
+            stockMovementDao = db.stockMovementDao(),
+            cashMovementDao = db.cashMovementDao(),
+            customerDao = db.customerDao(),
+            customerTransactionDao = db.customerTransactionDao(),
+            supplierDao = db.supplierDao(),
+            supplierTransactionDao = db.supplierTransactionDao()
+        )
+        this.db = db
+        this.stockMovementDao = db.stockMovementDao()
+        this.returnUseCase = professionalReturnUseCase
 
         // إنشاء أول مدير تلقائياً إذا كان النظام فارغاً
         CoroutineScope(Dispatchers.IO + SupervisorJob()).launch {

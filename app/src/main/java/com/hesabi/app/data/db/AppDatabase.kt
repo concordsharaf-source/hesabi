@@ -66,7 +66,7 @@ import com.hesabi.app.data.dao.UserDao
 	        SupplierTransaction::class,
 	        User::class
 	    ],
-	    version = 5,
+		    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

@@ -272,6 +272,17 @@ fun PurchaseFormScreen(
                 Text("إضافة بند")
             }
             Spacer(Modifier.height(12.dp))
+            if (state.paymentType == PurchasePaymentType.DEBT) {
+                OutlinedTextField(
+                    value = state.paidAmount,
+                    onValueChange = viewModel::onPaidAmountChange,
+                    label = { Text("المبلغ المدفوع (اختياري)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+                Spacer(Modifier.height(12.dp))
+            }
             OutlinedTextField(
                 value = state.note,
                 onValueChange = viewModel::onNoteChange,

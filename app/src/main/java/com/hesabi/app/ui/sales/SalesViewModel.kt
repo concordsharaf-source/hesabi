@@ -282,7 +282,11 @@ class SalesViewModel(app: HesabiApp) : ViewModel() {
         _state.update { it.copy(isCheckingOut = true, errorMessage = null) }
 
         viewModelScope.launch {
-            val paid = parseMinorUnits(current.paidInput)
+            val paid = if (current.paymentType == SalePaymentType.CASH) {
+                current.finalTotal
+            } else {
+                parseMinorUnits(current.paidInput)
+            }
             val input = CheckoutInput(
                 items = current.cart.toList(),
                 discountMinorUnits = current.discount,

@@ -27,10 +27,11 @@ data class PurchaseReturnUiState(
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
     val isSaved: Boolean = false,
-    val currencySymbol: String = ""
+    val currencySymbol: String = "",
+    val returnToCashbox: Boolean = true
 )
 
-class PurchaseReturnViewModel(app: HesabiApp, private val purchaseId: Long) : ViewModel() {
+class PurchaseReturnViewModel(private val app: HesabiApp, private val purchaseId: Long) : ViewModel() {
 
     val purchaseReturnUseCase = app.purchaseReturnUseCase
     val purchaseRepository = app.purchaseRepository
@@ -87,6 +88,10 @@ class PurchaseReturnViewModel(app: HesabiApp, private val purchaseId: Long) : Vi
         _state.update { it.copy(note = value) }
     }
 
+    fun onReturnToCashboxChange(value: Boolean) {
+        _state.update { it.copy(returnToCashbox = value) }
+    }
+
     fun save() {
         val current = _state.value
         val purchase = current.purchase ?: return
@@ -97,23 +102,17 @@ class PurchaseReturnViewModel(app: HesabiApp, private val purchaseId: Long) : Vi
         }
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true, errorMessage = null) }
-            val inputs = selected.map {
-                PurchaseReturnItemInput(
-                    purchaseItemId = it.item.id,
-                    productId = it.item.productId,
-                    productName = it.item.productName,
-                    quantity = it.quantity,
-                    unit = it.item.unit,
-                    unitPrice = it.item.unitPrice
+            val inputs = selected.map { it.item.id to it.quantity }
+            try {
+                (app.returnUseCase).processPurchaseReturn(
+                    purchaseId = purchaseId,
+                    itemsToReturn = inputs,
+                    returnToCashbox = current.returnToCashbox,
+                    note = current.note.ifBlank { null }
                 )
-            }
-            when (val result = purchaseReturnUseCase.execute(purchaseId, inputs, current.note.ifBlank { null })) {
-                is PurchaseReturnResult.Success -> {
-                    _state.update { it.copy(isSaving = false, isSaved = true) }
-                }
-                is PurchaseReturnResult.Failure -> {
-                    _state.update { it.copy(isSaving = false, errorMessage = result.message) }
-                }
+                _state.update { it.copy(isSaving = false, isSaved = true) }
+            } catch (e: Exception) {
+                _state.update { it.copy(isSaving = false, errorMessage = e.message ?: "فشل المرتجع") }
             }
         }
     }

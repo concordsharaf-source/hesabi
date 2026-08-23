@@ -49,7 +49,8 @@ class CheckoutUseCase(
     private val saleDao: SaleDao,
     private val movementDao: StockMovementDao,
     private val cashMovementDao: com.hesabi.app.data.dao.CashMovementDao,
-    private val customerTransactionDao: com.hesabi.app.data.dao.CustomerTransactionDao
+    private val customerTransactionDao: com.hesabi.app.data.dao.CustomerTransactionDao,
+    private val customerDao: com.hesabi.app.data.dao.CustomerDao
 ) {
 
     private val checkoutMutex = Mutex()
@@ -183,20 +184,28 @@ class CheckoutUseCase(
                     )
                 }
 
-                // 8. تسجيل دين العميل إذا كان هناك متبقي
-                if (remaining > 0 && customerId != null) {
-                    customerTransactionDao.insert(
-                        com.hesabi.app.domain.model.CustomerTransaction(
-                            customerId = customerId,
-                            type = com.hesabi.app.domain.model.CustomerTransactionType.SALE,
-                            amount = totals.final,
-                            paid = paid,
-                            remaining = remaining,
-                            referenceId = saleId,
-                            date = now,
-                            notes = "فاتورة بيع $invoiceNumber"
+                // 8. تسجيل دين العميل وتحديث رصيده
+                if (customerId != null) {
+                    val customer = customerDao.getById(customerId)
+                    if (customer != null) {
+                        customerDao.update(customer.copy(
+                            balance = customer.balance + remaining,
+                            updatedAt = now
+                        ))
+
+                        customerTransactionDao.insert(
+                            com.hesabi.app.domain.model.CustomerTransaction(
+                                customerId = customerId,
+                                type = com.hesabi.app.domain.model.CustomerTransactionType.SALE,
+                                amount = totals.final,
+                                paid = paid,
+                                remaining = remaining,
+                                referenceId = saleId,
+                                date = now,
+                                notes = "فاتورة بيع $invoiceNumber"
+                            )
                         )
-                    )
+                    }
                 }
 
                 val savedSale = saleDao.getById(saleId)

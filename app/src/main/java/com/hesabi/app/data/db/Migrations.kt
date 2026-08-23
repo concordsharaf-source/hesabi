@@ -270,3 +270,28 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         db.execSQL("CREATE INDEX IF NOT EXISTS `index_supplier_transactions_date` ON `supplier_transactions` (`date`)")
     }
 }
+
+/**
+ * مهاجرة 5 → 6 — التوافق مع PWA الاحترافي:
+ * - تحديث المستخدمين: تشفير PIN و mustChangePassword.
+ * - تحديث الفواتير: سجل المرتجعات التفصيلي في البنود.
+ * - تحديث الأرصدة: إضافة balance لسرعة العرض.
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // 1. تحديث المستخدمين
+        db.execSQL("ALTER TABLE `users` ADD COLUMN `passwordSalt` TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE `users` ADD COLUMN `mustChangePassword` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `users` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0")
+        
+        // 2. المرتجعات في الفواتير والبنود
+        db.execSQL("ALTER TABLE `sales` ADD COLUMN `returnedTotal` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `sale_items` ADD COLUMN `returnedQuantity` REAL NOT NULL DEFAULT 0.0")
+        db.execSQL("ALTER TABLE `purchases` ADD COLUMN `returnedTotal` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `purchase_items` ADD COLUMN `returnedQuantity` REAL NOT NULL DEFAULT 0.0")
+        
+        // 3. أرصدة الحسابات
+        db.execSQL("ALTER TABLE `customers` ADD COLUMN `balance` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE `suppliers` ADD COLUMN `balance` INTEGER NOT NULL DEFAULT 0")
+    }
+}

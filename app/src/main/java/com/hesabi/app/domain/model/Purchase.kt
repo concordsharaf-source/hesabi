@@ -33,6 +33,7 @@ data class Purchase(
     val remaining: Long = 0L,
     val paymentType: PurchasePaymentType = PurchasePaymentType.CASH_BOX,
     val note: String? = null,
+    val returnedTotal: Long = 0L,
     val isDeleted: Boolean = false
 )
 
@@ -71,5 +72,6 @@ data class PurchaseItem(
     val quantity: Double = 0.0,
     val unit: String = "حبة",
     /** الإجمالي لهذا البند بوحدة العملة الصغرى */
-    val itemTotal: Long = 0L
+    val itemTotal: Long = 0L,
+    val returnedQuantity: Double = 0.0
 )

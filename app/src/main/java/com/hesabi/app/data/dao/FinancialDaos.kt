@@ -69,6 +69,12 @@ interface CustomerTransactionDao {
 
     @Query("SELECT COALESCE(SUM(remaining), 0) FROM customer_transactions")
     fun observeTotalDebts(): Flow<Long>
+
+    @Query("SELECT * FROM customer_transactions WHERE customerId = :customerId AND remaining > 0 ORDER BY date ASC")
+    suspend fun getPendingInvoices(customerId: Long): List<CustomerTransaction>
+
+    @Update
+    suspend fun update(transaction: CustomerTransaction)
 }
 
 @Dao
@@ -84,4 +90,10 @@ interface SupplierTransactionDao {
 
     @Query("SELECT COALESCE(SUM(remaining), 0) FROM supplier_transactions")
     fun observeTotalSupplierDebts(): Flow<Long>
+
+    @Query("SELECT * FROM supplier_transactions WHERE supplierId = :supplierId AND remaining > 0 ORDER BY date ASC")
+    suspend fun getPendingSupplierInvoices(supplierId: Long): List<SupplierTransaction>
+
+    @Update
+    suspend fun update(transaction: SupplierTransaction)
 }

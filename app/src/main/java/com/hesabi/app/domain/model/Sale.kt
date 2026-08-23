@@ -34,6 +34,7 @@ data class Sale(
     val remaining: Long = 0L,
     val paymentMethod: PaymentMethod = PaymentMethod.CASH,
     val paymentType: SalePaymentType = SalePaymentType.CASH,
+    val returnedTotal: Long = 0L,
     val isDeleted: Boolean = false
 )
 
@@ -79,5 +80,6 @@ data class SaleItem(
     /** الإجمالي لهذا العنصر بوحدة العملة الصغرى */
     val itemTotal: Long = 0L,
     /** تكلفة الوحدة وقت البيع بوحدة العملة الصغرى — لا تتغير بتعديل المنتج لاحقًا */
-    val costPrice: Long = 0L
+    val costPrice: Long = 0L,
+    val returnedQuantity: Double = 0.0
 )

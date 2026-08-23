@@ -44,6 +44,9 @@ interface SupplierDao {
     @Query("UPDATE suppliers SET isDeleted = 1 WHERE id = :id")
     suspend fun softDelete(id: Long)
 
+    @Query("UPDATE suppliers SET balance = :balance, updatedAt = :now WHERE id = :id")
+    suspend fun updateBalance(id: Long, balance: Long, now: Long)
+
     /** هل المورد مرتبط بفواتير شراء؟ لمنع الحذف النهائي */
     @Query("SELECT COUNT(*) FROM purchases WHERE supplierId = :id AND isDeleted = 0")
     suspend fun countPurchases(id: Long): Long

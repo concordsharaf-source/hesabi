@@ -24,4 +24,7 @@ interface StockMovementDao {
 
     @Query("SELECT COUNT(*) FROM stock_movements WHERE productId = :productId")
     suspend fun countByProduct(productId: Long): Long
+
+    @Query("SELECT * FROM stock_movements ORDER BY date DESC LIMIT 200")
+    fun observeAll(): Flow<List<StockMovement>>
 }

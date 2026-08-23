@@ -18,6 +18,7 @@ data class Supplier(
     val phone: String? = null,
     val address: String? = null,
     val notes: String? = null,
+    val balance: Long = 0L,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
     val isDeleted: Boolean = false

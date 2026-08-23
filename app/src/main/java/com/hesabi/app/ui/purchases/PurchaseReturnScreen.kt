@@ -128,6 +128,22 @@ fun PurchaseReturnScreen(
                     singleLine = true
                 )
                 Spacer(Modifier.height(12.dp))
+                if (state.purchase?.supplierId != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = state.returnToCashbox,
+                            onCheckedChange = viewModel::onReturnToCashboxChange
+                        )
+                        Text(
+                            "استلام المبلغ نقداً في الصندوق (إلغاء التحديد يخصم من رصيد المورد)",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    Spacer(Modifier.height(12.dp))
+                }
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(

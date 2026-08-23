@@ -109,30 +109,9 @@ fun CustomerDetailScreen(
             onDismiss = { showPaymentDialog = false },
             onConfirm = { amount, note ->
                 scope.launch {
-                    val now = System.currentTimeMillis()
-                    // 1. تسجيل حركة دفع في سجل العميل (تنقص الدين)
-                    transactionDao.insert(
-                        CustomerTransaction(
-                            customerId = customerId,
-                            type = CustomerTransactionType.PAYMENT,
-                            amount = amount,
-                            paid = amount,
-                            remaining = -amount, // سيطرح من المجموع
-                            date = now,
-                            notes = note.ifBlank { "تسديد دين" }
-                        )
-                    )
-                    // 2. تسجيل حركة دخول للصندوق
-                    cashMovementDao.insert(
-                        CashMovement(
-                            amount = amount,
-                            type = CashMovementType.CUSTOMER_PAYMENT,
-                            description = "تسديد دين: ${customer?.name}",
-                            date = now,
-                            note = note
-                        )
-                    )
+                    app.paymentUseCase.recordCustomerPayment(customerId, amount, note)
                     showPaymentDialog = false
+                    customer = customerDao.getById(customerId)
                 }
             }
         )

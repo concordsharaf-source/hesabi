@@ -177,20 +177,29 @@ class PurchaseUseCase(
                     )
                 }
 
-                // 5. تسجيل دين المورد إذا كان هناك متبقي
-                if (remaining > 0 && supplierId != null) {
-                    supplierTransactionDao.insert(
-                        com.hesabi.app.domain.model.SupplierTransaction(
-                            supplierId = supplierId,
-                            type = com.hesabi.app.domain.model.SupplierTransactionType.PURCHASE,
-                            amount = subtotal,
-                            paid = paidAmount,
-                            remaining = remaining,
-                            referenceId = purchaseId,
-                            date = now,
-                            notes = "فاتورة شراء $invoiceNumber"
+                // 5. تسجيل دين المورد وتحديث رصيده
+                if (supplierId != null) {
+                    val supplier = supplierDao.getById(supplierId)
+                    if (supplier != null) {
+                        supplierDao.updateBalance(
+                            supplier.id,
+                            supplier.balance + remaining,
+                            now
                         )
-                    )
+
+                        supplierTransactionDao.insert(
+                            com.hesabi.app.domain.model.SupplierTransaction(
+                                supplierId = supplierId,
+                                type = com.hesabi.app.domain.model.SupplierTransactionType.PURCHASE,
+                                amount = subtotal,
+                                paid = paidAmount,
+                                remaining = remaining,
+                                referenceId = purchaseId,
+                                date = now,
+                                notes = "فاتورة شراء $invoiceNumber"
+                            )
+                        )
+                    }
                 }
 
                 val saved = purchaseDao.getById(purchaseId)

@@ -98,6 +98,7 @@ object Routes {
     const val CUSTOMERS = "customers"
     const val CUSTOMER_DETAIL = "customers/{customerId}"
     const val SUPPLIER_DETAIL = "suppliers/{supplierId}"
+    const val STOCK_MOVEMENTS = "stock_movements"
     const val USERS = "users"
     const val LOGIN = "login"
 
@@ -138,7 +139,7 @@ private fun HesabiNavHost(startRoute: String) {
             HomeScreen(
                 onNavigateToSales = { navController.navigate(Routes.SALES) },
                 onNavigateToProducts = { navController.navigate(Routes.PRODUCTS) },
-                onNavigateToInventory = { navController.navigate(Routes.INVENTORY) },
+                onNavigateToInventory = { navController.navigate(Routes.STOCK_MOVEMENTS) },
                 onNavigateToInvoices = { navController.navigate(Routes.INVOICES) },
                 onNavigateToSuppliers = { navController.navigate(Routes.SUPPLIERS) },
                 onNavigateToPurchases = { navController.navigate(Routes.PURCHASES) },
@@ -186,6 +187,12 @@ private fun HesabiNavHost(startRoute: String) {
 
         composable(Routes.USERS) {
             com.hesabi.app.ui.users.UserManagementScreen(
+                onBack = { navController.popBackStack() }
+            )
+        }
+        
+        composable(Routes.STOCK_MOVEMENTS) {
+            com.hesabi.app.ui.inventory.StockMovementScreen(
                 onBack = { navController.popBackStack() }
             )
         }

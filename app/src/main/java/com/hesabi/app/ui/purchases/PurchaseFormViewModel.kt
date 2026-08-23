@@ -36,7 +36,8 @@ data class PurchaseFormUiState(
     val errorMessage: String? = null,
     val isSaved: Boolean = false,
     val currencySymbol: String = "",
-    val initialSupplierId: Long? = null
+    val initialSupplierId: Long? = null,
+    val paidAmount: String = ""
 )
 
 class PurchaseFormViewModel(app: HesabiApp) : ViewModel() {
@@ -92,6 +93,12 @@ class PurchaseFormViewModel(app: HesabiApp) : ViewModel() {
         _state.update { it.copy(paymentType = type) }
     }
 
+    fun onPaidAmountChange(value: String) {
+        if (value.isEmpty() || value.all { it.isDigit() }) {
+            _state.update { it.copy(paidAmount = value) }
+        }
+    }
+
     fun save() {
         val current = _state.value
         val validItems = current.items.filter { it.quantity > 0 && it.unitPrice >= 0L }
@@ -119,7 +126,10 @@ class PurchaseFormViewModel(app: HesabiApp) : ViewModel() {
             }
             
             val totalValue = validItems.sumOf { it.itemTotal }
-            val paid = if (current.paymentType == PurchasePaymentType.DEBT) 0L else totalValue
+            val paid = when (current.paymentType) {
+                PurchasePaymentType.DEBT -> current.paidAmount.toLongOrNull() ?: 0L
+                else -> totalValue
+            }
             val remaining = totalValue - paid
 
             when (val result = purchaseUseCase.execute(

@@ -28,6 +28,8 @@ import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material.icons.rounded.Person
 import androidx.compose.material.icons.automirrored.rounded.Logout
+import androidx.compose.material.icons.rounded.History
+import androidx.compose.material.icons.rounded.List
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -328,7 +330,13 @@ fun HomeScreen(
                         tint = MaterialTheme.colorScheme.secondary,
                         onClick = onNavigateToUsers
                     )
-                    Spacer(modifier = Modifier.weight(1f))
+                    QuickAction(
+                        modifier = Modifier.weight(1f),
+                        icon = Icons.Rounded.List,
+                        label = "حركة المخزون",
+                        tint = MaterialTheme.colorScheme.tertiary,
+                        onClick = onNavigateToInventory // أو صفحة مخصصة للـ Audit Trail
+                    )
                 }
             }
             Spacer(Modifier.height(24.dp))

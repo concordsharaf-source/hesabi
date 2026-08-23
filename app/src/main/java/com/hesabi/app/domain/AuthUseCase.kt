@@ -18,8 +18,8 @@ class AuthUseCase(private val userRepository: UserRepository) {
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
 
     suspend fun login(username: String, pin: String): AuthResult {
-        val user = userRepository.getByUsername(username)
-        return if (user != null && user.passwordHash == pin && user.isActive) {
+        val user = userRepository.authenticate(username, pin)
+        return if (user != null) {
             _currentUser.value = user
             AuthResult.Success(user)
         } else {

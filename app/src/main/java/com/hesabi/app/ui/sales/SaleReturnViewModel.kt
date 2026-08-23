@@ -28,10 +28,11 @@ data class SaleReturnUiState(
     val isSaving: Boolean = false,
     val errorMessage: String? = null,
     val isSaved: Boolean = false,
-    val currencySymbol: String = ""
+    val currencySymbol: String = "",
+    val refundFromCashbox: Boolean = true
 )
 
-class SaleReturnViewModel(app: HesabiApp, private val saleId: Long) : ViewModel() {
+class SaleReturnViewModel(private val app: HesabiApp, private val saleId: Long) : ViewModel() {
 
     val saleReturnUseCase = app.saleReturnUseCase
     private val saleDao: SaleDao = app.saleDao
@@ -88,6 +89,10 @@ class SaleReturnViewModel(app: HesabiApp, private val saleId: Long) : ViewModel(
         _state.update { it.copy(note = value) }
     }
 
+    fun onRefundFromCashboxChange(value: Boolean) {
+        _state.update { it.copy(refundFromCashbox = value) }
+    }
+
     fun save() {
         val current = _state.value
         val sale = current.sale ?: return
@@ -98,23 +103,17 @@ class SaleReturnViewModel(app: HesabiApp, private val saleId: Long) : ViewModel(
         }
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true, errorMessage = null) }
-            val inputs = selected.map {
-                SaleReturnItemInput(
-                    saleItemId = it.item.id,
-                    productId = it.item.productId,
-                    productName = it.item.productName,
-                    quantity = it.quantity,
-                    unit = it.item.unit,
-                    unitPrice = it.item.unitPrice
+            val inputs = selected.map { it.item.id to it.quantity }
+            try {
+                (app.returnUseCase).processSaleReturn(
+                    saleId = saleId,
+                    itemsToReturn = inputs,
+                    refundFromCashbox = current.refundFromCashbox,
+                    note = current.note.ifBlank { null }
                 )
-            }
-            when (val result = saleReturnUseCase.execute(saleId, inputs, current.note.ifBlank { null })) {
-                is SaleReturnResult.Success -> {
-                    _state.update { it.copy(isSaving = false, isSaved = true) }
-                }
-                is SaleReturnResult.Failure -> {
-                    _state.update { it.copy(isSaving = false, errorMessage = result.message) }
-                }
+                _state.update { it.copy(isSaving = false, isSaved = true) }
+            } catch (e: Exception) {
+                _state.update { it.copy(isSaving = false, errorMessage = e.message ?: "فشل المرتجع") }
             }
         }
     }
