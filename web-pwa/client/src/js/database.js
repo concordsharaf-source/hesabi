@@ -222,6 +222,13 @@ export const db = {
     const products = await requestAsPromise(database.transaction("products", "readonly").objectStore("products").getAll());
     return products.filter((product) => includeDeleted || !product.isDeleted).sort((a, b) => a.name.localeCompare(b.name, "ar"));
   },
+  async listProductSupplierLinks() {
+    const database = await this.open(); const transaction = database.transaction(["purchases", "purchaseItems", "suppliers"], "readonly");
+    const [purchases, items, suppliers] = await Promise.all([requestAsPromise(transaction.objectStore("purchases").getAll()), requestAsPromise(transaction.objectStore("purchaseItems").getAll()), requestAsPromise(transaction.objectStore("suppliers").getAll())]);
+    const purchasesById = new Map(purchases.map((purchase) => [purchase.id, purchase])); const suppliersById = new Map(suppliers.filter((supplier) => !supplier.isDeleted).map((supplier) => [supplier.id, supplier])); const links = {};
+    items.forEach((item) => { const purchase = purchasesById.get(item.purchaseId); const supplier = purchase?.supplierId ? suppliersById.get(purchase.supplierId) : null; if (!purchase || !supplier) return; const previous = links[item.productId]; if (!previous || dateOrder(purchase) > dateOrder(previous.purchase)) links[item.productId] = { id: supplier.id, name: supplier.name, phone: supplier.phone, purchase: { id: purchase.id, date: purchase.date } }; });
+    return links;
+  },
   async getProduct(productId) { const database = await this.open(); return requestAsPromise(database.transaction("products", "readonly").objectStore("products").get(productId)); },
   async findProductByBarcode(barcode, excludeProductId = null) {
     const normalized = normalize(barcode); if (!normalized) return null;

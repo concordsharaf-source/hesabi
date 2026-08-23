@@ -101,6 +101,21 @@ test("تتيح صفحة دفعات الموردين اختيار المورد ا
   assert.match(permissions, /"new-supplier-payment"/);
 });
 
+test("يعرض اختصاري حساب المورد والاتصال بجانب المنتج المرتبط به في قوائم المنتج والمخزون والبيع", async () => {
+  const [app, styles] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /productSuppliers: \{\}/);
+  assert.match(app, /db\.listProductSupplierLinks\(\)/);
+  assert.match(app, /function productSupplierActions\(product\)/);
+  assert.match(app, /data-action="open-supplier-account"/);
+  assert.match(app, /phoneCallButton\(supplier\.phone, supplier\.name\)/);
+  assert.match(app, /sale-product-line/);
+  assert.match(styles, /\.product-supplier-actions,\.product-row-actions/);
+  assert.match(styles, /\.sale-product-line/);
+});
+
 test("يفصل عنوان ووصف الصندوق عن أزراره على شاشات الهاتف الصغيرة", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),

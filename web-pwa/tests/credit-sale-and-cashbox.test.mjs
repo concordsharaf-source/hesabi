@@ -57,3 +57,15 @@ test("دفعة المورد تختار المورد المستحق وتسوّي 
   assert.equal(secondCashbox.transferOutgoing, 20);
   await db.resetAllData();
 });
+
+test("يربط المنتج بآخر مورد مورّد له ليظهر اختصار حسابه واتصاله في القوائم", async () => {
+  await db.resetAllData();
+  const product = await db.createProduct({ name: "منتج مورد مرتبط", unit: "حبة", purchasePrice: 20, salePrice: 40, quantity: 0, minimumStock: 0 });
+  const supplier = await db.createSupplier({ name: "مورد المنتج", phone: "777123456" });
+  await db.createPurchase({ supplierId: supplier.id, paymentType: "نقدي", paymentMethod: "نقدي", items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 1, packageCost: 25, packageUnit: "حبة", salePrice: 45 }] });
+  const links = await db.listProductSupplierLinks();
+  assert.equal(links[product.id].id, supplier.id);
+  assert.equal(links[product.id].name, "مورد المنتج");
+  assert.equal(links[product.id].phone, "777123456");
+  await db.resetAllData();
+});
