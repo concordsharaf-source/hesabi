@@ -7,7 +7,7 @@ import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBacku
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { isSecondBackPress } from "./navigation-guard.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
-import { isNewContinuousBarcode } from "./scanner-session.js";
+import { isNewContinuousBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 
 const icon = (name, size = 20) => {
   const paths = {
@@ -967,7 +967,7 @@ async function startCameraScanner(overlay, onDetected, unsupportedMessage, manua
     video.srcObject = stream;
     await video.play();
     const detector = new window.BarcodeDetector({ formats: await getBarcodeFormats() });
-    const session = { stream, frame: null, reading: false, overlay, continuous, lastCode: "" };
+    const session = { stream, frame: null, reading: false, overlay, continuous, lastCode: "", absentSince: 0 };
     state.scanner = session;
     const scanFrame = async () => {
       if (state.scanner !== session || !overlay.isConnected) return;
@@ -976,6 +976,7 @@ async function startCameraScanner(overlay, onDetected, unsupportedMessage, manua
           const codes = await detector.detect(video);
           const code = codes[0]?.rawValue?.trim();
           if (code) {
+            session.absentSince = 0;
             if (continuous && !isNewContinuousBarcode(session.lastCode, code)) { session.frame = requestAnimationFrame(scanFrame); return; }
             session.reading = true;
             playScannerSuccessSound();
@@ -989,7 +990,13 @@ async function startCameraScanner(overlay, onDetected, unsupportedMessage, manua
             }
             if (closeAfterRead !== false) closeScannerDialog();
             return;
-          } else if (continuous) session.lastCode = "";
+          } else if (continuous && session.lastCode) {
+            session.absentSince ||= Date.now();
+            if (shouldReleaseContinuousBarcode(session.lastCode, session.absentSince)) {
+              session.lastCode = "";
+              session.absentSince = 0;
+            }
+          }
         } catch (error) { console.warn("تعذر تحليل الباركود", error); }
       }
       if (state.scanner === session) session.frame = requestAnimationFrame(scanFrame);
