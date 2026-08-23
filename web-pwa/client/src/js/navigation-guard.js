@@ -8,3 +8,9 @@ export const leaveAfterExitConfirmation = (goBack, schedule = setTimeout) => {
   goBack();
   schedule(goBack, 70);
 };
+
+export const primeExitGuardHistory = (historyApi, href) => {
+  const state = { ...(historyApi.state || {}), hesabiExitGuard: true };
+  historyApi.replaceState(state, "", href);
+  historyApi.pushState(state, "", href);
+};

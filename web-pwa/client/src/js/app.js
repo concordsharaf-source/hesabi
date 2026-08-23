@@ -6,7 +6,7 @@ import { calculatePackagePurchase, calculateSaleTotals, calculateTransferCollect
 import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { renderCustomerAccountHtml } from "./customer-account-print.js";
-import { getExitGuardAction, leaveAfterExitConfirmation } from "./navigation-guard.js";
+import { getExitGuardAction, leaveAfterExitConfirmation, primeExitGuardHistory } from "./navigation-guard.js";
 import { createPdfFileFromHtml, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf } from "./pdf-export.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 import { isNewContinuousBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
@@ -80,7 +80,7 @@ function installExitGuard() {
   if (exitGuardInstalled) return;
   exitGuardInstalled = true;
   const guardState = () => ({ ...(history.state || {}), hesabiExitGuard: true });
-  history.pushState(guardState(), "", window.location.href);
+  primeExitGuardHistory(history, window.location.href);
   window.addEventListener("popstate", () => {
     const action = getExitGuardAction({ exitAllowed, hasOpenOverlay: Boolean(document.querySelector("#scanner-backdrop") || document.querySelector("#dialog-backdrop")) });
     if (action === "allow-exit") return;
