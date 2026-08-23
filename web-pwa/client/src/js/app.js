@@ -135,8 +135,7 @@ function openExitConfirmDialog() {
     exitAllowed = true;
     closeDialog();
     leaveAfterExitConfirmation(
-      () => history.back(),
-      (callback, delay) => window.setTimeout(callback, delay),
+      (steps) => history.go(steps),
     );
   });
 }

@@ -8,17 +8,10 @@ test("يختار حارس الرجوع نافذة التأكيد أو إغلاق
   assert.equal(getExitGuardAction({ exitAllowed: true }), "allow-exit");
 });
 
-test("اختيار نعم للخروج ينفذ رجوعًا فوريًا ثم رجوعًا مؤجلًا للسماح بمغادرة التطبيق", () => {
-  let backCalls = 0;
-  let scheduled;
-  leaveAfterExitConfirmation(
-    () => { backCalls += 1; },
-    (callback, delay) => { scheduled = { callback, delay }; },
-  );
-  assert.equal(backCalls, 1);
-  assert.equal(scheduled.delay, 70);
-  scheduled.callback();
-  assert.equal(backCalls, 2);
+test("اختيار نعم للخروج يتجاوز نقطتي الحماية في قفزة واحدة لمغادرة التطبيق فورًا", () => {
+  let receivedSteps;
+  leaveAfterExitConfirmation((steps) => { receivedSteps = steps; });
+  assert.equal(receivedSteps, -2);
 });
 
 test("يهيئ حارس الرجوع نقطتي تاريخ من أول شاشة لمنع الخروج المباشر", () => {

@@ -4,9 +4,8 @@ export const getExitGuardAction = ({ exitAllowed = false, hasOpenOverlay = false
   return "confirm-exit";
 };
 
-export const leaveAfterExitConfirmation = (goBack, schedule = setTimeout) => {
-  goBack();
-  schedule(goBack, 70);
+export const leaveAfterExitConfirmation = (go, steps = -2) => {
+  go(steps);
 };
 
 export const primeExitGuardHistory = (historyApi, href) => {
