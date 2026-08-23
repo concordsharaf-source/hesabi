@@ -71,6 +71,29 @@ const phoneCallButton = (phone, name) => {
   const href = phoneHref(phone);
   return href ? `<a class="icon-button icon-button--call" href="${href}" aria-label="اتصال بـ ${escapeHtml(name)}" title="اتصال">${icon("phone", 18)}</a>` : "";
 };
+const canPickContacts = () => typeof navigator !== "undefined" && typeof navigator.contacts?.select === "function";
+const phoneFieldMarkup = (inputId, value = "") => `<label>رقم الهاتف<div class="phone-field__control"><input id="${inputId}" name="phone" type="tel" inputmode="tel" dir="ltr" value="${escapeHtml(value)}" />${canPickContacts() ? `<button id="${inputId}-contact-picker" class="button button--secondary phone-field__picker" type="button">${icon("users", 17)}<span>جهات الاتصال</span></button>` : ""}</div><small class="phone-field__hint">${canPickContacts() ? "اختر رقمًا من جهات اتصال الجهاز أو أدخله يدويًا." : "أدخل الرقم يدويًا؛ اختيار جهات الاتصال غير مدعوم في هذا الجهاز."}</small></label>`;
+async function pickContactPhone(phoneInput, nameInput) {
+  if (!canPickContacts()) { showToast("اختيار جهات الاتصال غير مدعوم في هذا الجهاز. أدخل الرقم يدويًا.", "error"); phoneInput.focus(); return; }
+  try {
+    const [contact] = await navigator.contacts.select(["name", "tel"], { multiple: false });
+    const phone = contact?.tel?.find(Boolean);
+    if (!phone) { showToast("جهة الاتصال المختارة لا تحتوي على رقم هاتف.", "error"); return; }
+    phoneInput.value = phone;
+    phoneInput.dispatchEvent(new Event("input", { bubbles: true }));
+    if (!nameInput.value.trim() && contact?.name?.[0]) nameInput.value = contact.name[0];
+    showToast("تم إدخال رقم جهة الاتصال.");
+  } catch (error) {
+    if (error?.name !== "AbortError") showToast("تعذر فتح جهات الاتصال. يمكنك إدخال الرقم يدويًا.", "error");
+  }
+}
+function bindContactPicker(overlay, phoneInputId, nameInputName = "name") {
+  const picker = overlay.querySelector(`#${phoneInputId}-contact-picker`);
+  if (!picker) return;
+  const phoneInput = overlay.querySelector(`#${phoneInputId}`);
+  const nameInput = overlay.querySelector(`[name=${nameInputName}]`);
+  picker.addEventListener("click", () => void pickContactPhone(phoneInput, nameInput));
+}
 const paymentChannelLabel = (invoice) => invoice?.paymentType === "آجل" ? "دين" : invoice?.paymentMethod === "تحويل" ? "تحويل" : "كاش";
 const assetBaseUrl = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage";
 const emptyImage = `${assetBaseUrl}/hesabi-empty-inventory_96623fe2.png`;
@@ -846,8 +869,9 @@ function printInvoiceThermal(invoice) {
 }
 
 function openSupplierDialog(supplier = null) {
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">${supplier ? "تحديث مورد" : "مورد جديد"}</span><h2>${supplier ? `تعديل ${escapeHtml(supplier.name)}` : "إضافة مورد"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="supplier-form" class="form-grid"><label>اسم المورد<input name="name" required maxlength="100" dir="rtl" value="${escapeHtml(supplier?.name || "")}" autofocus /></label><label>رقم الهاتف<input name="phone" type="tel" dir="ltr" value="${escapeHtml(supplier?.phone || "")}" /></label><label class="form-full">العنوان<input name="address" dir="rtl" value="${escapeHtml(supplier?.address || "")}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl">${escapeHtml(supplier?.notes || "")}</textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ ${icon("check", 17)}</button></div></form>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">${supplier ? "تحديث مورد" : "مورد جديد"}</span><h2>${supplier ? `تعديل ${escapeHtml(supplier.name)}` : "إضافة مورد"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="supplier-form" class="form-grid"><label>اسم المورد<input name="name" required maxlength="100" dir="rtl" value="${escapeHtml(supplier?.name || "")}" autofocus /></label>${phoneFieldMarkup("supplier-phone", supplier?.phone || "")}<label class="form-full">العنوان<input name="address" dir="rtl" value="${escapeHtml(supplier?.address || "")}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl">${escapeHtml(supplier?.notes || "")}</textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ ${icon("check", 17)}</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  bindContactPicker(overlay, "supplier-phone");
   overlay.querySelector("#supplier-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); if (supplier) await db.updateSupplier(supplier.id, values); else await db.createSupplier(values); await refresh(); closeDialog(); render(); showToast(supplier ? "تم تعديل المورد" : "تم حفظ المورد"); } catch (error) { showToast(error.message, "error"); } });
 }
 
@@ -868,8 +892,9 @@ function openSupplierPaymentReceipt(payment) {
 }
 
 function openCustomerDialog(customer = null) {
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">${customer ? "تحديث عميل" : "عميل جديد"}</span><h2>${customer ? `تعديل ${escapeHtml(customer.name)}` : "إضافة عميل"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="customer-form" class="form-grid"><label>اسم العميل<input name="name" required maxlength="100" dir="rtl" value="${escapeHtml(customer?.name || "")}" autofocus /></label><label>رقم الهاتف<input name="phone" type="tel" inputmode="tel" dir="ltr" value="${escapeHtml(customer?.phone || "")}" /></label><label class="form-full">العنوان<input name="address" dir="rtl" value="${escapeHtml(customer?.address || "")}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl">${escapeHtml(customer?.notes || "")}</textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ العميل ${icon("check", 17)}</button></div></form>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">${customer ? "تحديث عميل" : "عميل جديد"}</span><h2>${customer ? `تعديل ${escapeHtml(customer.name)}` : "إضافة عميل"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="customer-form" class="form-grid"><label>اسم العميل<input name="name" required maxlength="100" dir="rtl" value="${escapeHtml(customer?.name || "")}" autofocus /></label>${phoneFieldMarkup("customer-phone", customer?.phone || "")}<label class="form-full">العنوان<input name="address" dir="rtl" value="${escapeHtml(customer?.address || "")}" /></label><label class="form-full">ملاحظات<textarea name="notes" dir="rtl">${escapeHtml(customer?.notes || "")}</textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ العميل ${icon("check", 17)}</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  bindContactPicker(overlay, "customer-phone");
   overlay.querySelector("#customer-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); if (customer) await db.updateCustomer(customer.id, values); else await db.createCustomer(values); await refresh(); closeDialog(); state.view = "customers"; render(); showToast(customer ? "تم تعديل العميل" : "تم حفظ العميل"); } catch (error) { showToast(error.message, "error"); } });
 }
 

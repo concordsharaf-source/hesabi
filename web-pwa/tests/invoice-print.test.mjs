@@ -69,6 +69,16 @@ test("يضيف رابط اتصال آمنًا لعملاء وموردين لدي
   assert.match(app, /return href \? `<a class="icon-button icon-button--call"/);
 });
 
+test("يدعم اختيار رقم من جهات الاتصال لحقلي العميل والمورد مع إبقاء الإدخال اليدوي", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /navigator\.contacts\?\.select/);
+  assert.match(app, /navigator\.contacts\.select\(\["name", "tel"\], \{ multiple: false \}\)/);
+  assert.match(app, /phoneFieldMarkup\("customer-phone"/);
+  assert.match(app, /phoneFieldMarkup\("supplier-phone"/);
+  assert.match(app, /bindContactPicker\(overlay, "customer-phone"\)/);
+  assert.match(app, /bindContactPicker\(overlay, "supplier-phone"\)/);
+});
+
 test("يضع كشف حساب العميل بياناته في بطاقة واضحة بخط عربي مناسب للطباعة", () => {
   const html = renderCustomerAccountHtml({
     account: { customer: { name: "أحمد العميل", phone: "777123456", address: "صنعاء" }, totalSales: 80, totalPaid: 40, balance: 40, transactions: [] },

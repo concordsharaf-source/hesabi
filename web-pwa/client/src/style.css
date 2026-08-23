@@ -39,6 +39,10 @@ h1,h2,h3,strong { letter-spacing:-.02em; }
 .icon-button:hover { background:var(--green-pale); }
 .icon-button--call { color:var(--green-deep); background:var(--green-pale); }
 .icon-button--call:hover { color:#fff; background:var(--green); }
+.phone-field__control { display:flex; min-width:0; gap:8px; }
+.phone-field__control input { min-width:0; }
+.phone-field__picker { flex:0 0 auto; min-height:45px; padding:0 10px; white-space:nowrap; }
+.phone-field__hint { color:var(--muted); font-size:10px; font-weight:600; line-height:1.45; }
 .text-button { display:inline-flex; align-items:center; gap:4px; padding:3px 0; color:var(--green); background:none; font-size:12px; font-weight:800; }
 .text-button--danger { color:var(--danger); }
 .daily-ribbon { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:15px 16px; margin-bottom:16px; border:1px solid rgba(31,107,89,.13); background:rgba(255,255,250,.55); backdrop-filter:blur(9px); border-radius:15px; box-shadow:var(--shadow-soft); }
