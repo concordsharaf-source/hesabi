@@ -37,12 +37,15 @@ test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الد
   assert.match(pdfExport, /weight: "100 900"/);
   assert.match(pdfExport, /drawThermalInvoiceCanvas/);
   assert.match(pdfExport, /drawCustomerAccountCanvas/);
+  assert.match(pdfExport, /drawReportCanvas/);
+  assert.match(pdfExport, /createReportPdfFile/);
   assert.match(pdfExport, /shareOrDownloadCustomerAccountPdf/);
   assert.match(pdfExport, /context\.direction = "rtl"/);
   assert.match(app, /shareOrDownloadInvoicePdf/);
   assert.match(app, /shareInvoice\(invoice\)/);
   assert.match(app, /await db\.getCustomer\(invoice\.customerId\)/);
   assert.match(app, /shareOrDownloadCustomerAccountPdf\(/);
+  assert.match(app, /createReportPdfFile\(/);
 });
 
 test("يدعم البحث المباشر برقم الفاتورة ويعرض عددي المنتجات والفواتير بأرقام إنجليزية في الرئيسية", async () => {

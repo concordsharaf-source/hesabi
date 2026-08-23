@@ -191,6 +191,56 @@ function drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDate
   return canvas;
 }
 
+function drawReportCanvas({ rows, storeName, from, to }) {
+  const mm = 12;
+  const width = 210 * mm;
+  const dataRows = rows.slice(1);
+  const height = Math.max(297 * mm, (88 + Math.max(1, dataRows.length) * 15) * mm);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.direction = "rtl";
+  context.textBaseline = "middle";
+  const right = 196 * mm;
+  const left = 14 * mm;
+  const text = (value, x, y, align = "right", size = 28, weight = 400, color = "#172e27", direction = "rtl") => {
+    context.direction = direction;
+    context.textAlign = align;
+    context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
+    context.fillStyle = color;
+    context.fillText(String(value ?? ""), x, y);
+  };
+  let y = 20 * mm;
+  text(storeName || "حسابي", right, y, "right", 62, 700, "#174c3f");
+  y += 9 * mm;
+  text("تقرير تشغيلي", right, y, "right", 40, 700, "#172e27");
+  y += 9 * mm;
+  text(`الفترة: ${from || "بداية السجل"} إلى ${to || "اليوم"}`, right, y, "right", 26, 400, "#52645b");
+  y += 10 * mm;
+  context.strokeStyle = "#1f6b59";
+  context.lineWidth = 3;
+  context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke();
+  y += 11 * mm;
+  context.fillStyle = "#e8f2ee";
+  context.fillRect(left, y - 7 * mm, right - left, 14 * mm);
+  text(rows[0]?.[0] || "البند", right - 5 * mm, y, "right", 28, 700, "#145d4d");
+  text(rows[0]?.[1] || "القيمة", left + 5 * mm, y, "left", 28, 700, "#145d4d");
+  y += 15 * mm;
+  dataRows.forEach(([label, value], index) => {
+    if (index % 2 === 1) { context.fillStyle = "#f8fbfa"; context.fillRect(left, y - 7 * mm, right - left, 14 * mm); }
+    text(label, right - 5 * mm, y, "right", 28, 600);
+    text(value, left + 5 * mm, y, "left", 28, 700, /^[-−]/.test(String(value)) ? "#a74340" : "#172e27");
+    context.strokeStyle = "#cad8d3"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(left, y + 7 * mm); context.lineTo(right, y + 7 * mm); context.stroke();
+    y += 15 * mm;
+  });
+  y += 7 * mm;
+  text("تقرير صادر من حسابي للاستخدام التشغيلي.", width / 2, y, "center", 23, 400, "#52645b");
+  return canvas;
+}
+
 function createA4PdfFromCanvas(canvas) {
   const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait", compress: true });
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -249,6 +299,14 @@ export async function createCustomerAccountPdfFile({ account, storeName, formatM
   const pdf = createA4PdfFromCanvas(drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDateTime }));
   const blob = pdf.output("blob");
   if (!blob || blob.size < 800) throw new Error("تعذر إنشاء ملف PDF واضح لكشف الحساب.");
+  return new File([blob], filename, { type: "application/pdf" });
+}
+
+export async function createReportPdfFile({ rows, storeName, from, to, filename }) {
+  await loadCanvasArabicFont();
+  const pdf = createA4PdfFromCanvas(drawReportCanvas({ rows, storeName, from, to }));
+  const blob = pdf.output("blob");
+  if (!blob || blob.size < 800) throw new Error("تعذر إنشاء تقرير PDF عربي واضح.");
   return new File([blob], filename, { type: "application/pdf" });
 }
 
