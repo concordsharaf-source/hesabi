@@ -49,6 +49,7 @@ export const NAV_ITEMS = [
   { id: "purchases", label: "المشتريات", icon: "truck" },
   { id: "expenses", label: "المصروفات", icon: "wallet" },
   { id: "cashbox", label: "الصندوق", icon: "wallet" },
+  { id: "transfers", label: "التحويلات", icon: "transfer" },
   { id: "reports", label: "التقارير", icon: "chart" },
   { id: "accounts", label: "الحسابات", icon: "users" },
   { id: "settings", label: "الإعدادات", icon: "box" },
