@@ -128,20 +128,20 @@ html[data-theme="dark"], html[data-theme="dark"] body { background:radial-gradie
 .payment-method-toggle { display:grid; grid-template-columns:1fr 1fr; gap:0; padding:0; margin:0; overflow:hidden; border:1px solid var(--line); border-radius:11px; }.payment-method-toggle legend { grid-column:1 / -1; padding:7px 11px 5px; color:var(--ink); font-size:12px; font-weight:800; }.payment-method-toggle__button { min-height:45px; padding:0 10px; color:var(--muted); background:var(--paper); border-left:1px solid var(--line); font-family:inherit; font-size:13px; font-weight:800; transition:background .16s var(--ease-out), color .16s var(--ease-out), transform .16s var(--ease-out); }.payment-method-toggle__button:last-child { border-left:0; }.payment-method-toggle__button.is-cash.is-selected { color:#fff; background:#187247; }.payment-method-toggle__button.is-transfer.is-selected { color:#fff; background:#2868a7; }.payment-method-toggle__button:not(.is-selected):hover { background:var(--green-pale); }.payment-method-toggle__button:active { transform:scale(.98); }[data-theme="dark"] .payment-method-toggle__button { color:var(--muted); background:#1a2b25; border-color:var(--line); }[data-theme="dark"] .payment-method-toggle__button.is-cash.is-selected { color:#fff; background:#2c966c; }[data-theme="dark"] .payment-method-toggle__button.is-transfer.is-selected { color:#fff; background:#4388cf; }
 
 /* قراءة أوضح على الهاتف: تضخيم محسوب دون إزاحة واجهة المبيعات أو إحداث تمرير أفقي. */
-body { font-size:16px; line-height:1.55; }
-input,select,textarea { font-size:16px; }
-label { font-size:14px; }
-.button { font-size:14px; }
-.topbar__description,.dialog__subtext { font-size:14px; }
-.metric-card small,.metric-card span,.warning-row small,.invoice-row__main small,.entity-row__main small,.account-row__main small,.cloud-backup-row small { font-size:11px; }
-.metric-card strong { font-size:19px; }
-.warning-row strong,.invoice-row__main strong,.entity-row__main strong,.account-row__main strong { font-size:14px; }
-.invoice-detail>div,.checkout-lines>div,.payment-receipt div { font-size:14px; }
-.toast { font-size:14px; line-height:1.55; }
-.scanner-status,.scanner-notice { font-size:13px; }
+body { font-size:17px; line-height:1.6; }
+input,select,textarea { font-size:17px; }
+label { font-size:15px; }
+.button { font-size:15px; }
+.topbar__description,.dialog__subtext { font-size:15px; }
+.metric-card small,.metric-card span,.warning-row small,.invoice-row__main small,.entity-row__main small,.account-row__main small,.cloud-backup-row small { font-size:12px; }
+.metric-card strong { font-size:20px; }
+.warning-row strong,.invoice-row__main strong,.entity-row__main strong,.account-row__main strong { font-size:15px; }
+.invoice-detail>div,.checkout-lines>div,.payment-receipt div { font-size:15px; }
+.toast { font-size:15px; line-height:1.6; }
+.scanner-status,.scanner-notice { font-size:14px; }
 .scanner-session-note { padding:10px 11px; margin:-4px 0 12px; color:#174c3f; background:var(--green-pale); border:1px solid rgba(31,107,89,.34); border-radius:11px; font-size:12px; font-weight:800; line-height:1.7; }
 [data-theme="dark"] .scanner-session-note { color:#e8fff0; background:#244b3d; border-color:#79b899; }
-@media (max-width:599px) { .topbar h1 { font-size:30px; }.metric-card { min-height:122px; }.metric-card strong { font-size:18px; }.dialog__head h2 { font-size:21px; }.scanner-dialog__actions .button { min-height:46px; }.bottom-nav .nav-item { font-size:10px; }.cart-line__detail strong,.cart-line>strong { font-size:14px; }.cart-line__detail small { font-size:11px; } }
+@media (max-width:599px) { .topbar h1 { font-size:31px; }.metric-card { min-height:126px; }.metric-card strong { font-size:19px; }.dialog__head h2 { font-size:23px; }.scanner-dialog__actions .button { min-height:48px; }.bottom-nav .nav-item { font-size:11px; }.cart-line__detail strong,.cart-line>strong { font-size:15px; }.cart-line__detail small { font-size:12px; } }
 
 /* مدخلات العبوات في المشتريات: كل المخزون يبقى بوحدة البيع الأساسية، بينما تبقى العبوة مرئية في الفاتورة. */
 .purchase-line--pack { grid-template-columns:minmax(150px,1.15fr) repeat(3,minmax(92px,1fr)) auto auto; align-items:end; }
@@ -151,3 +151,8 @@ label { font-size:14px; }
 .purchase-line__total { align-self:end; padding-bottom:12px; color:var(--green-deep); white-space:nowrap; }
 @media (min-width:600px) { .purchase-line--pack { grid-template-columns:minmax(170px,1.2fr) repeat(3,minmax(104px,1fr)) minmax(110px,1fr) auto auto; } }
 @media (max-width:599px) { .purchase-line--pack { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }.purchase-line--pack>div { grid-column:1 / -1; }.purchase-line--pack .purchase-line__total { grid-column:1; justify-self:start; padding:4px 0; }.purchase-line--pack button { grid-column:2; justify-self:end; }.purchase-line--pack output { min-width:0; font-size:12px; } }
+
+/* الوضع الداكن يغيّر الواجهة فقط؛ الصور تبقى بألوانها الأصلية دون فلتر أو دمج لوني. */
+[data-theme="dark"] img { filter:none !important; mix-blend-mode:normal !important; }
+.purchase-search-control { display:flex; align-items:stretch; gap:8px; }.purchase-search-control input { min-width:0; flex:1; }.purchase-search-control .icon-button { flex:0 0 46px; min-height:46px; color:#fff; background:var(--green); border-color:var(--green); }
+.confirm-dialog { max-width:480px; }.confirm-dialog .dialog__subtext { max-width:36ch; }
