@@ -142,3 +142,12 @@ label { font-size:14px; }
 .scanner-session-note { padding:10px 11px; margin:-4px 0 12px; color:#174c3f; background:var(--green-pale); border:1px solid rgba(31,107,89,.34); border-radius:11px; font-size:12px; font-weight:800; line-height:1.7; }
 [data-theme="dark"] .scanner-session-note { color:#e8fff0; background:#244b3d; border-color:#79b899; }
 @media (max-width:599px) { .topbar h1 { font-size:30px; }.metric-card { min-height:122px; }.metric-card strong { font-size:18px; }.dialog__head h2 { font-size:21px; }.scanner-dialog__actions .button { min-height:46px; }.bottom-nav .nav-item { font-size:10px; }.cart-line__detail strong,.cart-line>strong { font-size:14px; }.cart-line__detail small { font-size:11px; } }
+
+/* مدخلات العبوات في المشتريات: كل المخزون يبقى بوحدة البيع الأساسية، بينما تبقى العبوة مرئية في الفاتورة. */
+.purchase-line--pack { grid-template-columns:minmax(150px,1.15fr) repeat(3,minmax(92px,1fr)) auto auto; align-items:end; }
+.purchase-line--pack>div { grid-column:1 / -1; }
+.purchase-line--pack label { min-width:0; }
+.purchase-line--pack output { display:flex; align-items:center; min-height:45px; padding:0 10px; color:var(--green-deep); background:var(--green-pale); border:1px solid var(--line); border-radius:9px; font-weight:900; white-space:nowrap; }
+.purchase-line__total { align-self:end; padding-bottom:12px; color:var(--green-deep); white-space:nowrap; }
+@media (min-width:600px) { .purchase-line--pack { grid-template-columns:minmax(170px,1.2fr) repeat(3,minmax(104px,1fr)) minmax(110px,1fr) auto auto; } }
+@media (max-width:599px) { .purchase-line--pack { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }.purchase-line--pack>div { grid-column:1 / -1; }.purchase-line--pack .purchase-line__total { grid-column:1; justify-self:start; padding:4px 0; }.purchase-line--pack button { grid-column:2; justify-self:end; }.purchase-line--pack output { min-width:0; font-size:12px; } }

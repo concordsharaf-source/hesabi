@@ -22,7 +22,8 @@ export const CURRENCIES = [
   { code: "USD", label: "دولار أمريكي ($)", symbol: "$" },
 ];
 
-export const UNITS = ["حبة", "علبة", "كرتون", "كيلو", "جرام", "لتر", "متر"];
+export const UNITS = ["حبة", "علبة", "كرتون", "كيس", "حزمة", "كيلو", "جرام", "لتر", "متر"];
+export const PACKAGE_UNITS = ["حبة", "علبة", "كرتون", "كيس", "حزمة", "ربطة", "صندوق"];
 
 export const PAYMENT_METHODS = ["نقدي", "تحويل"];
 

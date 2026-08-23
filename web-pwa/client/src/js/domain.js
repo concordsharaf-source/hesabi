@@ -26,7 +26,15 @@ export const calculateSaleTotals = (items, discount = 0) => {
   return { subtotal, discount: safeDiscount, total: roundMoney(subtotal - safeDiscount) };
 };
 
-export const calculatePurchaseTotals = (items) => roundMoney(items.reduce((sum, item) => sum + toNumber(item.unitCost) * toNumber(item.quantity), 0));
+export const calculatePackagePurchase = ({ packageQuantity = 1, unitsPerPackage = 1, packageCost = 0 } = {}) => {
+  const packages = Math.max(0, toNumber(packageQuantity));
+  const units = Math.max(0, toNumber(unitsPerPackage));
+  const cost = Math.max(0, toNumber(packageCost));
+  const quantity = packages * units;
+  return { packageQuantity: packages, unitsPerPackage: units, packageCost: cost, quantity, unitCost: units ? cost / units : 0, total: roundMoney(packages * cost) };
+};
+
+export const calculatePurchaseTotals = (items) => roundMoney(items.reduce((sum, item) => sum + (item.total === undefined ? toNumber(item.unitCost) * toNumber(item.quantity) : toNumber(item.total)), 0));
 
 export const remainingAmount = (total, paid) => roundMoney(Math.max(0, toNumber(total) - Math.min(Math.max(0, toNumber(paid)), toNumber(total))));
 export const paymentStatus = (total, paid) => {
