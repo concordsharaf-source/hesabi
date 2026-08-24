@@ -116,6 +116,16 @@ test("يعرض اختصاري حساب المورد والاتصال بجانب 
   assert.match(styles, /\.sale-product-line/);
 });
 
+test("يجمع قائمة إعادة الطلب حسب المورد ويتيح حسابه واتصاله ومشاركة الطلب", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /function openReorderDialog\(\)/);
+  assert.match(app, /data-action="open-reorder-list"/);
+  assert.match(app, /data-reorder-supplier/);
+  assert.match(app, /data-share-reorder/);
+  assert.match(app, /navigator\.share/);
+  assert.match(app, /phoneCallButton\(group\.supplier\.phone, group\.supplier\.name\)/);
+});
+
 test("تتيح شاشة البداية استعادة ملف حسابي قبل إنشاء متجر أو حسابات جديدة", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
   assert.match(app, /for="setup-restore-file"/);

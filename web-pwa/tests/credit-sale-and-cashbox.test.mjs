@@ -111,3 +111,24 @@ test("شراء الصيدلية يفرض التشغيلة والصلاحية و�
   assert.equal(storedPurchase.items[0].expiryDate, "2026-12-31");
   await db.resetAllData();
 });
+
+test("بيع الصيدلية يستهلك التشغيلة الأقرب انتهاءً أولًا ويترك الأحدث للمبيعات التالية", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "صيدلية التشغيلة", businessType: "صيدلية", currency: "YER" });
+  const product = await db.createProduct({ name: "علاج تشغيلي", unit: "حبة", purchasePrice: 0, salePrice: 20, quantity: 0, minimumStock: 1 });
+  const firstPurchase = await db.createPurchase({ items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 10, packageCost: 100, packageUnit: "علبة", salePrice: 20, batchNumber: "EARLY", expiryDate: "2026-11-30" }] });
+  await db.createPurchase({ items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 10, packageCost: 100, packageUnit: "علبة", salePrice: 20, batchNumber: "LATER", expiryDate: "2026-12-31" }] });
+  const sale = await db.completeSale({ items: [{ productId: product.id, quantity: 12 }], discount: 0, paidAmount: 240, paymentMethod: "نقدي" });
+  const batches = await db.listProductBatches(product.id); const invoice = await db.getInvoice(sale.id);
+  assert.deepEqual(batches.map((batch) => [batch.batchNumber, batch.remainingQuantity]), [["EARLY", 0], ["LATER", 8]]);
+  assert.deepEqual(invoice.items[0].batchAllocations.map((item) => [item.batchNumber, item.quantity]), [["EARLY", 10], ["LATER", 2]]);
+  assert.equal((await db.getProduct(product.id)).nearestExpiryDate, "2026-12-31");
+  await db.createSaleReturn({ saleId: sale.id, items: [{ saleItemId: invoice.items[0].id, quantity: 4 }] });
+  assert.deepEqual((await db.listProductBatches(product.id)).map((batch) => [batch.batchNumber, batch.remainingQuantity]), [["EARLY", 4], ["LATER", 8]]);
+  const purchaseDetails = await db.getPurchase(firstPurchase.id);
+  await db.createPurchaseReturn({ purchaseId: firstPurchase.id, items: [{ purchaseItemId: purchaseDetails.items[0].id, quantity: 2 }] });
+  assert.deepEqual((await db.listProductBatches(product.id)).map((batch) => [batch.batchNumber, batch.remainingQuantity]), [["EARLY", 2], ["LATER", 8]]);
+  const backup = await db.exportBackup(); await db.resetAllData(); await db.restoreBackup(backup);
+  assert.deepEqual((await db.listProductBatches(product.id)).map((batch) => [batch.batchNumber, batch.remainingQuantity]), [["EARLY", 2], ["LATER", 8]]);
+  await db.resetAllData();
+});
