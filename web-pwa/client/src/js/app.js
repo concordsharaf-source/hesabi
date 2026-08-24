@@ -38,6 +38,7 @@ const icon = (name, size = 20) => {
     chart: '<path d="M4 19V5M4 19h16M8 16v-5M12 16V7M16 16v-8"/>',
     history: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="M12 7v5l3 2"/>',
     rotate: '<path d="M21 12a9 9 0 0 0-15.5-6.2L3 8M3 3v5h5M3 12a9 9 0 0 0 15.5 6.2L21 16m0 5v-5h-5"/>',
+    restore: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="M12 8v4l3 2"/>',
     phone: '<path d="M22 16.9v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.8a2 2 0 0 1-.45 2.11L8.11 9.89a16 16 0 0 0 6 6l1.26-1.26a2 2 0 0 1 2.11-.45c.9.35 1.84.59 2.8.72A2 2 0 0 1 22 16.9Z"/>',
     moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
@@ -446,13 +447,22 @@ function accountsMarkup() {
 }
 
 function render() {
-  if (!state.settings?.setupCompleted) { root.innerHTML = setupMarkup(); bindEvents(); return; }
+  if (!state.settings?.setupCompleted) { root.innerHTML = setupMarkup(); injectSetupRestoreControl(); bindEvents(); return; }
   if (!state.currentUser) { root.innerHTML = loginMarkup(); bindEvents(); return; }
   if (state.currentUser.mustChangePin) { root.innerHTML = requiredPinMarkup(); bindEvents(); return; }
   if (!canAccessView(state.currentUser, state.view)) state.view = isAdmin(state.currentUser) ? "dashboard" : "sales";
   const body = { dashboard: dashboardMarkup, products: productsMarkup, inventory: inventoryMarkup, sales: salesMarkup, invoices: invoicesMarkup, customers: customersMarkup, "customer-payments": customerPaymentsMarkup, suppliers: suppliersMarkup, "supplier-payments": supplierPaymentsMarkup, purchases: purchasesMarkup, expenses: expensesMarkup, cashbox: cashboxMarkup, transfers: transfersMarkup, reports: reportsMarkup, accounts: accountsMarkup, settings: settingsMarkup }[state.view]?.() || dashboardMarkup();
   root.innerHTML = `<div class="app-shell">${navMarkup()}<main class="workspace">${body}</main>${salesScannerFabMarkup()}</div>`;
   bindEvents();
+}
+
+function injectSetupRestoreControl() {
+  const setupForm = root.querySelector("#setup-form");
+  if (!setupForm || root.querySelector("#setup-restore-file")) return;
+  const control = document.createElement("div");
+  control.className = "setup-restore";
+  control.innerHTML = `<span>لديك متجر محفوظ سابقًا؟</span><label class="button button--secondary button--wide" for="setup-restore-file">${icon("restore", 18)} استعادة بيانات سابقة</label><input id="setup-restore-file" type="file" accept="application/json,.json" hidden /><small>اختر ملف نسخة «حسابي» الاحتياطية؛ ستعود بعدها إلى الدخول بحساباتك ورموزك السابقة.</small>`;
+  setupForm.insertAdjacentElement("afterend", control);
 }
 
 function setupMarkup() {
@@ -493,6 +503,7 @@ function bindEvents() {
   root.querySelector("#cash-filter")?.addEventListener("change", async (event) => { state.cashFrom = event.currentTarget.querySelector("[name=from]").value; state.cashTo = event.currentTarget.querySelector("[name=to]").value; await refresh(); render(); });
   root.querySelector("#settings-form")?.addEventListener("submit", saveSettings);
   root.querySelector("#restore-file")?.addEventListener("change", restoreBackupFromFile);
+  root.querySelector("#setup-restore-file")?.addEventListener("change", restoreBackupFromFile);
   root.querySelectorAll("[data-cart-quantity]").forEach((input) => input.addEventListener("change", (event) => {
     setCartQuantity(event.currentTarget.dataset.cartQuantity, event.currentTarget.value, { renderNow: false });
     window.setTimeout(render, 0);

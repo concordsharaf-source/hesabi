@@ -69,3 +69,23 @@ test("يربط المنتج بآخر مورد مورّد له ليظهر اخت�
   assert.equal(links[product.id].phone, "777123456");
   await db.resetAllData();
 });
+
+test("استعادة النسخة قبل الإعداد تعيد بيانات المتجر وحساب الدخول السابقين دون إنشاء حساب جديد", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "متجر الاستعادة", businessType: "بقالة", currency: "YER" });
+  const admin = await db.createAccount({ username: "restore-admin", name: "مدير الاستعادة", role: "admin", pin: "2468" });
+  await db.createProduct({ name: "منتج محفوظ", unit: "حبة", purchasePrice: 25, salePrice: 50, quantity: 3, minimumStock: 1 });
+  const backup = await db.exportBackup();
+  const backupAccountCount = backup.stores.accounts.length;
+
+  await db.resetAllData();
+  assert.equal((await db.getSettings())?.setupCompleted, undefined);
+  await db.restoreBackup(backup);
+
+  assert.equal((await db.getSettings()).storeName, "متجر الاستعادة");
+  assert.equal((await db.listProducts()).some((product) => product.name === "منتج محفوظ"), true);
+  assert.equal((await db.listAccounts()).length, backupAccountCount);
+  const restoredUser = await db.authenticateAccount({ username: admin.username, pin: "2468" });
+  assert.equal(restoredUser.id, admin.id);
+  await db.resetAllData();
+});

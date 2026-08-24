@@ -116,6 +116,14 @@ test("يعرض اختصاري حساب المورد والاتصال بجانب 
   assert.match(styles, /\.sale-product-line/);
 });
 
+test("تتيح شاشة البداية استعادة ملف حسابي قبل إنشاء متجر أو حسابات جديدة", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /for="setup-restore-file"/);
+  assert.match(app, /id="setup-restore-file" type="file" accept="application\/json,\.json" hidden/);
+  assert.match(app, /root\.querySelector\("#setup-restore-file"\)\?\.addEventListener\("change", restoreBackupFromFile\)/);
+  assert.match(app, /ستعود بعدها إلى الدخول بحساباتك ورموزك السابقة/);
+});
+
 test("يفصل عنوان ووصف الصندوق عن أزراره على شاشات الهاتف الصغيرة", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
