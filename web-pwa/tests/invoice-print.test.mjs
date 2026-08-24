@@ -194,4 +194,5 @@ test("تظهر خدمة التوصيل وخيار تحميلها على العم
   assert.match(app, /delivery-compact/);
   assert.match(app, /delivery-choice--store/);
   assert.match(app, /delivery-choice--customer/);
+  assert.match(app, /checkout-launch/);
 });

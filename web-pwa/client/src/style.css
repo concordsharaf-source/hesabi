@@ -199,3 +199,9 @@ label { font-size:15px; }
 [data-theme="dark"] .checkout-submit { color:#ffffff; background:linear-gradient(135deg,#087f63 0%,#075845 100%); border:1px solid #56d3a7; box-shadow:0 8px 18px rgba(0,0,0,.32), inset 0 1px 0 rgba(255,255,255,.12); text-shadow:0 1px 1px rgba(0,0,0,.25); }
 [data-theme="dark"] .checkout-submit:hover { color:#ffffff; background:linear-gradient(135deg,#0b9a77 0%,#086951 100%); border-color:#8be8c7; }
 [data-theme="dark"] .checkout-submit:focus-visible { outline:3px solid #f3cf70; outline-offset:3px; }
+
+/* زر إتمام البيع بعد الإجمالي المبدئي في سلة المبيعات. */
+.checkout-launch { display:flex; align-items:center; justify-content:center; gap:9px; min-height:54px; margin-top:10px; border-radius:13px; font-size:17px; font-weight:900; box-shadow:0 8px 18px rgba(21,95,73,.18); }
+[data-theme="dark"] .checkout-launch { color:#ffffff; background:linear-gradient(135deg,#087f63 0%,#075845 100%); border:1px solid #6ce0b2; box-shadow:0 10px 22px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.13); text-shadow:0 1px 1px rgba(0,0,0,.3); }
+[data-theme="dark"] .checkout-launch:hover { color:#ffffff; background:linear-gradient(135deg,#0b9a77 0%,#086951 100%); border-color:#a1f0d0; }
+[data-theme="dark"] .checkout-launch:focus-visible { outline:3px solid #f3cf70; outline-offset:3px; }
