@@ -1207,32 +1207,42 @@ function addScannerCameraAssist(content, session, video) {
   const assist = getCameraAssistOptions(capabilities, settings);
   session.track = track;
   if (assist.canUseContinuousFocus) applyScannerTrackConstraint(session, { focusMode: "continuous" });
-  const controls = [];
-  if (assist.canZoom) controls.push(`<label class="scanner-assist__zoom">تكبير القراءة <input id="scanner-zoom" type="range" min="${assist.zoomMin}" max="${assist.zoomMax}" step="${assist.zoomStep}" value="${assist.zoomValue}" aria-label="تكبير الكاميرا" /><output id="scanner-zoom-value">${assist.zoomValue}×</output></label>`);
-  if (assist.canUseManualFocus) controls.push(`<label class="scanner-assist__focus">فوكِس يدوي <input id="scanner-focus" type="range" min="${assist.focusMin}" max="${assist.focusMax}" step="${assist.focusStep}" value="${assist.focusValue}" aria-label="ضبط فوكس الكاميرا" /><output id="scanner-focus-value">تلقائي</output></label>${assist.canUseContinuousFocus ? `<button id="scanner-focus-auto" class="button button--secondary scanner-assist__focus-auto" type="button">فوكِس تلقائي</button>` : ""}`);
-  if (assist.canUseTorch) controls.push(`<button id="scanner-torch" class="button button--secondary scanner-assist__torch" type="button">${icon("scan", 16)} إضاءة</button>`);
-  content.insertAdjacentHTML("beforeend", `<div class="scanner-assist"><p>${icon("scan", 16)} ثبّت الجوال ونظّف العدسة؛ ${controls.length ? "استخدم أدوات القراءة عند الحاجة." : "جرّب تقريب الرمز أو إعادة المحاولة عند تغيّر الإضاءة."}</p>${controls.length ? `<div class="scanner-assist__controls">${controls.join("")}</div>` : ""}</div>`);
-  const zoomInput = content.querySelector("#scanner-zoom");
-  zoomInput?.addEventListener("input", async (event) => {
-    const value = Number(event.currentTarget.value);
-    const applied = await applyScannerTrackConstraint(session, { zoom: value });
-    if (applied) content.querySelector("#scanner-zoom-value").value = `${value}×`;
-  });
-  const focusInput = content.querySelector("#scanner-focus");
-  focusInput?.addEventListener("input", async (event) => {
-    const value = Number(event.currentTarget.value);
-    const applied = await applyScannerTrackConstraint(session, { focusMode: "manual", focusDistance: value });
-    if (!applied) return;
-    session.manualFocus = true;
-    content.querySelector("#scanner-focus-value").value = "يدوي";
-    content.querySelector("#scanner-focus-auto")?.classList.remove("is-active");
-  });
-  content.querySelector("#scanner-focus-auto")?.addEventListener("click", async (event) => {
-    if (!await applyScannerTrackConstraint(session, { focusMode: "continuous" })) return;
-    session.manualFocus = false;
-    content.querySelector("#scanner-focus-value").value = "تلقائي";
-    event.currentTarget.classList.add("is-active");
-  });
+  const quickActions = [];
+  if (assist.canZoom) quickActions.push(`<button class="scanner-assist__action" data-scanner-adjustment="zoom" type="button">تكبير</button>`);
+  if (assist.canUseManualFocus) quickActions.push(`<button class="scanner-assist__action" data-scanner-adjustment="focus" type="button">فوكِس</button>`);
+  if (assist.canUseTorch) quickActions.push(`<button id="scanner-torch" class="scanner-assist__action" type="button">إضاءة</button>`);
+  const assistSlot = content.querySelector("#scanner-assist-slot");
+  if (!quickActions.length || !assistSlot) return;
+  assistSlot.innerHTML = `<div class="scanner-assist"><div class="scanner-assist__quick"><span>${icon("scan", 15)} تحسين القراءة</span><div>${quickActions.join("")}</div></div><div id="scanner-adjustment" class="scanner-adjustment" hidden></div></div>`;
+  const adjustment = assistSlot.querySelector("#scanner-adjustment");
+  const renderAdjustment = (kind) => {
+    const shouldClose = adjustment.dataset.kind === kind && !adjustment.hidden;
+    adjustment.hidden = shouldClose;
+    assistSlot.querySelectorAll("[data-scanner-adjustment]").forEach((button) => button.classList.toggle("is-active", !shouldClose && button.dataset.scannerAdjustment === kind));
+    if (shouldClose) return;
+    adjustment.dataset.kind = kind;
+    if (kind === "zoom") {
+      adjustment.innerHTML = `<label>تكبير القراءة <input id="scanner-zoom" type="range" min="${assist.zoomMin}" max="${assist.zoomMax}" step="${assist.zoomStep}" value="${assist.zoomValue}" aria-label="تكبير الكاميرا" /><output id="scanner-zoom-value">${assist.zoomValue}×</output></label>`;
+      adjustment.querySelector("#scanner-zoom").addEventListener("input", async (event) => {
+        const value = Number(event.currentTarget.value);
+        if (await applyScannerTrackConstraint(session, { zoom: value })) adjustment.querySelector("#scanner-zoom-value").value = `${value}×`;
+      });
+      return;
+    }
+    adjustment.innerHTML = `<label>فوكِس يدوي <input id="scanner-focus" type="range" min="${assist.focusMin}" max="${assist.focusMax}" step="${assist.focusStep}" value="${assist.focusValue}" aria-label="ضبط فوكس الكاميرا" /><output id="scanner-focus-value">تلقائي</output></label>${assist.canUseContinuousFocus ? `<button id="scanner-focus-auto" class="scanner-adjustment__auto" type="button">فوكِس تلقائي</button>` : ""}`;
+    adjustment.querySelector("#scanner-focus").addEventListener("input", async (event) => {
+      const value = Number(event.currentTarget.value);
+      if (!await applyScannerTrackConstraint(session, { focusMode: "manual", focusDistance: value })) return;
+      session.manualFocus = true;
+      adjustment.querySelector("#scanner-focus-value").value = "يدوي";
+    });
+    adjustment.querySelector("#scanner-focus-auto")?.addEventListener("click", async () => {
+      if (!await applyScannerTrackConstraint(session, { focusMode: "continuous" })) return;
+      session.manualFocus = false;
+      adjustment.querySelector("#scanner-focus-value").value = "تلقائي";
+    });
+  };
+  assistSlot.querySelectorAll("[data-scanner-adjustment]").forEach((button) => button.addEventListener("click", () => renderAdjustment(button.dataset.scannerAdjustment)));
   content.querySelector("#scanner-torch")?.addEventListener("click", async (event) => {
     const nextState = !session.torchOn;
     if (!await applyScannerTrackConstraint(session, { torch: nextState })) return;
@@ -1249,7 +1259,7 @@ async function startCameraScanner(overlay, onDetected, unsupportedMessage, manua
   const content = overlay.querySelector("#scanner-content");
   const retry = overlay.querySelector("#scanner-retry");
   retry.hidden = false;
-  content.innerHTML = `<div class="scanner-box"><video id="scanner-video" autoplay muted playsinline></video><div class="scanner-box__guide"><span>ضع الباركود داخل الإطار وثبّت الجوال</span></div></div><div id="scanner-status" class="scanner-status">${icon("scan", 16)}<span>وجّه الكاميرا نحو الباركود</span></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" /><button class="button button--secondary" type="submit">بحث بالكود الداخلي</button></form>` : ""}`;
+  content.innerHTML = `<div class="scanner-box"><video id="scanner-video" autoplay muted playsinline></video><div class="scanner-box__guide"><span>ضع الباركود داخل الإطار وثبّت الجوال</span></div></div><div id="scanner-status" class="scanner-status">${icon("scan", 16)}<span>وجّه الكاميرا نحو الباركود</span></div><div id="scanner-assist-slot"></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" /><button class="button button--secondary" type="submit">بحث بالكود الداخلي</button></form>` : ""}`;
   content.querySelector("#manual-barcode-form")?.addEventListener("submit", (event) => { event.preventDefault(); findInternalCode(new FormData(event.currentTarget).get("internalCode"), manualMode, { keepScannerOpen: true }); });
   try {
     let stream;

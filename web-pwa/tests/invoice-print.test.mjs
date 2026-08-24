@@ -135,12 +135,14 @@ test("يعرض الماسح أدوات مساعدة للكاميرا الضعي�
   assert.match(app, /getCameraAssistOptions/);
   assert.match(app, /focusMode: "continuous"/);
   assert.match(app, /focusDistance: value/);
-  assert.match(app, /scanner-focus-auto/);
+  assert.match(app, /data-scanner-adjustment="focus"/);
+  assert.match(app, /id="scanner-adjustment" class="scanner-adjustment" hidden/);
   assert.match(app, /torch: nextState/);
   assert.match(app, /CAMERA_SCAN_INTERVAL_MS/);
-  assert.match(app, /ثبّت الجوال ونظّف العدسة/);
+  assert.match(app, /تحسين القراءة/);
   assert.match(styles, /scanner-assist/);
-  assert.match(styles, /scanner-assist__zoom/);
+  assert.match(styles, /scanner-assist__quick/);
+  assert.match(styles, /scanner-adjustment\[hidden\]/);
 });
 
 test("تتيح شاشة البداية استعادة ملف حسابي قبل إنشاء متجر أو حسابات جديدة", async () => {
