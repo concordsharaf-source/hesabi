@@ -190,4 +190,5 @@ test("تظهر خدمة التوصيل وخيار تحميلها على العم
   assert.match(app, /deliveryLine/);
   assert.match(pdfExport, /invoice\.deliveryFee/);
   assert.match(thermalPrint, /invoice\.deliveryFee/);
+  assert.match(app, /checkout-submit/);
 });
