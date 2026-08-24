@@ -132,3 +132,33 @@ test("بيع الصيدلية يستهلك التشغيلة الأقرب انت�
   assert.deepEqual((await db.listProductBatches(product.id)).map((batch) => [batch.batchNumber, batch.remainingQuantity]), [["EARLY", 2], ["LATER", 8]]);
   await db.resetAllData();
 });
+
+test("تسجيل توصيل على حساب المحل يضيف مصروف توصيل ولا يضيفه إلى فاتورة البيع", async () => {
+  await db.resetAllData();
+  const product = await db.createProduct({ name: "منتج مع توصيل محل", unit: "حبة", purchasePrice: 20, salePrice: 100, quantity: 2, minimumStock: 0 });
+  const sale = await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], discount: 0, paidAmount: 100, paymentMethod: "نقدي", deliveryFee: 15, deliveryChargeType: "store" });
+  const invoice = await db.getInvoice(sale.id); const expenses = await db.listExpenses(); const cashbox = await db.getCashbox();
+  assert.equal(invoice.total, 100); assert.equal(invoice.deliveryFee, 15); assert.equal(invoice.deliveryChargeType, "store");
+  assert.equal(expenses.some((item) => item.category === "توصيل" && item.referenceId === sale.id && item.amount === 15), true);
+  assert.equal(cashbox.closingBalance, 85);
+  await db.resetAllData();
+});
+
+test("تسجيل توصيل على حساب العميل يضيف حركة مستقلة إلى رصيده دون مصروف محل", async () => {
+  await db.resetAllData();
+  const product = await db.createProduct({ name: "منتج مع توصيل عميل", unit: "حبة", purchasePrice: 20, salePrice: 100, quantity: 2, minimumStock: 0 });
+  const customer = await db.createCustomer({ name: "عميل التوصيل" });
+  const sale = await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], discount: 0, paidAmount: 100, paymentMethod: "نقدي", deliveryFee: 15, deliveryChargeType: "customer", customerId: customer.id });
+  const account = await db.getCustomerAccount(customer.id); const expenses = await db.listExpenses(); const cashbox = await db.getCashbox();
+  assert.equal(sale.deliveryChargeType, "customer"); assert.equal(account.balance, 15);
+  assert.equal(account.transactions.some((item) => item.type === "DELIVERY_CHARGE" && item.amount === 15 && item.referenceId === sale.id), true);
+  assert.equal(expenses.some((item) => item.referenceId === sale.id && item.category === "توصيل"), false); assert.equal(cashbox.closingBalance, 100);
+  await db.resetAllData();
+});
+
+test("توصيل العميل يتطلب اختيار عميل ولا يحفظ بيعًا ناقصًا", async () => {
+  await db.resetAllData();
+  const product = await db.createProduct({ name: "منتج تحقق التوصيل", unit: "حبة", purchasePrice: 20, salePrice: 100, quantity: 1, minimumStock: 0 });
+  await assert.rejects(() => db.completeSale({ items: [{ productId: product.id, quantity: 1 }], discount: 0, paidAmount: 100, paymentMethod: "نقدي", deliveryFee: 10, deliveryChargeType: "customer" }), /اختر العميل/);
+  assert.equal((await db.listSales()).length, 0); await db.resetAllData();
+});

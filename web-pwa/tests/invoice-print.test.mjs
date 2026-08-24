@@ -177,3 +177,17 @@ test("يضع كشف حساب العميل بياناته في بطاقة واض�
   assert.match(html, /customer-card/);
   assert.match(html, /family=Cairo/);
 });
+
+test("تظهر خدمة التوصيل وخيار تحميلها على العميل أو المحل في مراجعة البيع والفاتورة", async () => {
+  const [app, database, pdfExport, thermalPrint] = await Promise.all([readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"), readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"), readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8"), readFile(new URL("../client/src/js/invoice-print.js", import.meta.url), "utf8")]);
+  assert.match(app, /name="deliveryFee"/);
+  assert.match(app, /name="deliveryChargeType"/);
+  assert.match(app, /value="store"/);
+  assert.match(app, /value="customer"/);
+  assert.match(app, /التوصيل يُضاف لحساب العميل/);
+  assert.match(database, /توصيل على حساب العميل/);
+  assert.match(database, /category: "توصيل"/);
+  assert.match(app, /deliveryLine/);
+  assert.match(pdfExport, /invoice\.deliveryFee/);
+  assert.match(thermalPrint, /invoice\.deliveryFee/);
+});
