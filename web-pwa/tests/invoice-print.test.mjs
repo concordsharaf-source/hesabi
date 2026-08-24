@@ -126,6 +126,21 @@ test("يجمع قائمة إعادة الطلب حسب المورد ويتيح �
   assert.match(app, /phoneCallButton\(group\.supplier\.phone, group\.supplier\.name\)/);
 });
 
+test("يعرض الماسح أدوات مساعدة للكاميرا الضعيفة ويخفف تكرار تحليل الإطارات", async () => {
+  const [app, styles] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /getScannerCameraConstraints/);
+  assert.match(app, /getCameraAssistOptions/);
+  assert.match(app, /focusMode: "continuous"/);
+  assert.match(app, /torch: nextState/);
+  assert.match(app, /CAMERA_SCAN_INTERVAL_MS/);
+  assert.match(app, /ثبّت الجوال ونظّف العدسة/);
+  assert.match(styles, /scanner-assist/);
+  assert.match(styles, /scanner-assist__zoom/);
+});
+
 test("تتيح شاشة البداية استعادة ملف حسابي قبل إنشاء متجر أو حسابات جديدة", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
   assert.match(app, /for="setup-restore-file"/);

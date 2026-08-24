@@ -9,7 +9,7 @@ import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { getExitGuardAction, leaveAfterExitConfirmation, primeExitGuardHistory } from "./navigation-guard.js";
 import { createReportPdfFile, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf } from "./pdf-export.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
-import { isNewContinuousBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
+import { CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isNewContinuousBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 
 const icon = (name, size = 20) => {
   const paths = {
@@ -1193,27 +1193,64 @@ function renderUnsupportedScanner(overlay, message, manualMode, onManualEntry) {
   content.querySelector("#scanner-manual-entry")?.addEventListener("click", onManualEntry);
 }
 
+async function applyScannerTrackConstraint(session, advanced) {
+  if (!session?.track?.applyConstraints || state.scanner !== session) return false;
+  try { await session.track.applyConstraints({ advanced: [advanced] }); return true; }
+  catch { return false; }
+}
+
+function addScannerCameraAssist(content, session, video) {
+  const track = session.stream?.getVideoTracks?.()[0];
+  if (!track) return;
+  const capabilities = typeof track.getCapabilities === "function" ? track.getCapabilities() || {} : {};
+  const settings = typeof track.getSettings === "function" ? track.getSettings() || {} : {};
+  const assist = getCameraAssistOptions(capabilities, settings);
+  session.track = track;
+  if (assist.canUseContinuousFocus) applyScannerTrackConstraint(session, { focusMode: "continuous" });
+  const controls = [];
+  if (assist.canZoom) controls.push(`<label class="scanner-assist__zoom">تكبير القراءة <input id="scanner-zoom" type="range" min="${assist.zoomMin}" max="${assist.zoomMax}" step="${assist.zoomStep}" value="${assist.zoomValue}" aria-label="تكبير الكاميرا" /><output id="scanner-zoom-value">${assist.zoomValue}×</output></label>`);
+  if (assist.canUseTorch) controls.push(`<button id="scanner-torch" class="button button--secondary scanner-assist__torch" type="button">${icon("scan", 16)} إضاءة</button>`);
+  content.insertAdjacentHTML("beforeend", `<div class="scanner-assist"><p>${icon("scan", 16)} ثبّت الجوال ونظّف العدسة؛ ${controls.length ? "استخدم أدوات القراءة عند الحاجة." : "جرّب تقريب الرمز أو إعادة المحاولة عند تغيّر الإضاءة."}</p>${controls.length ? `<div class="scanner-assist__controls">${controls.join("")}</div>` : ""}</div>`);
+  const zoomInput = content.querySelector("#scanner-zoom");
+  zoomInput?.addEventListener("input", async (event) => {
+    const value = Number(event.currentTarget.value);
+    const applied = await applyScannerTrackConstraint(session, { zoom: value });
+    if (applied) content.querySelector("#scanner-zoom-value").value = `${value}×`;
+  });
+  content.querySelector("#scanner-torch")?.addEventListener("click", async (event) => {
+    const nextState = !session.torchOn;
+    if (!await applyScannerTrackConstraint(session, { torch: nextState })) return;
+    session.torchOn = nextState;
+    event.currentTarget.classList.toggle("is-active", nextState);
+    event.currentTarget.textContent = nextState ? "إضاءة مفعّلة" : "إضاءة";
+  });
+  video.addEventListener("click", () => { if (assist.canUseContinuousFocus) applyScannerTrackConstraint(session, { focusMode: "continuous" }); });
+}
+
 async function startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry = null, continuous = false) {
   if (!hasBarcodeScannerSupport()) { renderUnsupportedScanner(overlay, unsupportedMessage, manualMode, onManualEntry); return; }
   stopScanner();
   const content = overlay.querySelector("#scanner-content");
   const retry = overlay.querySelector("#scanner-retry");
   retry.hidden = false;
-  content.innerHTML = `<div class="scanner-box"><video id="scanner-video" autoplay muted playsinline></video><div class="scanner-box__guide"><span>ضع الباركود داخل الإطار</span></div></div><div id="scanner-status" class="scanner-status">${icon("scan", 16)}<span>وجّه الكاميرا نحو الباركود</span></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" /><button class="button button--secondary" type="submit">بحث بالكود الداخلي</button></form>` : ""}`;
+  content.innerHTML = `<div class="scanner-box"><video id="scanner-video" autoplay muted playsinline></video><div class="scanner-box__guide"><span>ضع الباركود داخل الإطار وثبّت الجوال</span></div></div><div id="scanner-status" class="scanner-status">${icon("scan", 16)}<span>وجّه الكاميرا نحو الباركود</span></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" /><button class="button button--secondary" type="submit">بحث بالكود الداخلي</button></form>` : ""}`;
   content.querySelector("#manual-barcode-form")?.addEventListener("submit", (event) => { event.preventDefault(); findInternalCode(new FormData(event.currentTarget).get("internalCode"), manualMode, { keepScannerOpen: true }); });
   try {
     let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }); }
+    try { stream = await navigator.mediaDevices.getUserMedia(getScannerCameraConstraints()); }
     catch { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
     const video = content.querySelector("#scanner-video");
     video.srcObject = stream;
     await video.play();
     const detector = new window.BarcodeDetector({ formats: await getBarcodeFormats() });
-    const session = { stream, frame: null, reading: false, overlay, continuous, lastCode: "", absentSince: 0 };
+    const session = { stream, frame: null, reading: false, overlay, continuous, lastCode: "", absentSince: 0, lastScanAt: 0, track: null, torchOn: false };
     state.scanner = session;
+    addScannerCameraAssist(content, session, video);
     const scanFrame = async () => {
       if (state.scanner !== session || !overlay.isConnected) return;
-      if (!session.reading && video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+      const now = Date.now();
+      if (!session.reading && now - session.lastScanAt >= CAMERA_SCAN_INTERVAL_MS && video.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+        session.lastScanAt = now;
         try {
           const codes = await detector.detect(video);
           const code = codes[0]?.rawValue?.trim();
