@@ -13,10 +13,11 @@ test("يطلب الماسح الكاميرا الخلفية بدقة وإيقا�
 });
 
 test("لا تظهر أدوات التكبير والإضاءة إلا حين تدعمها الكاميرا", () => {
-  const full = getCameraAssistOptions({ zoom: { min: 1, max: 4, step: 0.25 }, torch: true, focusMode: ["continuous", "single-shot"] }, { zoom: 2 });
-  assert.deepEqual(full, { canZoom: true, zoomMin: 1, zoomMax: 4, zoomStep: 0.25, zoomValue: 2, canUseTorch: true, canUseContinuousFocus: true });
+  const full = getCameraAssistOptions({ zoom: { min: 1, max: 4, step: 0.25 }, focusDistance: { min: 0, max: 10, step: 0.5 }, torch: true, focusMode: ["continuous", "single-shot"] }, { zoom: 2, focusDistance: 4 });
+  assert.deepEqual(full, { canZoom: true, zoomMin: 1, zoomMax: 4, zoomStep: 0.25, zoomValue: 2, canUseManualFocus: true, focusMin: 0, focusMax: 10, focusStep: 0.5, focusValue: 4, canUseTorch: true, canUseContinuousFocus: true });
   const basic = getCameraAssistOptions({}, {});
   assert.equal(basic.canZoom, false);
+  assert.equal(basic.canUseManualFocus, false);
   assert.equal(basic.canUseTorch, false);
   assert.equal(basic.canUseContinuousFocus, false);
 });

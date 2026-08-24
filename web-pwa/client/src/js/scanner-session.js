@@ -15,17 +15,27 @@ export const getScannerCameraConstraints = () => ({
 
 export const getCameraAssistOptions = (capabilities = {}, settings = {}) => {
   const zoom = capabilities?.zoom || {};
+  const focusDistance = capabilities?.focusDistance || {};
   const zoomMin = Number(zoom.min);
   const zoomMax = Number(zoom.max);
+  const focusMin = Number(focusDistance.min);
+  const focusMax = Number(focusDistance.max);
   const canZoom = finiteNumber(zoomMin) && finiteNumber(zoomMax) && zoomMax > zoomMin;
+  const canUseManualFocus = finiteNumber(focusMin) && finiteNumber(focusMax) && focusMax > focusMin;
   const focusModes = Array.isArray(capabilities?.focusMode) ? capabilities.focusMode : [capabilities?.focusMode].filter(Boolean);
   const currentZoom = Number(settings?.zoom);
+  const currentFocus = Number(settings?.focusDistance);
   return {
     canZoom,
     zoomMin: canZoom ? zoomMin : null,
     zoomMax: canZoom ? zoomMax : null,
     zoomStep: canZoom && finiteNumber(zoom.step) && Number(zoom.step) > 0 ? Number(zoom.step) : 0.1,
     zoomValue: canZoom ? Math.min(zoomMax, Math.max(zoomMin, finiteNumber(currentZoom) ? currentZoom : zoomMin)) : null,
+    canUseManualFocus,
+    focusMin: canUseManualFocus ? focusMin : null,
+    focusMax: canUseManualFocus ? focusMax : null,
+    focusStep: canUseManualFocus && finiteNumber(focusDistance.step) && Number(focusDistance.step) > 0 ? Number(focusDistance.step) : (focusMax - focusMin) / 100,
+    focusValue: canUseManualFocus ? Math.min(focusMax, Math.max(focusMin, finiteNumber(currentFocus) ? currentFocus : (focusMin + focusMax) / 2)) : null,
     canUseTorch: capabilities?.torch === true,
     canUseContinuousFocus: focusModes.includes("continuous"),
   };

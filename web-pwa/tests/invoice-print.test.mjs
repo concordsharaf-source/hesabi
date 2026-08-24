@@ -134,6 +134,8 @@ test("يعرض الماسح أدوات مساعدة للكاميرا الضعي�
   assert.match(app, /getScannerCameraConstraints/);
   assert.match(app, /getCameraAssistOptions/);
   assert.match(app, /focusMode: "continuous"/);
+  assert.match(app, /focusDistance: value/);
+  assert.match(app, /scanner-focus-auto/);
   assert.match(app, /torch: nextState/);
   assert.match(app, /CAMERA_SCAN_INTERVAL_MS/);
   assert.match(app, /ثبّت الجوال ونظّف العدسة/);
