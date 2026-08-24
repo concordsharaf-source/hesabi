@@ -211,4 +211,8 @@ test("يعرض الخصم العام فقط في مراجعة البيع ويخ�
   assert.match(style, /\.delivery-compact__amount,\.delivery-choice \{ min-height:45px; height:100%;/);
   assert.match(style, /\.nav-item \{[^}]*color:#315a4b;/);
   assert.match(style, /\[data-theme="dark"\] \.bottom-nav \.nav-item \{ color:#d9f4e6; \}/);
+  assert.match(app, /metric-card--\$\{tone\}/);
+  assert.match(style, /\.metric-card \{[^}]*background:#12634f;[^}]*border:2px solid #76d8b2;/);
+  assert.match(style, /\.metric-card--sales,\.metric-card--cash \{ background:#087a58; border-color:#8be8c8;/);
+  assert.match(style, /\.metric-card\.is-negative \{ background:#a73340; border-color:#ffc3ca;/);
 });
