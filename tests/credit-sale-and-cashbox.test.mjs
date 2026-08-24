@@ -3,6 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { db } from "../client/src/js/database.js";
 import { BUSINESS_PROFILES } from "../client/src/js/constants.js";
+import { createCloudBackupPackage, decodeCloudBackupPackage } from "../client/src/js/cloud-backup-codec.js";
 
 test("البيع الآجل يفرض صفرًا كدفعة أولى وتبقى الحوالة خارج رصيد الصندوق", async () => {
   await db.resetAllData();
@@ -175,5 +176,21 @@ test("يحسب خصم البيع العام وخصم الصنف كنسب مئو�
   const invoice = await db.getInvoice(sale.id);
   assert.equal(invoice.items[0].discount, 20);
   assert.equal(invoice.items[0].total, 180);
+  await db.resetAllData();
+});
+
+test("ينشئ النسخة السحابية المجزأة ثم يستعيدها فعليًا إلى IndexedDB", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "متجر النسخة السحابية", businessType: "بقالة", currency: "YER" });
+  const product = await db.createProduct({ name: "منتج النسخة السحابية", unit: "حبة", purchasePrice: 12, salePrice: 25, quantity: 7, minimumStock: 2 });
+  const backup = await db.exportBackup();
+  const packed = await createCloudBackupPackage(backup, { chunkCharLimit: 1024, preferCompression: false });
+  assert.ok(packed.chunks.length > 1);
+  await db.resetAllData();
+  assert.equal((await db.getProduct(product.id)), undefined);
+  const restoredPayload = await decodeCloudBackupPackage(packed.metadata, packed.chunks);
+  await db.restoreBackup(restoredPayload);
+  assert.equal((await db.getSettings()).storeName, "متجر النسخة السحابية");
+  assert.equal((await db.getProduct(product.id)).quantity, 7);
   await db.resetAllData();
 });

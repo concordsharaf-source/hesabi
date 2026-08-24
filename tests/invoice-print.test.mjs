@@ -197,14 +197,18 @@ test("تظهر خدمة التوصيل وخيار تحميلها على العم
   assert.match(app, /checkout-launch/);
 });
 
-test("يدعم خصم البيع العام وخصم الصنف بالمبلغ أو النسبة ويعرض بطاقات الإجماليات بتباين موحد", async () => {
+test("يعرض الخصم العام فقط في مراجعة البيع ويخفي خصم السطر والسعر المبدئي", async () => {
   const [app, domain, style] = await Promise.all([readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"), readFile(new URL("../client/src/js/domain.js", import.meta.url), "utf8"), readFile(new URL("../client/src/style.css", import.meta.url), "utf8")]);
   assert.match(domain, /calculateDiscountAmount/);
   assert.match(domain, /raw\.endsWith\("%"\)/);
-  assert.match(app, /data-cart-discount/);
-  assert.match(app, /data-cart-line-discount/);
+  assert.match(app, /name="discount"/);
   assert.match(app, /placeholder="0 أو 20%"/);
+  assert.doesNotMatch(app, /data-cart-discount/);
+  assert.doesNotMatch(app, /data-cart-line-discount/);
+  assert.doesNotMatch(app, /الإجمالي المبدئي/);
   assert.match(style, /inventory-summary div,\.account-summary>div/);
   assert.match(style, /\.delivery-compact__amount,\.delivery-choice \{ box-sizing:border-box; align-self:stretch; width:100%; height:100%;/);
   assert.match(style, /\.delivery-compact__amount,\.delivery-choice \{ min-height:45px; height:100%;/);
+  assert.match(style, /\.nav-item \{[^}]*color:#315a4b;/);
+  assert.match(style, /\[data-theme="dark"\] \.bottom-nav \.nav-item \{ color:#d9f4e6; \}/);
 });

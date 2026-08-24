@@ -29,3 +29,12 @@ test("لا يربط عامل الخدمة تخزينه الابتدائي بمس
   assert.match(worker, /cache: "no-store"/);
   assert.match(main, /navigator\.serviceWorker\.register\("\/service-worker\.js"\)/);
 });
+
+test("يستمر التطبيق محليًا بعد أول تحميل عبر كاش الواجهة والأصول", async () => {
+  const worker = await readFile(new URL("../client/public/service-worker.js", import.meta.url), "utf8");
+  assert.match(worker, /const APP_SHELL = \[SCOPE_PATH, `\$\{SCOPE_PATH\}manifest\.json`, `\$\{SCOPE_PATH\}service-worker\.js`\]/);
+  assert.match(worker, /pendingUrls\.push\(\.\.\.discoveredUrls/);
+  assert.match(worker, /if \(event\.request\.mode === "navigate"\)/);
+  assert.match(worker, /cached \|\| fetch\(event\.request\)/);
+  assert.match(worker, /cache\.put\(event\.request, response\.clone\(\)\)/);
+});

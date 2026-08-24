@@ -20,6 +20,14 @@ test("يقتصر الكاشير على المبيعات والفواتير", () 
   assert.equal(canAccessView(cashier, "reports"), false);
 });
 
+test("يقيّد الرفع والاستعادة السحابية بالأدمن فقط", () => {
+  const cloudActions = ["open-cloud-auth", "cloud-upload-backup", "cloud-refresh-backups", "cloud-restore-backup", "cloud-delete-backup", "cloud-signout"];
+  for (const action of cloudActions) {
+    assert.equal(canUseAction(admin, action), true, `admin should use ${action}`);
+    assert.equal(canUseAction(cashier, action), false, `cashier should not use ${action}`);
+  }
+});
+
 test("يمنع الكاشير من إنشاء المنتجات والتقارير وإدارة الحسابات", () => {
   assert.equal(canUseAction(cashier, "new-product"), false);
   assert.equal(canUseAction(cashier, "export-report"), false);
