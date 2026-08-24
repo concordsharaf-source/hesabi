@@ -25,6 +25,19 @@ export const CURRENCIES = [
 export const UNITS = ["حبة", "علبة", "كرتون", "كيس", "حزمة", "كيلو", "جرام", "لتر", "متر"];
 export const PACKAGE_UNITS = ["حبة", "علبة", "كرتون", "كيس", "حزمة", "ربطة", "صندوق"];
 
+const GENERAL_PROFILE = { units: UNITS, packageUnits: PACKAGE_UNITS, defaultUnit: "حبة", defaultPackageUnit: "كرتون" };
+export const BUSINESS_PROFILES = {
+  "بقالة": GENERAL_PROFILE,
+  "سوبرماركت": GENERAL_PROFILE,
+  "صيدلية": { units: ["حبة", "شريط", "علبة", "عبوة", "كرتون"], packageUnits: ["شريط", "علبة", "عبوة", "كرتون"], defaultUnit: "حبة", defaultPackageUnit: "علبة" },
+  "ملابس": { units: ["قطعة", "طقم", "دزينة", "كيس", "كرتون"], packageUnits: ["قطعة", "طقم", "دزينة", "كيس", "كرتون"], defaultUnit: "قطعة", defaultPackageUnit: "كيس" },
+  "جوالات": { units: ["جهاز", "قطعة", "كرتون", "صندوق"], packageUnits: ["جهاز", "كرتون", "صندوق"], defaultUnit: "جهاز", defaultPackageUnit: "صندوق" },
+  "قطع غيار": { units: ["قطعة", "طقم", "علبة", "كرتون", "صندوق"], packageUnits: ["قطعة", "طقم", "علبة", "كرتون", "صندوق"], defaultUnit: "قطعة", defaultPackageUnit: "علبة" },
+  "مطعم": { units: ["حبة", "كيلو", "جرام", "لتر", "علبة", "كيس", "كرتون"], packageUnits: ["علبة", "كيس", "كرتون", "صندوق"], defaultUnit: "حبة", defaultPackageUnit: "كرتون" },
+  "كافيه": { units: ["حبة", "كيلو", "جرام", "لتر", "علبة", "كيس", "كرتون"], packageUnits: ["علبة", "كيس", "كرتون", "صندوق"], defaultUnit: "حبة", defaultPackageUnit: "كرتون" },
+  "متجر عام": GENERAL_PROFILE,
+};
+
 export const PAYMENT_METHODS = ["نقدي", "تحويل"];
 
 export const ACCOUNT_ROLES = [

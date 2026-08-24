@@ -2,6 +2,7 @@ import "fake-indexeddb/auto";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { db } from "../client/src/js/database.js";
+import { BUSINESS_PROFILES } from "../client/src/js/constants.js";
 
 test("البيع الآجل يفرض صفرًا كدفعة أولى وتبقى الحوالة خارج رصيد الصندوق", async () => {
   await db.resetAllData();
@@ -88,5 +89,25 @@ test("استعادة النسخة قبل الإعداد تعيد بيانات ا
   assert.equal((await db.listAccounts()).length, backupAccountCount);
   const restoredUser = await db.authenticateAccount({ username: admin.username, pin: "2468" });
   assert.equal(restoredUser.id, admin.id);
+  await db.resetAllData();
+});
+
+test("تخصص الأنشطة وحداتها ولا تعرض عبوات البقالة غير المناسبة للملابس أو الجوالات", () => {
+  assert.equal(BUSINESS_PROFILES["ملابس"].packageUnits.includes("جرام"), false);
+  assert.equal(BUSINESS_PROFILES["ملابس"].units.includes("قطعة"), true);
+  assert.equal(BUSINESS_PROFILES["جوالات"].units.includes("جهاز"), true);
+  assert.equal(BUSINESS_PROFILES["صيدلية"].packageUnits.includes("شريط"), true);
+});
+
+test("شراء الصيدلية يفرض التشغيلة والصلاحية ويحفظهما لتنبيه المنتج", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "صيدلية الاختبار", businessType: "صيدلية", currency: "YER" });
+  const product = await db.createProduct({ name: "دواء تجريبي", unit: "حبة", purchasePrice: 0, salePrice: 0, quantity: 0, minimumStock: 1 });
+  await assert.rejects(() => db.createPurchase({ items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 10, packageCost: 1000, packageUnit: "علبة", salePrice: 150 }] }), /رقم التشغيلة/);
+  const purchase = await db.createPurchase({ items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 10, packageCost: 1000, packageUnit: "علبة", salePrice: 150, batchNumber: "B-2026", expiryDate: "2026-12-31" }] });
+  const storedProduct = await db.getProduct(product.id); const storedPurchase = await db.getPurchase(purchase.id);
+  assert.equal(storedProduct.latestBatchNumber, "B-2026");
+  assert.equal(storedProduct.nearestExpiryDate, "2026-12-31");
+  assert.equal(storedPurchase.items[0].expiryDate, "2026-12-31");
   await db.resetAllData();
 });
