@@ -67,6 +67,7 @@ test("يربط المنتج بآخر مورد مورّد له ليظهر اخت�
   assert.equal(links[product.id].id, supplier.id);
   assert.equal(links[product.id].name, "مورد المنتج");
   assert.equal(links[product.id].phone, "777123456");
+  assert.equal((await db.getProduct(product.id)).lastSupplierId, supplier.id);
   await db.resetAllData();
 });
 

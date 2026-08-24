@@ -223,9 +223,10 @@ export const db = {
     return products.filter((product) => includeDeleted || !product.isDeleted).sort((a, b) => a.name.localeCompare(b.name, "ar"));
   },
   async listProductSupplierLinks() {
-    const database = await this.open(); const transaction = database.transaction(["purchases", "purchaseItems", "suppliers"], "readonly");
-    const [purchases, items, suppliers] = await Promise.all([requestAsPromise(transaction.objectStore("purchases").getAll()), requestAsPromise(transaction.objectStore("purchaseItems").getAll()), requestAsPromise(transaction.objectStore("suppliers").getAll())]);
+    const database = await this.open(); const transaction = database.transaction(["products", "purchases", "purchaseItems", "suppliers"], "readonly");
+    const [products, purchases, items, suppliers] = await Promise.all([requestAsPromise(transaction.objectStore("products").getAll()), requestAsPromise(transaction.objectStore("purchases").getAll()), requestAsPromise(transaction.objectStore("purchaseItems").getAll()), requestAsPromise(transaction.objectStore("suppliers").getAll())]);
     const purchasesById = new Map(purchases.map((purchase) => [purchase.id, purchase])); const suppliersById = new Map(suppliers.filter((supplier) => !supplier.isDeleted).map((supplier) => [supplier.id, supplier])); const links = {};
+    products.forEach((product) => { const supplier = product.lastSupplierId ? suppliersById.get(product.lastSupplierId) : null; if (supplier) links[product.id] = { id: supplier.id, name: supplier.name, phone: supplier.phone, purchase: { id: product.lastSupplierPurchaseId || "", date: product.lastSupplierAt || "" } }; });
     items.forEach((item) => { const purchase = purchasesById.get(item.purchaseId); const supplier = purchase?.supplierId ? suppliersById.get(purchase.supplierId) : null; if (!purchase || !supplier) return; const previous = links[item.productId]; if (!previous || dateOrder(purchase) > dateOrder(previous.purchase)) links[item.productId] = { id: supplier.id, name: supplier.name, phone: supplier.phone, purchase: { id: purchase.id, date: purchase.date } }; });
     return links;
   },
@@ -321,7 +322,7 @@ export const db = {
     transaction.objectStore("purchases").add(purchase);
     for (const { product, quantity, unitCost, total: itemTotal, packageQuantity, unitsPerPackage, packageCost, packageUnit, salePrice } of resolved) {
       const previousQuantity = toNumber(product.quantity); const newQuantity = previousQuantity + quantity;
-      products.put({ ...product, quantity: newQuantity, purchasePrice: unitCost, salePrice, purchasePackageUnit: packageUnit, unitsPerPackage, lastPackageCost: packageCost, updatedAt: date });
+      products.put({ ...product, quantity: newQuantity, purchasePrice: unitCost, salePrice, purchasePackageUnit: packageUnit, unitsPerPackage, lastPackageCost: packageCost, lastSupplierId: supplier?.id || product.lastSupplierId || "", lastSupplierPurchaseId: supplier ? purchase.id : product.lastSupplierPurchaseId || "", lastSupplierAt: supplier ? date : product.lastSupplierAt || "", updatedAt: date });
       transaction.objectStore("purchaseItems").add({ id: uid("purchase-item"), purchaseId: purchase.id, productId: product.id, productName: product.name, unit: product.unit, quantity, unitCost, total: itemTotal, packageUnit, packageQuantity, unitsPerPackage, packageCost, salePrice, returnedQuantity: 0 });
       createStockMovement(transaction.objectStore("stockMovements"), { productId: product.id, type: "PURCHASE", quantity, previousQuantity, newQuantity, date, note: `شراء ${packageQuantity} ${packageUnit} ضمن الفاتورة ${purchase.invoiceNumber}`, referenceType: "PURCHASE", referenceId: purchase.id });
     }
