@@ -19,7 +19,7 @@ test("يحسب خصم المخزون في حركة التعديل", () => {
   assert.equal(adjustmentDelta(18, 15), -3);
 });
 
-test("يحدد حالات المخزون كما في قواعد المرحلة الأولى", () => {
+test("يحدد حالات المخزون وفق قواعد التطبيق", () => {
   assert.equal(stockStatus(0, 5), "نافد");
   assert.equal(stockStatus(5, 5), "منخفض");
   assert.equal(stockStatus(6, 5), "متوفر");

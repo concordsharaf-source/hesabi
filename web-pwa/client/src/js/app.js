@@ -457,6 +457,10 @@ function render() {
 }
 
 function injectSetupRestoreControl() {
+  const setupEyebrow = root.querySelector(".setup-art__copy .eyebrow");
+  const setupStamp = root.querySelector(".setup-stamp");
+  if (setupEyebrow) setupEyebrow.textContent = "سجل حسابي";
+  if (setupStamp) setupStamp.textContent = "حسابي";
   const setupForm = root.querySelector("#setup-form");
   if (!setupForm || root.querySelector("#setup-restore-file")) return;
   const control = document.createElement("div");
