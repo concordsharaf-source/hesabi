@@ -69,6 +69,10 @@ try {
   const reordered = await evaluate(`new Promise((resolve) => { document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"]').click(); setTimeout(() => resolve({ order: [...document.querySelectorAll('[data-bottom-nav] [data-view]')].map((item) => item.dataset.view), settingRows: document.querySelectorAll('.mobile-nav-settings__item').length }), 350); })`);
   assert.equal(reordered.settingRows, 16);
   assert.ok(reordered.order.indexOf("inventory") < reordered.order.indexOf("products"), "يجب أن ينتقل المخزون خطوة للأمام بعد تغيير الترتيب.");
+  await evaluate(`document.querySelector('[data-view="data-management"]').click()`);
+  await waitFor('#restore-file');
+  const dataManagement = await evaluate(`({ title: document.querySelector('.workspace h1')?.textContent?.trim(), exportVisible: Boolean(document.querySelector('[data-action="export-backup"]')), restoreVisible: Boolean(document.querySelector('#restore-file')), cloudVisible: Boolean(document.querySelector('.cloud-backup-card')) })`);
+  assert.deepEqual(dataManagement, { title: "إدارة البيانات", exportVisible: true, restoreVisible: true, cloudVisible: true });
   const views = [["dashboard", "نظرة على يومك"], ["sales", "بيع جديد"], ["invoices", "الفواتير"], ["purchases", "المشتريات"], ["inventory", "المخزون"]];
   for (const [view, title] of views) {
     const viewResult = await evaluate(`new Promise((resolve) => { document.querySelector('[data-bottom-nav] [data-view="${view}"]').click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim() }), 250); })`);

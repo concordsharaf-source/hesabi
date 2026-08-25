@@ -150,6 +150,22 @@ test("يبدأ شريط الهاتف بترتيب افتراضي قابل للت
   assert.match(app, /input\("nearestExpiryDate", "تاريخ الانتهاء", "date", product\?\.nearestExpiryDate \?\? ""\)/);
 });
 
+test("تفصل الإعدادات إدارة البيانات في صفحة مخصصة لتصدير واستيراد النسخ", async () => {
+  const [app, styles] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /function dataManagementMarkup\(\)/);
+  assert.match(app, /data-view="data-management"/);
+  assert.match(app, /تصدير واستيراد البيانات/);
+  assert.match(app, /data-action="export-backup"/);
+  assert.match(app, /for="restore-file"/);
+  assert.match(app, /"data-management": dataManagementMarkup/);
+  assert.match(app, /\["settings", "data-management"\]\.includes\(view\)/);
+  assert.match(styles, /\.data-management-page \.button--danger \{ color:#fff; background:linear-gradient\(145deg,#c42a47,#84132b\)/);
+  assert.match(styles, /\.topbar-sales-action \{ min-height:44px;/);
+});
+
 test("يعرض اختصاري حساب المورد والاتصال بجانب المنتج المرتبط به في قوائم المنتج والمخزون والبيع", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
