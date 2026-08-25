@@ -145,23 +145,25 @@ test("تسجيل توصيل على حساب المحل يضيف مصروف تو�
   await db.resetAllData();
 });
 
-test("تسجيل توصيل على حساب العميل يضيف حركة مستقلة إلى رصيده دون مصروف محل", async () => {
+test("تسجيل توصيل على العميل يضيفه إلى إجمالي الفاتورة دون عميل مسجل أو مديونية مستقلة", async () => {
   await db.resetAllData();
   const product = await db.createProduct({ name: "منتج مع توصيل عميل", unit: "حبة", purchasePrice: 20, salePrice: 100, quantity: 2, minimumStock: 0 });
-  const customer = await db.createCustomer({ name: "عميل التوصيل" });
-  const sale = await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], discount: 0, paidAmount: 100, paymentMethod: "نقدي", deliveryFee: 15, deliveryChargeType: "customer", customerId: customer.id });
-  const account = await db.getCustomerAccount(customer.id); const expenses = await db.listExpenses(); const cashbox = await db.getCashbox();
-  assert.equal(sale.deliveryChargeType, "customer"); assert.equal(account.balance, 15);
-  assert.equal(account.transactions.some((item) => item.type === "DELIVERY_CHARGE" && item.amount === 15 && item.referenceId === sale.id), true);
-  assert.equal(expenses.some((item) => item.referenceId === sale.id && item.category === "توصيل"), false); assert.equal(cashbox.closingBalance, 100);
+  const sale = await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], discount: 0, paidAmount: 115, paymentMethod: "نقدي", deliveryFee: 15, deliveryChargeType: "customer" });
+  const invoice = await db.getInvoice(sale.id); const expenses = await db.listExpenses(); const cashbox = await db.getCashbox();
+  assert.equal(invoice.customerId, ""); assert.equal(invoice.deliveryChargeType, "customer"); assert.equal(invoice.total, 115); assert.equal(invoice.paidAmount, 115);
+  assert.equal(expenses.some((item) => item.referenceId === sale.id && item.category === "توصيل"), false); assert.equal(cashbox.closingBalance, 115);
   await db.resetAllData();
 });
 
-test("توصيل العميل يتطلب اختيار عميل ولا يحفظ بيعًا ناقصًا", async () => {
+test("توصيل العميل ضمن فاتورة آجلة يدخل في إجمالي دين الفاتورة دون حركة توصيل مستقلة", async () => {
   await db.resetAllData();
   const product = await db.createProduct({ name: "منتج تحقق التوصيل", unit: "حبة", purchasePrice: 20, salePrice: 100, quantity: 1, minimumStock: 0 });
-  await assert.rejects(() => db.completeSale({ items: [{ productId: product.id, quantity: 1 }], discount: 0, paidAmount: 100, paymentMethod: "نقدي", deliveryFee: 10, deliveryChargeType: "customer" }), /اختر العميل/);
-  assert.equal((await db.listSales()).length, 0); await db.resetAllData();
+  const customer = await db.createCustomer({ name: "عميل آجل مع توصيل" });
+  const sale = await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], paymentType: "آجل", paidAmount: 0, paymentMethod: "نقدي", deliveryFee: 10, deliveryChargeType: "customer", customerId: customer.id });
+  const account = await db.getCustomerAccount(customer.id);
+  assert.equal(sale.total, 110); assert.equal(account.balance, 110);
+  assert.equal(account.transactions.filter((item) => item.referenceId === sale.id).length, 1); assert.equal(account.transactions.some((item) => item.type === "DELIVERY_CHARGE"), false);
+  await db.resetAllData();
 });
 
 test("يحسب خصم البيع العام وخصم الصنف كنسب مئوية ويحفظهما في الفاتورة", async () => {

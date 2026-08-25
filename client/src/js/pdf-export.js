@@ -96,7 +96,7 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, formatMoney, f
   divider(); y += 7 * mm;
   pair("الإجمالي قبل الخصم", formatMoney(invoice.subtotal));
   pair("الخصم", formatMoney(invoice.discount));
-  if (toNumber(invoice.deliveryFee) > 0) pair(`التوصيل · ${invoice.deliveryChargeType === "customer" ? "حساب العميل" : "حساب المحل"}`, formatMoney(invoice.deliveryFee));
+  if (toNumber(invoice.deliveryFee) > 0) pair(`التوصيل · ${invoice.deliveryChargeType === "customer" ? "على العميل ضمن الفاتورة" : "حساب المحل"}`, formatMoney(invoice.deliveryFee));
   context.strokeStyle = "#111"; context.beginPath(); context.moveTo(left, y - 4 * mm); context.lineTo(right, y - 4 * mm); context.stroke();
   pair("الإجمالي", formatMoney(invoice.total), { bold: true, labelSize: 32, valueSize: 32, gap: 7.5 * mm });
   pair("طريقة السداد", paymentLabel);

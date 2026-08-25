@@ -198,8 +198,9 @@ test("تظهر خدمة التوصيل وخيار تحميلها على العم
   assert.match(app, /name="deliveryChargeType"/);
   assert.match(app, /value="store"/);
   assert.match(app, /value="customer"/);
-  assert.match(app, /التوصيل يُضاف لحساب العميل/);
-  assert.match(database, /توصيل على حساب العميل/);
+  assert.match(app, /مدفوعة بما فيها التوصيل/);
+  assert.match(app, /على العميل ضمن الفاتورة/);
+  assert.doesNotMatch(database, /DELIVERY_CHARGE/);
   assert.match(database, /category: "توصيل"/);
   assert.match(app, /deliveryLine/);
   assert.match(pdfExport, /invoice\.deliveryFee/);
