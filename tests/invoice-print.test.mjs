@@ -196,6 +196,13 @@ test("تستخدم أزرار الوضع الداكن زمرديًا عميقً�
   assert.match(css, /payment-method-toggle__button\.is-cash\.is-selected.*background:#1d6a56/);
 });
 
+test("تعكس أسهم ترتيب شريط الهاتف اتجاه التقديم والتأخير بصريًا دون تغيير الإجراء", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  assert.match(css, /\.mobile-nav-settings__actions \[data-direction="-1"\] svg \{ transform:rotate\(180deg\); \}/);
+  assert.match(css, /\.mobile-nav-settings__actions \[data-direction="1"\] svg \{ transform:none; \}/);
+  assert.doesNotMatch(css, /\.mobile-nav-settings__down svg \{ transform:rotate\(180deg\); \}/);
+});
+
 test("تفصل الإعدادات إدارة البيانات في صفحة مخصصة لتصدير واستيراد النسخ", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
