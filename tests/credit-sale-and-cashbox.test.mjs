@@ -274,3 +274,41 @@ test("تسجل سلفة الكاشير كمصروف واحد وتخصم من ر�
   assert.equal((await db.listExpenses()).filter((item) => item.cashierSalaryAdvance).length, 1);
   await db.resetAllData();
 });
+
+test("يرحّل صندوق الكاشير إلى الخزنة مرة واحدة ويخصم العجز المرحّل من الراتب دون تكرار حركة النقد", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "متجر الخزنة", businessType: "بقالة", currency: "YER", openingCash: 500 });
+  const cashier = await db.createAccount({ username: "vault-cashier", name: "كاشير الخزنة", role: "cashier", pin: "2468", monthlySalary: 1000 });
+  const product = await db.createProduct({ name: "منتج الخزنة", unit: "حبة", purchasePrice: 30, salePrice: 100, quantity: 3, minimumStock: 0 });
+  const shift = await db.startCashierShift({ accountId: cashier.id, accountName: cashier.name, receivedCash: 500 });
+  await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], discount: 0, paidAmount: 100, paymentMethod: "نقدي", cashierShiftId: shift.id, cashierId: cashier.id, cashierName: cashier.name });
+  const closed = await db.closeCashierShift({ shiftId: shift.id, countedCash: 590 });
+  assert.equal(closed.difference, -10);
+  const beforeTransfer = await db.getVault();
+  assert.equal(beforeTransfer.cashierCashHeld, 590);
+  assert.equal(beforeTransfer.vaultBalance, 0);
+  assert.equal(beforeTransfer.untransferredShiftCount, 1);
+
+  const transferred = await db.transferCashierShiftToVault({ shiftId: closed.id, transferredByAccountId: "admin" });
+  assert.ok(transferred.vaultTransferredAt);
+  assert.equal(transferred.vaultTransferredAmount, 590);
+  const afterTransfer = await db.getVault(); const cashbox = await db.getCashbox();
+  assert.equal(afterTransfer.cashierCashHeld, 0);
+  assert.equal(afterTransfer.vaultBalance, 590);
+  assert.equal(cashbox.closingBalance, 590);
+  assert.equal((await db.listCashMovements()).filter((movement) => movement.cashierShiftId === closed.id && movement.sourceType === "CASHIER_SHORTAGE").length, 1);
+  await assert.rejects(() => db.transferCashierShiftToVault({ shiftId: closed.id }), /مسبقًا/);
+
+  const statistics = await db.listCashierShiftStatistics();
+  assert.deepEqual(statistics.find((item) => item.accountId === cashier.id).shortages, 10);
+  assert.deepEqual(statistics.find((item) => item.accountId === cashier.id).pendingShortages, 10);
+  const candidates = await db.listCashierShortageCandidates({ accountId: cashier.id });
+  assert.deepEqual(candidates.map((item) => item.id), [closed.id]);
+  const deduction = await db.deductCashierShortagesFromSalary({ accountId: cashier.id, shiftIds: [closed.id] });
+  assert.equal(deduction.amount, 10);
+  const salary = (await db.listCashierSalarySummaries()).find((item) => item.accountId === cashier.id);
+  assert.deepEqual({ deductions: salary.shortageDeductions, remaining: salary.remainingSalary }, { deductions: 10, remaining: 990 });
+  assert.equal((await db.listCashierShortageCandidates({ accountId: cashier.id })).length, 0);
+  await assert.rejects(() => db.createExpense({ cashierSalaryAdvance: true, cashierId: cashier.id, amount: 991, date: closed.date }), /تتجاوز المتبقي/);
+  await db.resetAllData();
+});

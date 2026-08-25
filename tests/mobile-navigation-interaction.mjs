@@ -30,13 +30,13 @@ try {
       socket.removeEventListener("message", onMessage);
       clearTimeout(timer);
       if (message.error) { reject(new Error(message.error.message)); return; }
-      if (message.result?.exceptionDetails) { reject(new Error(message.result.exceptionDetails.text)); return; }
+      if (message.result?.exceptionDetails) { reject(new Error(message.result.exceptionDetails.exception?.description || message.result.exceptionDetails.text)); return; }
       resolve(message.result);
     };
     socket.addEventListener("message", onMessage);
     socket.send(JSON.stringify({ id, method, params }));
   });
-  const evaluate = async (expression) => (await command("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })).result?.value;
+  const evaluate = async (expression) => { try { return (await command("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })).result?.value; } catch (error) { throw new Error(`${error.message}\nالتعبير المتعثر: ${expression}`); } };
   const waitFor = async (selector) => {
     for (let attempt = 0; attempt < 40; attempt += 1) {
       if (await evaluate(`Boolean(document.querySelector(${JSON.stringify(selector)}))`)) return;
@@ -98,7 +98,18 @@ try {
     }
   }
   assert.ok(purchaseDialogOpened, 'تعذر فتح فاتورة شراء جديدة لاختبار سعر بيع المنتج السابق.');
-  await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); search.value = 'منتج قريب الانتهاء'; search.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  let purchaseSearchEntered = false;
+  for (let attempt = 0; attempt < 3 && !purchaseSearchEntered; attempt += 1) {
+    if (!await evaluate(`Boolean(document.querySelector('#purchase-product-search'))`)) {
+      await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]')?.click()`);
+      await waitFor('.topbar [data-action="new-purchase"]');
+      await evaluate(`document.querySelector('.topbar [data-action="new-purchase"]').click()`);
+      await sleep(180);
+    }
+    purchaseSearchEntered = await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); if (!search) return false; search.value = 'منتج قريب الانتهاء'; search.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+    if (!purchaseSearchEntered) await sleep(180);
+  }
+  assert.ok(purchaseSearchEntered, 'تعذر الوصول إلى حقل بحث الشراء بعد إعادة تحميل واجهة PWA.');
   await waitFor('[data-add-purchase-product]');
   await evaluate(`document.querySelector('[data-add-purchase-product]').click()`);
   await waitFor('[data-purchase-sale-price="0"]');
@@ -181,11 +192,25 @@ try {
   await waitFor('.cashier-salary-summary');
   const shiftSummary = await evaluate(`(() => { const row = document.querySelector('.cashier-shift-row'); return { name: row.querySelector('strong')?.textContent.trim(), hasShortage: Boolean(row.querySelector('.is-negative')), hasLogin: row.textContent.includes('دخول:'), hasLogout: row.textContent.includes('خروج:') }; })()`);
   assert.deepEqual(shiftSummary, { name: 'كاشير اختبار الوردية', hasShortage: true, hasLogin: true, hasLogout: true });
+  await evaluate(`document.querySelector('[data-action="transfer-cashier-shift"]').click()`);
+  await waitFor('#confirm-cashier-shift-transfer');
+  await evaluate(`document.querySelector('#confirm-cashier-shift-transfer').click()`);
+  await waitForGone('#confirm-cashier-shift-transfer');
+  await waitFor('.cashier-difference-summary [data-action="deduct-cashier-shortages"]');
+  const vaultTransfer = await evaluate(`(() => { const vaultCard = [...document.querySelectorAll('.metric-card')].find((card) => card.textContent.includes('الخزنة الرئيسية')); const shiftRow = document.querySelector('.cashier-shift-row'); return { vaultVisible: Boolean(vaultCard), markedTransferred: shiftRow.textContent.includes('رُحّلت للخزنة'), transferActionGone: !shiftRow.querySelector('[data-action="transfer-cashier-shift"]') }; })()`);
+  assert.deepEqual(vaultTransfer, { vaultVisible: true, markedTransferred: true, transferActionGone: true });
+  await evaluate(`document.querySelector('.cashier-difference-summary [data-action="deduct-cashier-shortages"]').click()`);
+  await waitFor('#cashier-shortage-deduction-form');
+  const shortagePreview = await evaluate(`document.querySelector('#cashier-shortage-deduction-preview')?.textContent.replace(/\s+/g, ' ').trim()`);
+  assert.match(shortagePreview, /10/);
+  await evaluate(`document.querySelector('#cashier-shortage-deduction-form').requestSubmit()`);
+  await waitForGone('#cashier-shortage-deduction-form');
   const cashierSalarySummary = await evaluate(`(() => { const row = document.querySelector('.cashier-salary-row'); return { name: row.querySelector('strong')?.textContent.trim(), text: row.textContent.replace(/\s+/g, ' ') }; })()`);
   assert.equal(cashierSalarySummary.name, 'كاشير اختبار الوردية');
   assert.match(cashierSalarySummary.text, /1,?000/);
   assert.match(cashierSalarySummary.text, /200/);
-  assert.match(cashierSalarySummary.text, /800/);
+  assert.match(cashierSalarySummary.text, /10/);
+  assert.match(cashierSalarySummary.text, /790/);
   socket.close();
   console.log("اجتازت صفحات التطبيق وتبديل الكاشير وتسليم الصندوق اختبار التنقل التفاعلي.");
 } finally {

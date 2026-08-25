@@ -66,7 +66,7 @@ test("يوثق تسليم الصندوق عند تبديل الحساب ويعر
     readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
-  assert.match(database, /const DB_VERSION = 10/);
+  assert.match(database, /const DB_VERSION = 11/);
   assert.match(database, /makeIndexedStore\(database, "cashierShifts"/);
   assert.match(database, /async startCashierShift/);
   assert.match(database, /async closeCashierShift/);
@@ -96,6 +96,30 @@ test("تربط واجهة الحسابات راتب الكاشير بسلفة أ
   assert.match(database, /السلفة تتجاوز المتبقي من راتب/);
   assert.match(permissions, /"new-cashier-salary-advance"/);
   assert.match(css, /\.cashier-salary-row \{ display:grid;/);
+});
+
+test("تفصل الخزنة عن صندوق الكاشير وتدعم ترحيل الوردية وتسوية العجز من الراتب", async () => {
+  const [app, database, permissions, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/permissions.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(database, /const DB_VERSION = 11/);
+  assert.match(database, /makeIndexedStore\(database, "cashierSalaryDeductions"/);
+  assert.match(database, /async transferCashierShiftToVault/);
+  assert.match(database, /async getVault/);
+  assert.match(database, /async listCashierShiftStatistics/);
+  assert.match(database, /async deductCashierShortagesFromSalary/);
+  assert.match(app, /الخزنة الرئيسية/);
+  assert.match(app, /رأس المال في المخزون/);
+  assert.match(app, /function openCashierShiftTransferDialog/);
+  assert.match(app, /function openCashierShortageDeductionDialog/);
+  assert.match(app, /data-action="transfer-cashier-shift"/);
+  assert.match(app, /data-action="deduct-cashier-shortages"/);
+  assert.match(permissions, /"transfer-cashier-shift"/);
+  assert.match(permissions, /"deduct-cashier-shortages"/);
+  assert.match(css, /\.cashier-difference-row \{ display:grid;/);
 });
 
 test("يدعم البحث المباشر برقم الفاتورة ويعرض عددي المنتجات والفواتير بأرقام إنجليزية في الرئيسية", async () => {
