@@ -215,6 +215,15 @@ label { font-size:15px; }
 /* الوضع الداكن يغيّر الواجهة فقط؛ الصور تبقى بألوانها الأصلية دون فلتر أو دمج لوني. */
 [data-theme="dark"] img { filter:none !important; mix-blend-mode:normal !important; }
 [data-theme="dark"] .purchase-sale-price-field__current { color:#f2faf5; -webkit-text-fill-color:#f2faf5; }[data-theme="dark"] .purchase-sale-price-field input { color:#f2faf5 !important; -webkit-text-fill-color:#f2faf5; background:#1a2b25 !important; border-color:#6f9684; }
+
+/* احتواء موحد للنوافذ: لا يسمح لأي نموذج أو حقل بتمديد إطار النافذة على سطح المكتب. */
+.dialog { box-sizing:border-box; overflow-x:hidden; }.dialog :is(form,section,.form-grid,.purchase-form,.purchase-line,.barcode-field__control,.manual-barcode) { min-width:0; max-width:100%; }.dialog :is(input,select,textarea,output) { min-width:0; max-width:100%; }.dialog__actions { flex-wrap:wrap; }.dialog .return-line,.dialog__danger { min-width:0; flex-wrap:wrap; }
+@media (min-width:600px) {
+  .dialog .form-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .dialog .purchase-line--pack { grid-template-columns:repeat(2,minmax(0,1fr)); max-width:100%; }
+  .dialog .purchase-line--pack>div { grid-column:1 / -1; }.dialog .purchase-line--pack label:nth-of-type(1) { grid-column:1 / -1; }
+  .dialog .purchase-line--pack .purchase-line__total { grid-column:1 / -1; justify-self:stretch; }.dialog .purchase-line--pack>button { grid-column:2; justify-self:end; }
+}
 .purchase-search-control { display:flex; align-items:stretch; gap:8px; }.purchase-search-control input { min-width:0; flex:1; }.purchase-search-control .icon-button { flex:0 0 46px; min-height:46px; color:#fff; background:var(--green); border-color:var(--green); }
 .confirm-dialog { max-width:480px; }.confirm-dialog .dialog__subtext { max-width:36ch; }
 .is-negative,

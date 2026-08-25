@@ -243,6 +243,15 @@ test("يعرض حقل سعر البيع المعبأ قيمته داخل الخ�
   assert.match(css, /\[data-theme="dark"\] \.purchase-sale-price-field input \{ color:#f2faf5 !important;/);
 });
 
+test("تحتوي نوافذ سطح المكتب حقول الشراء والنماذج داخل إطار النافذة", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  assert.match(css, /\.dialog \{ box-sizing:border-box; overflow-x:hidden; \}/);
+  assert.match(css, /\.dialog :is\(form,section,\.form-grid,\.purchase-form,\.purchase-line,\.barcode-field__control,\.manual-barcode\) \{ min-width:0; max-width:100%; \}/);
+  assert.match(css, /\.dialog \.form-grid \{ grid-template-columns:repeat\(2,minmax\(0,1fr\)\); \}/);
+  assert.match(css, /\.dialog \.purchase-line--pack \{ grid-template-columns:repeat\(2,minmax\(0,1fr\)\); max-width:100%; \}/);
+  assert.match(css, /\.dialog \.purchase-line--pack>button \{ grid-column:2; justify-self:end; \}/);
+});
+
 test("تعكس أسهم ترتيب شريط الهاتف اتجاه التقديم والتأخير بصريًا دون تغيير الإجراء", async () => {
   const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
   assert.match(css, /\.mobile-nav-settings__actions \[data-direction="-1"\] svg \{ transform:rotate\(180deg\); \}/);
