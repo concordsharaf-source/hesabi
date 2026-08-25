@@ -230,6 +230,17 @@ test("تورث فاتورة الشراء سعر بيع الحبة للمنتج �
   assert.match(css, /\.purchase-line \.purchase-line__total \{ display:grid; grid-column:span 2;/);
 });
 
+test("يعرض حقل سعر البيع المعبأ قيمته مباشرة قبل التركيز ويبقيها قابلة للتعديل", async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /class="purchase-sale-price-field__current" aria-live="polite">\$\{money\(line\.salePrice\)\}/);
+  assert.match(app, /value="\$\{line\.salePrice \?\? ""\}"/);
+  assert.match(css, /\.purchase-sale-price-field input \{ color:var\(--ink\) !important; -webkit-text-fill-color:var\(--ink\); opacity:1; font-weight:900;/);
+  assert.match(css, /\[data-theme="dark"\] \.purchase-sale-price-field input \{ color:#f2faf5 !important;/);
+});
+
 test("تعكس أسهم ترتيب شريط الهاتف اتجاه التقديم والتأخير بصريًا دون تغيير الإجراء", async () => {
   const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
   assert.match(css, /\.mobile-nav-settings__actions \[data-direction="-1"\] svg \{ transform:rotate\(180deg\); \}/);

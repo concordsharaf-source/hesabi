@@ -207,12 +207,14 @@ label { font-size:15px; }
 .purchase-line--pack>div { grid-column:1 / -1; }
 .purchase-line--pack label { min-width:0; }
 .purchase-line--pack output { display:flex; align-items:center; min-height:45px; padding:0 10px; color:var(--green-deep); background:var(--green-pale); border:1px solid var(--line); border-radius:9px; font-weight:900; white-space:nowrap; }
+.purchase-sale-price-field>span { display:flex; align-items:center; justify-content:space-between; gap:6px; }.purchase-sale-price-field__current { color:var(--green-deep); font-size:10px; font-weight:900; white-space:nowrap; }.purchase-sale-price-field input { color:var(--ink) !important; -webkit-text-fill-color:var(--ink); opacity:1; font-weight:900; background:#fff !important; }
 .purchase-line__total { align-self:end; padding-bottom:12px; color:var(--green-deep); white-space:nowrap; }
 @media (min-width:600px) { .purchase-line--pack { grid-template-columns:minmax(170px,1.2fr) repeat(3,minmax(104px,1fr)) minmax(110px,1fr) auto auto; } }
 @media (max-width:599px) { .purchase-line--pack { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }.purchase-line--pack>div { grid-column:1 / -1; }.purchase-line--pack .purchase-line__total { grid-column:1; justify-self:start; padding:4px 0; }.purchase-line--pack button { grid-column:2; justify-self:end; }.purchase-line--pack output { min-width:0; font-size:12px; } }
 
 /* الوضع الداكن يغيّر الواجهة فقط؛ الصور تبقى بألوانها الأصلية دون فلتر أو دمج لوني. */
 [data-theme="dark"] img { filter:none !important; mix-blend-mode:normal !important; }
+[data-theme="dark"] .purchase-sale-price-field input { color:#f2faf5 !important; -webkit-text-fill-color:#f2faf5; background:#1a2b25 !important; border-color:#6f9684; }
 .purchase-search-control { display:flex; align-items:stretch; gap:8px; }.purchase-search-control input { min-width:0; flex:1; }.purchase-search-control .icon-button { flex:0 0 46px; min-height:46px; color:#fff; background:var(--green); border-color:var(--green); }
 .confirm-dialog { max-width:480px; }.confirm-dialog .dialog__subtext { max-width:36ch; }
 .is-negative,
