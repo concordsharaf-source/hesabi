@@ -93,27 +93,16 @@ test("استعادة النسخة قبل الإعداد تعيد بيانات ا
   await db.resetAllData();
 });
 
-test("يعيد الأدمن تعيين رمز الكاشير ويسترد رمز الأدمن بمفتاح طوارئ محلي دون كشف الرمز القديم", async () => {
+test("يعيد الأدمن تعيين رمز الكاشير دون تخزين رمز دخول بديل", async () => {
   await db.resetAllData();
   await db.saveSettings({ storeName: "متجر الاسترداد", businessType: "بقالة", currency: "YER" });
-  const admin = await db.createAccount({ username: "rescue-admin", name: "مدير الاسترداد", role: "admin", pin: "2468" });
   const cashier = await db.createAccount({ username: "rescue-cashier", name: "كاشير الاسترداد", role: "cashier", pin: "1357" });
-  const recoveryKey = "A1B2C3D4E5F6G7H8";
-
-  await db.saveAdminRecoveryKey({ adminId: admin.id, currentPin: "2468", recoveryKey });
-  const securedSettings = await db.getSettings();
-  assert.equal(securedSettings.adminRecoveryAccountId, admin.id);
-  assert.notEqual(securedSettings.adminRecoveryHash, recoveryKey);
-  assert.notEqual(securedSettings.adminRecoverySalt, recoveryKey);
+  const settings = await db.getSettings();
+  assert.equal("adminRecoveryHash" in settings, false);
 
   await db.resetAccountPinByAdmin(cashier.id, "9876");
   await assert.rejects(() => db.authenticateAccount({ username: cashier.username, pin: "1357" }), /بيانات الدخول غير صحيحة/);
   assert.equal((await db.authenticateAccount({ username: cashier.username, pin: "9876" })).mustChangePin, true);
-
-  await assert.rejects(() => db.resetAdminPinWithRecovery({ username: admin.username, recoveryKey: "WRONGKEY00000000", pin: "8642" }), /بيانات الاسترداد غير صحيحة/);
-  await db.resetAdminPinWithRecovery({ username: admin.username, recoveryKey, pin: "8642" });
-  await assert.rejects(() => db.authenticateAccount({ username: admin.username, pin: "2468" }), /بيانات الدخول غير صحيحة/);
-  assert.equal((await db.authenticateAccount({ username: admin.username, pin: "8642" })).id, admin.id);
   await db.resetAllData();
 });
 

@@ -42,8 +42,6 @@ const transactionDone = (transaction) => new Promise((resolve, reject) => {
 const normalize = (value) => String(value || "").trim();
 const normalizeUsername = (value) => normalize(value).toLocaleLowerCase("ar");
 const validatePin = (value) => /^\d{4,12}$/.test(String(value || ""));
-const normalizeRecoveryKey = (value) => String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
-const validateRecoveryKey = (value) => /^[A-Z0-9]{16}$/.test(normalizeRecoveryKey(value));
 const makeSalt = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
 const hashPin = async (pin, salt) => {
   const bytes = new TextEncoder().encode(`${salt}:${String(pin)}`);
@@ -225,20 +223,6 @@ export const db = {
     const database = await this.open(); const current = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").get(accountId)); if (!current || !current.isActive) throw new Error("الحساب غير متاح لإعادة التعيين.");
     const pinSalt = makeSalt(); const pinHash = await hashPin(pin, pinSalt); const transaction = database.transaction("accounts", "readwrite"); transaction.objectStore("accounts").put({ ...current, pinSalt, pinHash, mustChangePin: current.role === "cashier", updatedAt: nowIso() }); await transactionDone(transaction);
   },
-  async saveAdminRecoveryKey({ adminId, currentPin, recoveryKey }) {
-    if (!validateRecoveryKey(recoveryKey)) throw new Error("مفتاح الطوارئ غير صالح.");
-    const database = await this.open(); const read = database.transaction(["accounts", "settings"], "readonly"); const admin = await requestAsPromise(read.objectStore("accounts").get(adminId)); const currentSettings = await requestAsPromise(read.objectStore("settings").get("app"));
-    if (!admin || !admin.isActive || admin.role !== "admin" || !validatePin(currentPin) || await hashPin(currentPin, admin.pinSalt) !== admin.pinHash) throw new Error("رمز الأدمن الحالي غير صحيح.");
-    const recoverySalt = makeSalt(); const recoveryHash = await hashPin(normalizeRecoveryKey(recoveryKey), recoverySalt); const transaction = database.transaction("settings", "readwrite"); transaction.objectStore("settings").put({ ...currentSettings, id: "app", adminRecoveryAccountId: admin.id, adminRecoverySalt: recoverySalt, adminRecoveryHash: recoveryHash, updatedAt: nowIso() }); await transactionDone(transaction);
-  },
-  async resetAdminPinWithRecovery({ username, recoveryKey, pin }) {
-    if (!validatePin(pin)) throw new Error("رمز الدخول الجديد يجب أن يتكون من 4 إلى 12 رقمًا.");
-    if (!validateRecoveryKey(recoveryKey)) throw new Error("بيانات الاسترداد غير صحيحة.");
-    const database = await this.open(); const read = database.transaction(["accounts", "settings"], "readonly"); const admin = await requestAsPromise(read.objectStore("accounts").index("username").get(normalizeUsername(username))); const currentSettings = await requestAsPromise(read.objectStore("settings").get("app"));
-    if (!admin || !admin.isActive || admin.role !== "admin" || !currentSettings?.adminRecoveryHash || currentSettings.adminRecoveryAccountId !== admin.id || await hashPin(normalizeRecoveryKey(recoveryKey), currentSettings.adminRecoverySalt) !== currentSettings.adminRecoveryHash) throw new Error("بيانات الاسترداد غير صحيحة.");
-    const pinSalt = makeSalt(); const pinHash = await hashPin(pin, pinSalt); const transaction = database.transaction("accounts", "readwrite"); transaction.objectStore("accounts").put({ ...admin, pinSalt, pinHash, mustChangePin: false, updatedAt: nowIso() }); await transactionDone(transaction); return { ...toPersistentSessionUser(admin), mustChangePin: false };
-  },
-
   async listProducts({ includeDeleted = false } = {}) {
     const database = await this.open();
     const products = await requestAsPromise(database.transaction("products", "readonly").objectStore("products").getAll());
