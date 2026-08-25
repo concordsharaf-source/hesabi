@@ -33,15 +33,31 @@ async function waitForPdfStage(stage) {
   if (stage.getBoundingClientRect().height < 1 || stage.scrollHeight < 1) throw new Error("تعذر تجهيز محتوى الفاتورة للطباعة.");
 }
 
-function fileOrDownload(file, title) {
-  if (navigator.canShare?.({ files: [file] })) return navigator.share({ title, files: [file] }).then(() => "shared");
+function downloadPdfFile(file) {
   const url = URL.createObjectURL(file);
   const anchor = Object.assign(document.createElement("a"), { href: url, download: file.name });
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 0);
-  return Promise.resolve("downloaded");
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
+function canSharePdfFile(file) {
+  if (typeof navigator.share !== "function") return false;
+  try { return typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] }); } catch { return false; }
+}
+
+async function fileOrDownload(file, title) {
+  if (canSharePdfFile(file)) {
+    try {
+      await navigator.share({ title, files: [file] });
+      return "shared";
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+    }
+  }
+  downloadPdfFile(file);
+  return "downloaded";
 }
 
 function drawThermalInvoiceCanvas({ invoice, customer, storeName, formatMoney, formatAmount, formatDateTime, paymentLabel }) {

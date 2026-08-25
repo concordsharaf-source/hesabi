@@ -49,6 +49,17 @@ test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الد
   assert.match(app, /createReportPdfFile\(/);
 });
 
+test("تنزيل PDF تلقائيًا عند غياب دعم مشاركة الملفات أو فشل طلب المشاركة", async () => {
+  const pdfExport = await readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8");
+  assert.match(pdfExport, /function downloadPdfFile\(file\)/);
+  assert.match(pdfExport, /window\.setTimeout\(\(\) => URL\.revokeObjectURL\(url\), 60_000\)/);
+  assert.match(pdfExport, /function canSharePdfFile\(file\)/);
+  assert.match(pdfExport, /typeof navigator\.canShare !== "function" \|\| navigator\.canShare\(\{ files: \[file\] \}\)/);
+  assert.match(pdfExport, /await navigator\.share\(\{ title, files: \[file\] \}\)/);
+  assert.match(pdfExport, /if \(error\?\.name === "AbortError"\) throw error/);
+  assert.match(pdfExport, /downloadPdfFile\(file\);\n  return "downloaded"/);
+});
+
 test("يدعم البحث المباشر برقم الفاتورة ويعرض عددي المنتجات والفواتير بأرقام إنجليزية في الرئيسية", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
   assert.match(app, /invoiceQuery: ""/);
