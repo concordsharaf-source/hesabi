@@ -82,6 +82,8 @@ try {
   assert.deepEqual(result, { active: "inventory", title: "المخزون", inventoryVisible: true, expiryAlertVisible: true, expiryStatusVisible: true });
   await evaluate(`document.querySelector('[data-bottom-nav] [data-view="settings"]').click()`);
   await waitFor('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"]');
+  const darkNavigationColors = await evaluate(`(() => { document.documentElement.setAttribute('data-theme', 'dark'); const row = document.querySelector('.mobile-nav-settings__item'); const arrow = document.querySelector('.mobile-nav-settings__actions .icon-button:not(:disabled)'); const result = { text: getComputedStyle(row.querySelector('strong')).color, arrow: getComputedStyle(arrow).color, arrowBackground: getComputedStyle(arrow).backgroundImage }; document.documentElement.removeAttribute('data-theme'); return result; })()`);
+  assert.deepEqual(darkNavigationColors, { text: 'rgb(255, 255, 255)', arrow: 'rgb(255, 244, 246)', arrowBackground: 'linear-gradient(145deg, rgb(196, 42, 71), rgb(132, 19, 43))' });
   const reordered = await evaluate(`new Promise((resolve) => { document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"]').click(); setTimeout(() => resolve({ order: [...document.querySelectorAll('[data-bottom-nav] [data-view]')].map((item) => item.dataset.view), settingRows: document.querySelectorAll('.mobile-nav-settings__item').length }), 350); })`);
   assert.equal(reordered.settingRows, 16);
   assert.ok(reordered.order.indexOf("inventory") < reordered.order.indexOf("products"), "يجب أن ينتقل المخزون خطوة للأمام بعد تغيير الترتيب.");

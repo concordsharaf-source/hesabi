@@ -147,6 +147,8 @@ test("يبدأ شريط الهاتف بترتيب افتراضي قابل للت
   assert.match(app, /if \(action === "navigate"\)[\s\S]*?state\.view = view; render\(\);/);
   assert.match(styles, /\.bottom-nav \{[^}]*overflow-x:auto;[^}]*scroll-snap-type:x proximity;/);
   assert.match(styles, /\.bottom-nav::\-webkit-scrollbar \{ display:none; \}/);
+  assert.match(styles, /\[data-theme="dark"\] \.mobile-nav-settings__item strong \{ color:#fff; \}/);
+  assert.match(styles, /\[data-theme="dark"\] \.mobile-nav-settings__actions \.icon-button \{ color:#fff4f6; background:linear-gradient\(145deg,#c42a47,#84132b\);/);
   assert.match(app, /input\("nearestExpiryDate", "تاريخ الانتهاء", "date", product\?\.nearestExpiryDate \?\? ""\)/);
 });
 
