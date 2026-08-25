@@ -115,6 +115,22 @@ test("يعرض تنبيه المخزون المنخفض أو النافد بلو
   assert.match(styles, /\[data-theme="dark"\] \.inventory-summary div\+div \{ background:linear-gradient\(145deg,#c42a47,#84132b\);/);
 });
 
+test("تظهر صلاحية الشراء في المخزون بتحذير برتقالي قبل ثلاثة أشهر وأحمر خلال شهر", async () => {
+  const [app, database, styles] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /function expiryStatus\(product, today = dateKey\(\)\)/);
+  assert.match(app, /days <= 30 \? "danger" : "warning"/);
+  assert.match(app, /تنبيه انتهاء الصلاحية/);
+  assert.match(app, /data-purchase-expiry-date/);
+  assert.match(database, /if \(expiryDate\) batches\.add/);
+  assert.match(database, /لا يمكن حفظ منتج منتهٍ أو ينتهي اليوم/);
+  assert.match(styles, /\.expiry-status--warning \{ color:#845100; background:#fff3d4; border-color:#e2a443;/);
+  assert.match(styles, /\.expiry-status--danger \{ color:#8b1d31; background:#fde6e9; border-color:#cf4f63;/);
+});
+
 test("يعرض اختصاري حساب المورد والاتصال بجانب المنتج المرتبط به في قوائم المنتج والمخزون والبيع", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),

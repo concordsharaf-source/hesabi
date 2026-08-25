@@ -113,6 +113,18 @@ test("شراء الصيدلية يفرض التشغيلة والصلاحية و�
   await db.resetAllData();
 });
 
+test("شراء غير الصيدلية يقبل تاريخ انتهاء اختياريًا ويحفظه لتتبع المخزون", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "بقالة الاختبار", businessType: "بقالة", currency: "YER" });
+  const product = await db.createProduct({ name: "عصير تجريبي", unit: "حبة", purchasePrice: 0, salePrice: 0, quantity: 0, minimumStock: 1 });
+  const purchase = await db.createPurchase({ items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 6, packageCost: 600, packageUnit: "علبة", salePrice: 150, expiryDate: "2026-12-31" }] });
+  const storedProduct = await db.getProduct(product.id); const storedPurchase = await db.getPurchase(purchase.id); const batches = await db.listProductBatches(product.id);
+  assert.equal(storedProduct.nearestExpiryDate, "2026-12-31");
+  assert.equal(storedPurchase.items[0].expiryDate, "2026-12-31");
+  assert.equal(batches[0].remainingQuantity, 6);
+  await db.resetAllData();
+});
+
 test("بيع الصيدلية يستهلك التشغيلة الأقرب انتهاءً أولًا ويترك الأحدث للمبيعات التالية", async () => {
   await db.resetAllData();
   await db.saveSettings({ storeName: "صيدلية التشغيلة", businessType: "صيدلية", currency: "YER" });
