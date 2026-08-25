@@ -211,7 +211,7 @@ function navMarkup() {
     <div class="sidebar__account"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span><strong>${escapeHtml(state.currentUser?.name || "")}</strong><button class="text-button" data-action="account-session">تبديل المستخدمين</button></div>
     <div class="sidebar__footer"><span class="presence-dot"></span><span>البيانات محفوظة محليًا</span></div>
   </aside>
-  <nav class="bottom-nav" aria-label="التنقل الرئيسي">${renderItems(bottomItems)}</nav>`;
+  <nav class="bottom-nav" data-bottom-nav aria-label="التنقل الرئيسي">${renderItems(bottomItems)}</nav>`;
 }
 
 function applyTheme() { document.documentElement.dataset.theme = state.settings?.theme === "dark" ? "dark" : "light"; }
@@ -557,6 +557,13 @@ function bindEvents() {
     setCartQuantity(event.currentTarget.dataset.cartQuantity, event.currentTarget.value, { renderNow: false });
     window.setTimeout(render, 0);
   }));
+  syncMobileNavigation();
+}
+
+function syncMobileNavigation() {
+  const bottomNav = root.querySelector("[data-bottom-nav]");
+  const activeItem = bottomNav?.querySelector(`[data-view="${state.view}"]`);
+  activeItem?.scrollIntoView({ block: "nearest", inline: "center", behavior: "auto" });
 }
 
 async function handleSetup(event) {
