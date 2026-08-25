@@ -188,6 +188,14 @@ test("يحمي طلب استرداد الهاتف من تعليق الشبكة �
   assert.match(app, /window\.clearTimeout\(timeout\); submit\.disabled = false/);
 });
 
+test("تستخدم أزرار الوضع الداكن زمرديًا عميقًا وياقوتيًا مع نص أبيض واضح", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  assert.match(css, /\[data-theme="dark"\] \.button--primary \{ color:#fff; background:linear-gradient\(145deg,#21755f,#16473b\)/);
+  assert.match(css, /\[data-theme="dark"\] \.button--danger \{ color:#fff; background:linear-gradient\(145deg,#c42a47,#84132b\)/);
+  assert.match(css, /\[data-theme="dark"\] \.button--secondary,\[data-theme="dark"\] \.theme-toggle \{ color:#f4fff8; background:#21463a/);
+  assert.match(css, /payment-method-toggle__button\.is-cash\.is-selected.*background:#1d6a56/);
+});
+
 test("تفصل الإعدادات إدارة البيانات في صفحة مخصصة لتصدير واستيراد النسخ", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
