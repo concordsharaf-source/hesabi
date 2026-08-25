@@ -75,6 +75,16 @@ const formatDate = (value) => {
   const date = new Date(`${String(value || "")}T00:00:00`);
   return Number.isNaN(date.getTime()) ? String(value || "") : new Intl.DateTimeFormat("ar-EG-u-ca-gregory", { year: "numeric", month: "short", day: "numeric" }).format(date);
 };
+const selectNumericFieldValue = (event) => {
+  const input = event.target instanceof HTMLInputElement ? event.target : null;
+  if (!input || input.type !== "number" || input.disabled || input.readOnly || !input.value) return;
+  requestAnimationFrame(() => {
+    if (document.activeElement !== input) return;
+    try { input.select(); } catch { /* بعض متصفحات الهاتف تقيد تحديد مدخل الرقم الأصلي. */ }
+  });
+};
+document.addEventListener("focusin", selectNumericFieldValue, true);
+document.addEventListener("pointerup", selectNumericFieldValue, true);
 const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[character]);
 const phoneHref = (phone) => {
   const raw = String(phone || "").trim();

@@ -252,6 +252,18 @@ test("تحتوي نوافذ سطح المكتب حقول الشراء والنم
   assert.match(css, /\.dialog \.purchase-line--pack>button \{ grid-column:2; justify-self:end; \}/);
 });
 
+test("تظهر تواريخ الانتهاء باتجاه تاريخ ثابت وتحدد الحقول الرقمية قيمتها عند التركيز", async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /const selectNumericFieldValue = \(event\) =>/);
+  assert.match(app, /input\.type !== "number" \|\| input\.disabled \|\| input\.readOnly \|\| !input\.value/);
+  assert.match(app, /document\.addEventListener\("focusin", selectNumericFieldValue, true\)/);
+  assert.match(app, /document\.addEventListener\("pointerup", selectNumericFieldValue, true\)/);
+  assert.match(css, /input\[type="date"\] \{ direction:ltr; text-align:left; unicode-bidi:plaintext; \}/);
+});
+
 test("تعكس أسهم ترتيب شريط الهاتف اتجاه التقديم والتأخير بصريًا دون تغيير الإجراء", async () => {
   const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
   assert.match(css, /\.mobile-nav-settings__actions \[data-direction="-1"\] svg \{ transform:rotate\(180deg\); \}/);
