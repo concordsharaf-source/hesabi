@@ -47,6 +47,7 @@ const icon = (name, size = 20) => {
 };
 
 const state = { view: "dashboard", lastStableView: "dashboard", settings: null, accounts: [], currentUser: null, products: [], productSuppliers: {}, sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
+const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "invoices", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "invoices", "purchases"].includes(id))];
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
 const isPharmacy = () => state.settings?.businessType === "صيدلية";
 const profileOptions = (kind, current = "") => [...new Set([...(businessProfile()[kind] || []), current].filter(Boolean))];
@@ -218,8 +219,8 @@ async function refresh() {
 function navMarkup() {
   const accessibleItems = NAV_ITEMS.filter((item) => canAccessView(state.currentUser, item.id));
   const renderItems = (items) => items.map((item) => `<button class="nav-item ${state.view === item.id ? "is-active" : ""}" data-action="navigate" data-view="${item.id}">${icon(item.icon)}<span>${item.label}</span></button>`).join("");
-  const mobileNavigationOrder = ["dashboard", "sales", "invoices", "purchases"];
-  const bottomItems = [...mobileNavigationOrder.map((id) => accessibleItems.find((item) => item.id === id)).filter(Boolean), ...accessibleItems.filter((item) => !mobileNavigationOrder.includes(item.id))];
+  const configuredOrder = normalizedMobileNavigationOrder(state.settings?.mobileNavigationOrder);
+  const bottomItems = configuredOrder.map((id) => accessibleItems.find((item) => item.id === id)).filter(Boolean);
   const items = renderItems(accessibleItems);
   return `<aside class="sidebar">
     <div class="brand"><img src="${markImage}" alt="" /><div><strong>حسابي</strong><small>${escapeHtml(state.settings?.storeName || "متجرك")}</small></div></div>
@@ -228,6 +229,31 @@ function navMarkup() {
     <div class="sidebar__footer"><span class="presence-dot"></span><span>البيانات محفوظة محليًا</span></div>
   </aside>
   <nav class="bottom-nav" data-bottom-nav aria-label="التنقل الرئيسي">${renderItems(bottomItems)}</nav>`;
+}
+
+function normalizedMobileNavigationOrder(order = []) {
+  const knownIds = new Set(NAV_ITEMS.map((item) => item.id));
+  const configured = Array.isArray(order) ? order.filter((id, index) => knownIds.has(id) && order.indexOf(id) === index) : [];
+  return [...configured, ...DEFAULT_MOBILE_NAVIGATION_ORDER.filter((id) => !configured.includes(id))];
+}
+
+async function updateMobileNavigationOrder(id, direction = 0) {
+  const order = normalizedMobileNavigationOrder(state.settings?.mobileNavigationOrder);
+  const currentIndex = order.indexOf(id);
+  const destinationIndex = currentIndex + Number(direction);
+  if (currentIndex < 0 || destinationIndex < 0 || destinationIndex >= order.length) return;
+  [order[currentIndex], order[destinationIndex]] = [order[destinationIndex], order[currentIndex]];
+  await db.saveSettings({ mobileNavigationOrder: order });
+  state.settings = await db.getSettings();
+  render();
+  showToast("تم حفظ ترتيب شريط الهاتف.");
+}
+
+async function resetMobileNavigationOrder() {
+  await db.saveSettings({ mobileNavigationOrder: DEFAULT_MOBILE_NAVIGATION_ORDER });
+  state.settings = await db.getSettings();
+  render();
+  showToast("تمت استعادة ترتيب شريط الهاتف الافتراضي.");
 }
 
 function applyTheme() { document.documentElement.dataset.theme = state.settings?.theme === "dark" ? "dark" : "light"; }
@@ -487,9 +513,15 @@ function cloudBackupMarkup() {
   return `<section class="panel report-card cloud-backup-card"><div class="panel__head"><div><span class="eyebrow">نسخ سحابي مجاني</span><h2>نسخ ${escapeHtml(cloud.user.email || "السحابية")}</h2></div><button class="text-button" data-action="cloud-signout" ${busy ? "disabled" : ""}>فصل الحساب</button></div><p>يُحتفظ بآخر 3 نسخ مكتملة فقط لهذا البريد. لا تتغير البيانات بين الأجهزة إلا عند اختيار «استعادة» صراحة.</p><div class="dialog__actions"><button class="button button--primary" data-action="cloud-upload-backup" ${busy ? "disabled" : ""}>${busy === "upload" ? "جارٍ رفع النسخة…" : "إنشاء نسخة سحابية الآن"}</button><button class="button button--secondary" data-action="cloud-refresh-backups" ${busy ? "disabled" : ""}>تحديث القائمة</button></div>${cloud.error ? `<p class="cloud-backup-error">${escapeHtml(cloud.error)}</p>` : ""}<div class="cloud-backup-list">${cloud.loading ? `<div class="inline-empty">جارٍ تحميل النسخ السحابية…</div>` : rows || `<div class="inline-empty">لا توجد نسخة سحابية بعد. أنشئ أول نسخة بعد مراجعة بيانات جهازك.</div>`}</div></section>`;
 }
 
+function mobileNavigationSettingsMarkup() {
+  const order = normalizedMobileNavigationOrder(state.settings?.mobileNavigationOrder);
+  const byId = new Map(NAV_ITEMS.map((item) => [item.id, item]));
+  return `<section class="panel mobile-nav-settings"><div class="panel__head"><div><span class="eyebrow">شريط الهاتف</span><h2>ترتيب الأيقونات</h2></div></div><p>غيّر الأولوية لكل محل من هنا. الترتيب يحفظ على هذا الجهاز، ويظهر للكاشير بالأقسام المسموح له بها فقط.</p><div class="mobile-nav-settings__list">${order.map((id, index) => { const item = byId.get(id); return `<article class="mobile-nav-settings__item"><span class="mobile-nav-settings__icon">${icon(item.icon, 18)}</span><strong>${escapeHtml(item.label)}</strong><div class="mobile-nav-settings__actions"><button class="icon-button" type="button" data-action="move-mobile-nav" data-id="${id}" data-direction="-1" aria-label="تقديم ${escapeHtml(item.label)}" title="تقديم" ${index === 0 ? "disabled" : ""}>${icon("arrow", 16)}</button><button class="icon-button mobile-nav-settings__down" type="button" data-action="move-mobile-nav" data-id="${id}" data-direction="1" aria-label="تأخير ${escapeHtml(item.label)}" title="تأخير" ${index === order.length - 1 ? "disabled" : ""}>${icon("arrow", 16)}</button></div></article>`; }).join("")}</div><div class="dialog__actions"><button class="button button--secondary" type="button" data-action="reset-mobile-nav">استعادة الترتيب الافتراضي</button></div></section>`;
+}
+
 function settingsMarkup() {
   return `${topbarMarkup("الإعدادات", "تعمل بيانات المتجر محليًا دون اتصال، والنسخ السحابي اختياري ويدوي.")}
-  <section class="report-grid"><form id="settings-form" class="panel form-grid"><div class="panel__head form-full"><div><span class="eyebrow">بيانات المتجر</span><h2>إعدادات عامة</h2></div></div><label>اسم المتجر<input name="storeName" required maxlength="60" dir="rtl" value="${escapeHtml(state.settings?.storeName || "")}" /></label><label>نوع النشاط<select name="businessType">${BUSINESS_TYPES.map((type) => `<option value="${type}" ${state.settings?.businessType === type ? "selected" : ""}>${type}</option>`).join("")}</select></label><label>العملة<select name="currency">${CURRENCIES.map((currency) => `<option value="${currency.code}" ${state.settings?.currency === currency.code ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><label>رصيد افتتاحي للصندوق<input name="openingCash" type="number" min="0" step="0.01" value="${escapeHtml(state.settings?.openingCash ?? "")}" /></label><div class="dialog__actions form-full"><button class="button button--primary" type="submit">حفظ الإعدادات ${icon("check", 17)}</button></div></form><section class="panel report-card"><span class="eyebrow">نسخة محلية</span><h2>حماية بيانات هذا الجهاز</h2><p>صدّر ملف JSON يحتفظ بكل البيانات المحلية، واستعده فقط من ملف حسابي موثوق.</p><div class="dialog__actions"><button class="button button--secondary" data-action="export-backup">تصدير نسخة</button><label class="button button--primary" for="restore-file">استعادة نسخة</label><input id="restore-file" type="file" accept="application/json" hidden /></div></section>${cloudBackupMarkup()}<section class="panel report-card"><span class="eyebrow">منطقة حساسة</span><h2>مسح البيانات</h2><p>يمسح كل بيانات هذا الجهاز ويعيد التطبيق إلى شاشة الإعداد. صدّر نسخة احتياطية أولًا.</p><button class="button button--danger" data-action="reset-data">مسح جميع البيانات</button></section></section>`;
+  <section class="report-grid"><form id="settings-form" class="panel form-grid"><div class="panel__head form-full"><div><span class="eyebrow">بيانات المتجر</span><h2>إعدادات عامة</h2></div></div><label>اسم المتجر<input name="storeName" required maxlength="60" dir="rtl" value="${escapeHtml(state.settings?.storeName || "")}" /></label><label>نوع النشاط<select name="businessType">${BUSINESS_TYPES.map((type) => `<option value="${type}" ${state.settings?.businessType === type ? "selected" : ""}>${type}</option>`).join("")}</select></label><label>العملة<select name="currency">${CURRENCIES.map((currency) => `<option value="${currency.code}" ${state.settings?.currency === currency.code ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><label>رصيد افتتاحي للصندوق<input name="openingCash" type="number" min="0" step="0.01" value="${escapeHtml(state.settings?.openingCash ?? "")}" /></label><div class="dialog__actions form-full"><button class="button button--primary" type="submit">حفظ الإعدادات ${icon("check", 17)}</button></div></form>${mobileNavigationSettingsMarkup()}<section class="panel report-card"><span class="eyebrow">نسخة محلية</span><h2>حماية بيانات هذا الجهاز</h2><p>صدّر ملف JSON يحتفظ بكل البيانات المحلية، واستعده فقط من ملف حسابي موثوق.</p><div class="dialog__actions"><button class="button button--secondary" data-action="export-backup">تصدير نسخة</button><label class="button button--primary" for="restore-file">استعادة نسخة</label><input id="restore-file" type="file" accept="application/json" hidden /></div></section>${cloudBackupMarkup()}<section class="panel report-card"><span class="eyebrow">منطقة حساسة</span><h2>مسح البيانات</h2><p>يمسح كل بيانات هذا الجهاز ويعيد التطبيق إلى شاشة الإعداد. صدّر نسخة احتياطية أولًا.</p><button class="button button--danger" data-action="reset-data">مسح جميع البيانات</button></section></section>`;
 }
 
 function loginMarkup() {
@@ -668,6 +700,8 @@ async function handleActionUnsafe(event) {
   if (!state.currentUser) { render(); return; }
   if (action === "open-sales-scanner") { if (!canAccessView(state.currentUser, "sales")) { adminOnlyMessage(); return; } state.view = "sales"; render(); requestAnimationFrame(() => openScanner("sale")); return; }
   if (!canUseAction(state.currentUser, action, { mode: event.currentTarget.dataset.mode })) { adminOnlyMessage(); return; }
+  if (action === "move-mobile-nav") { await updateMobileNavigationOrder(id, event.currentTarget.dataset.direction); return; }
+  if (action === "reset-mobile-nav") { await resetMobileNavigationOrder(); return; }
   if (action === "toggle-theme") { toggleTheme(); return; }
   if (action === "open-reorder-list") { openReorderDialog(); return; }
   if (action === "new-product") { openProductDialog(); return; }

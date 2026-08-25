@@ -132,12 +132,16 @@ test("تظهر صلاحية الشراء في المخزون بتحذير برت
   assert.match(styles, /\.expiry-status--danger \{ color:#8b1d31; background:#fde6e9; border-color:#cf4f63;/);
 });
 
-test("يبدأ شريط الهاتف بالرئيسية ثم المبيعات والفواتير والمشتريات ويبقي القسم النشط قابلًا للوصول", async () => {
+test("يبدأ شريط الهاتف بترتيب افتراضي قابل للتخصيص من الإعدادات ويبقي القسم النشط قابلًا للوصول", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
-  assert.match(app, /const mobileNavigationOrder = \["dashboard", "sales", "invoices", "purchases"\]/);
+  assert.match(app, /const DEFAULT_MOBILE_NAVIGATION_ORDER = \["dashboard", "sales", "invoices", "purchases"/);
+  assert.match(app, /function normalizedMobileNavigationOrder\(order = \[\]\)/);
+  assert.match(app, /function mobileNavigationSettingsMarkup\(\)/);
+  assert.match(app, /data-action="move-mobile-nav"/);
+  assert.match(app, /data-action="reset-mobile-nav"/);
   assert.match(app, /<nav class="bottom-nav" data-bottom-nav aria-label="التنقل الرئيسي">\$\{renderItems\(bottomItems\)\}<\/nav>/);
   assert.match(app, /function syncMobileNavigation\(\)[\s\S]*?activeItem\?\.scrollIntoView/);
   assert.match(app, /if \(action === "navigate"\)[\s\S]*?state\.view = view; render\(\);/);

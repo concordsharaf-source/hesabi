@@ -64,6 +64,11 @@ try {
   await waitFor('[data-bottom-nav] [data-view="inventory"]');
   const result = await evaluate(`new Promise((resolve) => { const inventory = document.querySelector('[data-bottom-nav] [data-view="inventory"]'); inventory.click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim(), inventoryVisible: Boolean(document.querySelector('.inventory-list')), expiryAlertVisible: Boolean(document.querySelector('.expiry-inventory-alert')), expiryStatusVisible: Boolean(document.querySelector('.expiry-status')) }), 350); })`);
   assert.deepEqual(result, { active: "inventory", title: "المخزون", inventoryVisible: true, expiryAlertVisible: true, expiryStatusVisible: true });
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="settings"]').click()`);
+  await waitFor('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"]');
+  const reordered = await evaluate(`new Promise((resolve) => { document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"]').click(); setTimeout(() => resolve({ order: [...document.querySelectorAll('[data-bottom-nav] [data-view]')].map((item) => item.dataset.view), settingRows: document.querySelectorAll('.mobile-nav-settings__item').length }), 350); })`);
+  assert.equal(reordered.settingRows, 16);
+  assert.ok(reordered.order.indexOf("inventory") < reordered.order.indexOf("products"), "يجب أن ينتقل المخزون خطوة للأمام بعد تغيير الترتيب.");
   const views = [["dashboard", "نظرة على يومك"], ["sales", "بيع جديد"], ["invoices", "الفواتير"], ["purchases", "المشتريات"], ["inventory", "المخزون"]];
   for (const [view, title] of views) {
     const viewResult = await evaluate(`new Promise((resolve) => { document.querySelector('[data-bottom-nav] [data-view="${view}"]').click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim() }), 250); })`);
