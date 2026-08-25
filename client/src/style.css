@@ -138,6 +138,26 @@ html[data-theme="dark"], html[data-theme="dark"] body { background:radial-gradie
 [data-theme="dark"] .cloud-backup-error { color:#ffe6e3; background:#572d2c; border:1px solid #e88e87; }
 [data-theme="dark"] .setup-form>p,[data-theme="dark"] .setup-sheet__brand div span,[data-theme="dark"] .offline-note,[data-theme="dark"] .topbar__description { color:var(--muted); }
 
+/* سطح المكتب: حقول متسقة وقائمة جانبية واضحة في الوضعين. */
+@media (min-width:960px) {
+  .sidebar { padding:24px 16px; background:linear-gradient(180deg,#fdfefa 0%,#f2f6ef 100%); border-left-color:rgba(31,107,89,.2); box-shadow:-8px 0 28px rgba(24,52,43,.05); }
+  .brand { padding:6px 12px 23px; margin-bottom:8px; border-bottom:1px solid rgba(31,107,89,.16); }
+  .brand strong { color:var(--green-deep); font-size:20px; }.brand small { margin-top:2px; font-size:11px; }
+  .sidebar__label { padding:5px 12px 10px; color:#49685b; font-size:11px; }
+  .sidebar nav { gap:6px; }.sidebar .nav-item { min-height:47px; padding:0 12px; color:#365c4d; background:transparent; border:1px solid transparent; border-radius:12px; font-size:14px; }
+  .sidebar .nav-item:hover { color:var(--green-deep); background:#e5f0e9; border-color:#bcd7c7; }.sidebar .nav-item.is-active { color:#fff; background:linear-gradient(145deg,#21755f,#16473b); border-color:#0f5a47; box-shadow:0 4px 0 #0f5a47,0 9px 16px rgba(15,90,71,.2); }
+  .sidebar__account { padding:13px 12px; background:#e8f2eb; border-color:#b8d3c2; border-radius:14px; }.sidebar__account .text-button { margin-top:1px; color:var(--green-deep); }
+  .sidebar__footer { padding:12px; color:#4d685d; font-size:11px; }
+  .form-grid { align-items:start; gap:16px 18px; }.form-grid>label { gap:8px; font-size:14px; }.form-grid>label>input,.form-grid>label>select { height:46px; font-size:15px; }.form-grid>label>textarea { min-height:108px; font-size:15px; }
+}
+
+@media (min-width:960px) {
+  [data-theme="dark"] .sidebar { background:linear-gradient(180deg,#13261f 0%,#0f1c17 100%); border-left-color:#3e6756; box-shadow:-8px 0 28px rgba(0,0,0,.25); }
+  [data-theme="dark"] .brand { border-bottom-color:#3e6756; }[data-theme="dark"] .brand strong { color:#f4fff8; }[data-theme="dark"] .brand small,[data-theme="dark"] .sidebar__label { color:#b9d5c6; }
+  [data-theme="dark"] .sidebar .nav-item { color:#d8eee2; background:rgba(255,255,255,.025); border-color:rgba(132,190,163,.16); }[data-theme="dark"] .sidebar .nav-item:hover { color:#fff; background:#23493b; border-color:#74b99a; }[data-theme="dark"] .sidebar .nav-item.is-active { color:#fff; background:linear-gradient(145deg,#238465,#14513f); border-color:#75d4aa; box-shadow:0 4px 0 #0a382b,0 9px 17px rgba(0,0,0,.32); }
+  [data-theme="dark"] .sidebar__account { background:#1b382e; border-color:#4a8068; }[data-theme="dark"] .sidebar__account .text-button { color:#e5fff0; }[data-theme="dark"] .sidebar__footer { color:#c5ddd1; }
+}
+
 /* تحصيل البيع: زران متساويان يبرزان وسيلة الدفع المختارة بوضوح. */
 .cloud-backup-card { align-content:start; }.cloud-backup-card__note { display:grid !important; justify-content:initial !important; gap:3px !important; padding:10px 11px; color:var(--green-deep) !important; background:var(--green-pale); border:1px solid rgba(31,107,89,.14); border-radius:11px; font-size:10px !important; line-height:1.7; }.cloud-backup-card__note span { color:var(--muted); }.cloud-backup-list { display:grid; gap:0; margin-top:3px; border-top:1px solid var(--line); }.cloud-backup-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 0; border-bottom:1px solid var(--line); }.cloud-backup-row:last-child { border-bottom:0; }.cloud-backup-row>div:first-child { min-width:0; }.cloud-backup-row strong,.cloud-backup-row small { display:block; }.cloud-backup-row strong { overflow-wrap:anywhere; color:var(--ink); font-size:12px; }.cloud-backup-row small { color:var(--muted); font-size:9px; }.cloud-backup-row__actions { display:flex; flex:0 0 auto; align-items:center; gap:2px; }.cloud-backup-row__actions .button { min-height:36px; padding-inline:10px; font-size:11px; }.cloud-backup-error { padding:9px 10px; margin:0; color:var(--danger); background:var(--danger-pale); border-radius:10px; font-size:10px; line-height:1.7; }
 @media (max-width:599px) { .cloud-backup-row { align-items:flex-start; flex-direction:column; }.cloud-backup-row__actions { width:100%; justify-content:flex-end; }.cloud-backup-row__actions .button { flex:1 1 auto; } }

@@ -202,6 +202,14 @@ test("تستخدم أزرار الوضع الداكن زمرديًا عميقً�
   assert.match(css, /payment-method-toggle__button\.is-cash\.is-selected.*background:#1d6a56/);
 });
 
+test("توحّد واجهة سطح المكتب حقول النماذج وتبرز القائمة الجانبية في الوضعين", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  assert.match(css, /@media \(min-width:960px\) \{[\s\S]*?\.form-grid>label>input,\.form-grid>label>select \{ height:46px; font-size:15px;/);
+  assert.match(css, /\.sidebar \.nav-item\.is-active \{ color:#fff; background:linear-gradient\(145deg,#21755f,#16473b\);/);
+  assert.match(css, /\[data-theme="dark"\] \.sidebar \.nav-item \{ color:#d8eee2; background:rgba\(255,255,255,\.025\);/);
+  assert.match(css, /\[data-theme="dark"\] \.sidebar \.nav-item\.is-active \{ color:#fff; background:linear-gradient\(145deg,#238465,#14513f\);/);
+});
+
 test("تعكس أسهم ترتيب شريط الهاتف اتجاه التقديم والتأخير بصريًا دون تغيير الإجراء", async () => {
   const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
   assert.match(css, /\.mobile-nav-settings__actions \[data-direction="-1"\] svg \{ transform:rotate\(180deg\); \}/);
