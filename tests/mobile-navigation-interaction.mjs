@@ -80,10 +80,17 @@ try {
   await waitFor('#product-form');
   await evaluate(`(() => { const date = new Date(); date.setDate(date.getDate() + 10); document.querySelector('#product-form').elements.nearestExpiryDate.value = date.toISOString().slice(0, 10); document.querySelector('#product-form').requestSubmit(); })()`);
   await waitFor('[data-bottom-nav] [data-view="inventory"]');
-  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]').click()`);
-  await waitFor('[data-action="new-purchase"]');
-  await evaluate(`document.querySelector('[data-action="new-purchase"]').click()`);
-  await waitFor('#purchase-product-search');
+  let purchaseDialogOpened = false;
+  for (let attempt = 0; attempt < 2 && !purchaseDialogOpened; attempt += 1) {
+    await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]')?.click()`);
+    await waitFor('.topbar [data-action="new-purchase"]');
+    await evaluate(`document.querySelector('.topbar [data-action="new-purchase"]').click()`);
+    for (let check = 0; check < 20; check += 1) {
+      if (await evaluate(`Boolean(document.querySelector('#purchase-product-search'))`)) { purchaseDialogOpened = true; break; }
+      await sleep(150);
+    }
+  }
+  assert.ok(purchaseDialogOpened, 'تعذر فتح فاتورة شراء جديدة لاختبار سعر بيع المنتج السابق.');
   await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); search.value = 'منتج قريب الانتهاء'; search.dispatchEvent(new Event('input', { bubbles: true })); })()`);
   await waitFor('[data-add-purchase-product]');
   await evaluate(`document.querySelector('[data-add-purchase-product]').click()`);
