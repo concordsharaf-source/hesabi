@@ -66,7 +66,7 @@ test("يوثق تسليم الصندوق عند تبديل الحساب ويعر
     readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
-  assert.match(database, /const DB_VERSION = 9/);
+  assert.match(database, /const DB_VERSION = 10/);
   assert.match(database, /makeIndexedStore\(database, "cashierShifts"/);
   assert.match(database, /async startCashierShift/);
   assert.match(database, /async closeCashierShift/);
@@ -77,6 +77,25 @@ test("يوثق تسليم الصندوق عند تبديل الحساب ويعر
   assert.match(app, /cashierShiftId: state\.activeCashierShift\?\.id \|\| ""/);
   assert.match(app, /if \(state\.view === "cashbox" && isAdmin\(state\.currentUser\)\)/);
   assert.match(css, /\.cashier-shift-row \{ display:grid;/);
+});
+
+test("تربط واجهة الحسابات راتب الكاشير بسلفة أدمن وملخص الراتب الشهري", async () => {
+  const [app, database, permissions, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/permissions.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /name="monthlySalary"/);
+  assert.match(app, /function openCashierSalaryAdvanceDialog\(/);
+  assert.match(app, /data-action="new-cashier-salary-advance"/);
+  assert.match(app, /function cashierSalarySummaryMarkup\(/);
+  assert.match(app, /cashierSalaryAdvance: true/);
+  assert.match(database, /async listCashierSalarySummaries/);
+  assert.match(database, /cashierSalaryAdvance && expense\.cashierId === account\.id/);
+  assert.match(database, /السلفة تتجاوز المتبقي من راتب/);
+  assert.match(permissions, /"new-cashier-salary-advance"/);
+  assert.match(css, /\.cashier-salary-row \{ display:grid;/);
 });
 
 test("يدعم البحث المباشر برقم الفاتورة ويعرض عددي المنتجات والفواتير بأرقام إنجليزية في الرئيسية", async () => {

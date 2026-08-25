@@ -248,3 +248,29 @@ test("تسجل وردية الكاشير استلام الصندوق ومبيع�
   assert.equal((await db.listCashierShifts()).length, 1);
   await db.resetAllData();
 });
+
+test("تسجل سلفة الكاشير كمصروف واحد وتخصم من راتبه الشهري دون تجاوز المتبقي", async () => {
+  await db.resetAllData();
+  const legacyCashier = await db.createAccount({ username: "legacy-cashier", name: "كاشير قديم", role: "cashier", pin: "1111" });
+  const cashier = await db.createAccount({ username: "salary-cashier", name: "كاشير الراتب", role: "cashier", pin: "2222", monthlySalary: 1000 });
+  assert.equal(legacyCashier.monthlySalary, 0);
+  assert.equal(cashier.monthlySalary, 1000);
+
+  const advance = await db.createExpense({ cashierSalaryAdvance: true, cashierId: cashier.id, amount: 200, date: "2026-08-15", description: "سلفة منتصف الشهر" });
+  assert.equal(advance.category, "سلفة راتب كاشير");
+  assert.equal(advance.cashierId, cashier.id);
+  assert.equal(advance.cashierName, "كاشير الراتب");
+  assert.equal(advance.periodType, "daily");
+
+  const summaries = await db.listCashierSalarySummaries({ month: "2026-08" });
+  const salarySummary = summaries.find((item) => item.accountId === cashier.id);
+  assert.deepEqual({ monthlySalary: salarySummary.monthlySalary, advances: salarySummary.advances, remainingSalary: salarySummary.remainingSalary }, { monthlySalary: 1000, advances: 200, remainingSalary: 800 });
+  assert.equal(summaries.find((item) => item.accountId === legacyCashier.id).remainingSalary, 0);
+
+  const cashbox = await db.getCashbox({ from: "2026-08-15", to: "2026-08-15" });
+  assert.equal(cashbox.expenses, 200);
+  assert.equal(cashbox.closingBalance, -200);
+  await assert.rejects(() => db.createExpense({ cashierSalaryAdvance: true, cashierId: cashier.id, amount: 900, date: "2026-08-20" }), /تتجاوز المتبقي/);
+  assert.equal((await db.listExpenses()).filter((item) => item.cashierSalaryAdvance).length, 1);
+  await db.resetAllData();
+});

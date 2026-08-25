@@ -27,7 +27,7 @@ import { ACTIVE_SESSION_META_ID, toPersistentSessionUser } from "./session.js";
 import { randomId } from "./ids.js";
 
 const DB_NAME = "hesabi-pwa";
-const DB_VERSION = 9;
+const DB_VERSION = 10;
 let databasePromise;
 
 const uid = (prefix) => `${prefix}-${randomId()}`;
@@ -70,16 +70,18 @@ async function createAccountRecord(values) {
   if (!username || username.length < 3 || username.length > 30) throw new Error("اسم المستخدم يجب أن يتكون من 3 إلى 30 حرفًا أو رقمًا.");
   if (!name) throw new Error("اسم الحساب مطلوب.");
   if (!validatePin(values.pin)) throw new Error("رمز الدخول يجب أن يتكون من 4 إلى 12 رقمًا.");
+  const role = accountRole(values.role);
   const pinSalt = makeSalt();
   return {
     id: uid("account"),
     username,
     name,
-    role: accountRole(values.role),
+    role,
     pinSalt,
     pinHash: await hashPin(values.pin, pinSalt),
     mustChangePin: Boolean(values.mustChangePin),
     isActive: values.isActive !== false,
+    monthlySalary: role === "cashier" ? Math.max(0, toNumber(values.monthlySalary)) : 0,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
@@ -217,7 +219,8 @@ export const db = {
       if (all.filter((account) => account.role === "admin" && account.isActive).length <= 1) throw new Error("يجب الإبقاء على حساب أدمن نشط واحد على الأقل.");
     }
     const name = normalize(values.name ?? current.name); if (!name) throw new Error("اسم الحساب مطلوب.");
-    const updated = { ...current, name, role: nextRole, isActive: nextActive, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
+    const monthlySalary = nextRole === "cashier" ? Math.max(0, toNumber(values.monthlySalary ?? current.monthlySalary)) : 0;
+    const updated = { ...current, name, role: nextRole, isActive: nextActive, monthlySalary, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
   },
   async changeAccountPin(accountId, pin) {
     if (!validatePin(pin)) throw new Error("رمز الدخول يجب أن يتكون من 4 إلى 12 رقمًا.");
@@ -405,7 +408,32 @@ export const db = {
   async resetAllData() { const database = await this.open(); const storeNames = Array.from(database.objectStoreNames); const transaction = database.transaction(storeNames, "readwrite"); storeNames.forEach((name) => transaction.objectStore(name).clear()); await transactionDone(transaction); },
 
   async listExpenses() { const database = await this.open(); const items = await requestAsPromise(database.transaction("expenses", "readonly").objectStore("expenses").getAll()); return items.sort((a, b) => new Date(b.date) - new Date(a.date)); },
-  async createExpense(values) { const amount = Math.max(0, toNumber(values.amount)); if (amount <= 0) throw new Error("أدخل مبلغ مصروف أكبر من صفر."); const periodType = values.periodType === "monthly" ? "monthly" : "daily"; const database = await this.open(); const transaction = database.transaction("expenses", "readwrite"); const expense = { id: uid("expense"), amount, periodType, category: normalize(values.category || (periodType === "monthly" ? "مصروفات شهرية أخرى" : "مصروفات يومية أخرى")), description: normalize(values.description), date: values.date || dateKey(), notes: normalize(values.notes), createdAt: nowIso(), updatedAt: nowIso() }; transaction.objectStore("expenses").add(expense); await transactionDone(transaction); return expense; },
+  async listCashierSalarySummaries({ month = dateKey().slice(0, 7) } = {}) {
+    const database = await this.open(); const transaction = database.transaction(["accounts", "expenses"], "readonly");
+    const [accounts, expenses] = await Promise.all([requestAsPromise(transaction.objectStore("accounts").getAll()), requestAsPromise(transaction.objectStore("expenses").getAll())]);
+    await transactionDone(transaction);
+    return accounts.filter((account) => account.role === "cashier").sort((a, b) => a.name.localeCompare(b.name, "ar")).map((account) => {
+      const monthlySalary = Math.max(0, toNumber(account.monthlySalary));
+      const advances = roundMoney(expenses.filter((expense) => expense.cashierSalaryAdvance && expense.cashierId === account.id && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+      return { accountId: account.id, accountName: account.name, month, monthlySalary, advances, remainingSalary: roundMoney(monthlySalary - advances) };
+    });
+  },
+  async createExpense(values) {
+    const amount = Math.max(0, toNumber(values.amount)); if (amount <= 0) throw new Error("أدخل مبلغ مصروف أكبر من صفر.");
+    const isCashierSalaryAdvance = values.cashierSalaryAdvance === true || values.cashierSalaryAdvance === "on";
+    const periodType = isCashierSalaryAdvance ? "daily" : (values.periodType === "monthly" ? "monthly" : "daily"); const date = values.date || dateKey();
+    const database = await this.open(); const transaction = database.transaction(isCashierSalaryAdvance ? ["accounts", "expenses"] : ["expenses"], "readwrite");
+    let cashier = null;
+    if (isCashierSalaryAdvance) {
+      const cashierId = normalize(values.cashierId); cashier = await requestAsPromise(transaction.objectStore("accounts").get(cashierId));
+      if (!cashier || cashier.role !== "cashier") throw new Error("اختر كاشيرًا صالحًا لسلفة الراتب.");
+      const monthlySalary = Math.max(0, toNumber(cashier.monthlySalary)); if (monthlySalary <= 0) throw new Error("سجّل راتبًا شهريًا للكاشير أولًا.");
+      const month = String(date).slice(0, 7); const expenses = await requestAsPromise(transaction.objectStore("expenses").getAll());
+      const priorAdvances = roundMoney(expenses.filter((expense) => expense.cashierSalaryAdvance && expense.cashierId === cashierId && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+      if (roundMoney(priorAdvances + amount) > monthlySalary) throw new Error(`السلفة تتجاوز المتبقي من راتب ${cashier.name} لهذا الشهر (${roundMoney(monthlySalary - priorAdvances)}).`);
+    }
+    const expense = { id: uid("expense"), amount, periodType, category: isCashierSalaryAdvance ? "سلفة راتب كاشير" : normalize(values.category || (periodType === "monthly" ? "مصروفات شهرية أخرى" : "مصروفات يومية أخرى")), description: isCashierSalaryAdvance ? normalize(values.description || `سلفة من راتب ${cashier.name}`) : normalize(values.description), date, notes: normalize(values.notes), cashierSalaryAdvance: isCashierSalaryAdvance, cashierId: isCashierSalaryAdvance ? cashier.id : "", cashierName: isCashierSalaryAdvance ? cashier.name : "", createdAt: nowIso(), updatedAt: nowIso() }; transaction.objectStore("expenses").add(expense); await transactionDone(transaction); return expense;
+  },
   async updateExpense(expenseId, values) { const database = await this.open(); const transaction = database.transaction("expenses", "readwrite"); const store = transaction.objectStore("expenses"); const current = await requestAsPromise(store.get(expenseId)); if (!current) throw new Error("المصروف غير موجود."); const amount = Math.max(0, toNumber(values.amount)); if (amount <= 0) throw new Error("أدخل مبلغ مصروف أكبر من صفر."); const periodType = values.periodType === "monthly" ? "monthly" : "daily"; const updated = { ...current, amount, periodType, category: normalize(values.category || current.category), description: normalize(values.description), date: values.date || current.date, notes: normalize(values.notes), updatedAt: nowIso() }; store.put(updated); await transactionDone(transaction); return updated; },
   async deleteExpense(expenseId) { const database = await this.open(); const transaction = database.transaction("expenses", "readwrite"); transaction.objectStore("expenses").delete(expenseId); await transactionDone(transaction); },
 
