@@ -52,6 +52,8 @@ try {
   await waitFor("#required-pin-form");
   await evaluate(`(() => { const form = document.querySelector('#required-pin-form'); form.elements.pin.value = '1234'; form.elements.pinConfirm.value = '1234'; form.requestSubmit(); })()`);
   await waitFor('[data-bottom-nav] [data-view="inventory"]');
+  const storeNameInHeader = await evaluate(`document.querySelector('.topbar .eyebrow')?.textContent?.trim()`);
+  assert.equal(storeNameInHeader, 'متجر اختبار');
   await evaluate(`document.querySelector('[data-action="account-session"]').click()`);
   await waitFor('#open-local-logout-confirm');
   await evaluate(`document.querySelector('#open-local-logout-confirm').click()`);

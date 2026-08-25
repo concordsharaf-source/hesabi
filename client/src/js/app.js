@@ -265,7 +265,7 @@ function themeToggleMarkup() { const dark = state.settings?.theme === "dark"; re
 function salesScannerFabMarkup() { return `<button class="sales-scanner-fab" data-action="open-sales-scanner" data-mode="sale" aria-label="فتح المبيعات ومسح الباركود" title="بيع ومسح باركود">${icon("cart", 22)}<span>بيع</span></button>`; }
 
 function topbarMarkup(title, description, action = "", modifierClass = "") {
-  return `<header class="topbar${modifierClass ? ` ${modifierClass}` : ""}"><div><p class="eyebrow">${escapeHtml(state.settings?.businessType || "إدارة المتجر")}</p><h1>${title}</h1>${description ? `<p class="topbar__description">${description}</p>` : ""}</div><div class="topbar__actions"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span>${action}${themeToggleMarkup()}<button class="icon-button" data-action="account-session" aria-label="تبديل المستخدمين أو تسجيل الخروج" title="تبديل المستخدمين أو تسجيل الخروج">${icon("users", 18)}</button></div></header>`;
+  return `<header class="topbar${modifierClass ? ` ${modifierClass}` : ""}"><div><p class="eyebrow">${escapeHtml(state.settings?.storeName || "إدارة المتجر")}</p><h1>${title}</h1>${description ? `<p class="topbar__description">${description}</p>` : ""}</div><div class="topbar__actions"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span>${action}${themeToggleMarkup()}<button class="icon-button" data-action="account-session" aria-label="تبديل المستخدمين أو تسجيل الخروج" title="تبديل المستخدمين أو تسجيل الخروج">${icon("users", 18)}</button></div></header>`;
 }
 
 function dashboardMarkup() {

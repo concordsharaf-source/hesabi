@@ -58,6 +58,12 @@ test("يدعم البحث المباشر برقم الفاتورة ويعرض ع
   assert.match(app, /amountLatin\(dashboard\.todayInvoiceCount\)/);
 });
 
+test("يعرض رأس التطبيق اسم المتجر بدل نوع النشاط", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /escapeHtml\(state\.settings\?\.storeName \|\| "إدارة المتجر"\)/);
+  assert.doesNotMatch(app, /escapeHtml\(state\.settings\?\.businessType \|\| "إدارة المتجر"\)/);
+});
+
 test("يربط خيار البقاء وكل عناصر إغلاق النافذة بدالة الإغلاق الموحدة", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
   assert.match(app, /data-dialog-close>البقاء في التطبيق/);
