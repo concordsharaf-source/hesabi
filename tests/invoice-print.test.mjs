@@ -222,8 +222,9 @@ test("يعرض الخصم العام فقط في مراجعة البيع ويخ�
   assert.doesNotMatch(app, /data-cart-line-discount/);
   assert.doesNotMatch(app, /الإجمالي المبدئي/);
   assert.match(style, /inventory-summary div,\.account-summary>div/);
-  assert.match(style, /\.delivery-compact__amount,\.delivery-choice \{ box-sizing:border-box; align-self:stretch; width:100%; height:100%;/);
-  assert.match(style, /\.delivery-compact__amount,\.delivery-choice \{ min-height:45px; height:100%;/);
+  assert.match(style, /\.delivery-compact \{ display:grid; grid-template-columns:repeat\(3,minmax\(0,1fr\)\); align-items:end;/);
+  assert.match(style, /\.delivery-choice \{ position:relative;[\s\S]*?align-self:end; min-height:29px; height:29px;/);
+  assert.match(app, /<button class="button button--secondary" type="submit">ابحث<\/button>/);
   assert.match(style, /\.nav-item \{[^}]*color:#315a4b;/);
   assert.match(style, /\[data-theme="dark"\] \.bottom-nav \.nav-item \{ color:#d9f4e6; \}/);
   assert.match(style, /\.metric-card \{[^}]*background:#12634f;[^}]*border:2px solid #76d8b2;/);
