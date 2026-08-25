@@ -101,6 +101,13 @@ test("تتيح صفحة دفعات الموردين اختيار المورد ا
   assert.match(permissions, /"new-supplier-payment"/);
 });
 
+test("اختيار منتج في فاتورة الشراء يهيئ حقول العبوة مرة واحدة دون مراقب DOM يعيد الرسم بلا نهاية", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.doesNotMatch(app, /new MutationObserver\(hydrateBusinessPurchaseFields\)/);
+  assert.match(app, /linesHost\.innerHTML = lines\.length[\s\S]*?hydrateBusinessPurchaseFields\(\);[\s\S]*?syncPurchase\(\);/);
+  assert.match(app, /const addPurchaseProduct = \(product\)[\s\S]*?renderLines\(\);/);
+});
+
 test("يعرض اختصاري حساب المورد والاتصال بجانب المنتج المرتبط به في قوائم المنتج والمخزون والبيع", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
@@ -211,8 +218,9 @@ test("يعرض الخصم العام فقط في مراجعة البيع ويخ�
   assert.match(style, /\.delivery-compact__amount,\.delivery-choice \{ min-height:45px; height:100%;/);
   assert.match(style, /\.nav-item \{[^}]*color:#315a4b;/);
   assert.match(style, /\[data-theme="dark"\] \.bottom-nav \.nav-item \{ color:#d9f4e6; \}/);
-  assert.match(app, /metric-card--\$\{tone\}/);
   assert.match(style, /\.metric-card \{[^}]*background:#12634f;[^}]*border:2px solid #76d8b2;/);
-  assert.match(style, /\.metric-card--sales,\.metric-card--cash \{ background:#087a58; border-color:#8be8c8;/);
+  assert.doesNotMatch(style, /\.metric-card--sales/);
+  assert.doesNotMatch(app, /metric-card--/);
+  assert.match(style, /\[data-theme="dark"\] \.metric-card \{[^}]*background:#12634f;/);
   assert.match(style, /\.metric-card\.is-negative \{ background:#a73340; border-color:#ffc3ca;/);
 });

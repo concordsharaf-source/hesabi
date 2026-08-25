@@ -59,12 +59,6 @@ h1,h2,h3,strong { letter-spacing:-.02em; }
 .metric-card strong { margin:3px 0 auto; color:#fff; font-size:19px; white-space:nowrap; }
 .metric-card span { color:#e7fff4; font-size:9px; line-height:1.45; }
 .metric-card:active { transform:translateY(3px); box-shadow:0 2px 0 #093d31,0 5px 10px rgba(9,61,49,.18); }
-.metric-card--sales,.metric-card--cash { background:#087a58; border-color:#8be8c8; box-shadow:0 5px 0 #04533b,0 10px 18px rgba(4,83,59,.24); }.metric-card--sales .metric-card__icon,.metric-card--cash .metric-card__icon { background:#055a42; }
-.metric-card--purchases,.metric-card--transfers { background:#216ca3; border-color:#a6dcff; box-shadow:0 5px 0 #124b76,0 10px 18px rgba(18,75,118,.24); }.metric-card--purchases .metric-card__icon,.metric-card--transfers .metric-card__icon { background:#15527f; }
-.metric-card--expenses,.metric-card--debts { background:#a84e2a; border-color:#ffd0b3; box-shadow:0 5px 0 #743116,0 10px 18px rgba(116,49,22,.24); }.metric-card--expenses .metric-card__icon,.metric-card--debts .metric-card__icon { background:#813716; }
-.metric-card--profit { background:#66409b; border-color:#dcc0ff; box-shadow:0 5px 0 #44266c,0 10px 18px rgba(68,38,108,.24); }.metric-card--profit .metric-card__icon { background:#4e2d79; }
-.metric-card--products,.metric-card--invoices { background:#4c7048; border-color:#c5edbd; box-shadow:0 5px 0 #2f4a2d,0 10px 18px rgba(47,74,45,.24); }.metric-card--products .metric-card__icon,.metric-card--invoices .metric-card__icon { background:#385b35; }
-.metric-card--inventory,.metric-card--payments { background:#286d7a; border-color:#aae8ef; box-shadow:0 5px 0 #174953,0 10px 18px rgba(23,73,83,.24); }.metric-card--inventory .metric-card__icon,.metric-card--payments .metric-card__icon { background:#1b5560; }
 .metric-card.is-negative { background:#a73340; border-color:#ffc3ca; box-shadow:0 5px 0 #6f1e28,0 10px 18px rgba(111,30,40,.26); }.metric-card.is-negative .metric-card__icon { background:#7d222c; }.metric-card.is-negative strong { color:#fff !important; }
 .dashboard-split { display:grid; gap:16px; }
 .panel { overflow:hidden; background:rgba(255,255,250,.76); border:1px solid rgba(255,255,255,.9); border-radius:var(--radius); box-shadow:var(--shadow); }
@@ -131,8 +125,7 @@ html[data-theme="dark"], html[data-theme="dark"] body { background:radial-gradie
 [data-theme="dark"] .setup-sheet:before { background:rgba(223,185,111,.26); }
 [data-theme="dark"] .setup-sheet__brand strong,[data-theme="dark"] .setup-form h2 { color:var(--green-deep); }
 [data-theme="dark"] .bottom-nav { border-color:#2d4b40; box-shadow:0 -8px 24px rgba(0,0,0,.24); }[data-theme="dark"] .bottom-nav .nav-item { color:#d9f4e6; }
-[data-theme="dark"] .metric-card { color:#fff; border-color:#b3f3d5; box-shadow:0 5px 0 #072c23,0 10px 18px rgba(0,0,0,.34); }
-[data-theme="dark"] .metric-card--sales,[data-theme="dark"] .metric-card--cash { background:#087a58; }[data-theme="dark"] .metric-card--purchases,[data-theme="dark"] .metric-card--transfers { background:#216ca3; }[data-theme="dark"] .metric-card--expenses,[data-theme="dark"] .metric-card--debts { background:#a84e2a; }[data-theme="dark"] .metric-card--profit { background:#66409b; }[data-theme="dark"] .metric-card--products,[data-theme="dark"] .metric-card--invoices { background:#4c7048; }[data-theme="dark"] .metric-card--inventory,[data-theme="dark"] .metric-card--payments { background:#286d7a; }[data-theme="dark"] .metric-card.is-negative { background:#a73340; border-color:#ffc3ca; }
+[data-theme="dark"] .metric-card { color:#fff; background:#12634f; border-color:#b3f3d5; box-shadow:0 5px 0 #072c23,0 10px 18px rgba(0,0,0,.34); }[data-theme="dark"] .metric-card__icon { color:#fff; background:#0d4d3e; border-color:rgba(255,255,255,.34); }[data-theme="dark"] .metric-card.is-negative { background:#a73340; border-color:#ffc3ca; }
 [data-theme="dark"] .cart-panel { background:#10201b; }
 [data-theme="dark"] .quantity-control>button,[data-theme="dark"] .quantity-control__button { color:var(--green-deep); background:#244438; }
 [data-theme="dark"] .payment-type { border-color:var(--line); }

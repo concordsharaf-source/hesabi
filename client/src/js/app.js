@@ -214,18 +214,18 @@ function dashboardMarkup() {
   return `${topbarMarkup("نظرة على يومك", "تابع المبيعات والمخزون من سجل واحد واضح.", `<button class="button button--primary" data-action="navigate" data-view="sales">${icon("cart", 18)}<span>بيع جديد</span></button>`)}
   <section class="daily-ribbon"><div><span class="presence-dot"></span><strong>اليوم التشغيلي</strong><small>كل عملية تحفظ على هذا الجهاز تلقائيًا</small></div><div class="daily-ribbon__date">${new Intl.DateTimeFormat("ar-SA", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</div></section>
   <section class="metric-grid">
-    ${metricCard("مبيعات اليوم", money(dashboard.todaySales), "trend", "قيمة الفواتير المكتملة", dashboard.todaySales, "sales")}
-    ${metricCard("مشتريات اليوم", money(dashboard.todayPurchases), "truck", "توريد محفوظ", dashboard.todayPurchases, "purchases")}
-    ${metricCard("مصروفات اليوم", money(dashboard.todayExpenses), "wallet", "تؤثر على صافي الربح", dashboard.todayExpenses, "expenses")}
-    ${metricCard("أرباح اليوم", money(dashboard.todayProfit), "chart", "صافي بعد التكلفة والمصروفات", dashboard.todayProfit, "profit")}
-    ${metricCard("المنتجات", amountLatin(dashboard.productCount), "package", "منتجات فعّالة", 0, "products")}
-    ${metricCard("قيمة المخزون", money(dashboard.inventoryValue), "layers", "وفق سعر الشراء", 0, "inventory")}
-    ${metricCard("فواتير اليوم", amountLatin(dashboard.todayInvoiceCount), "receipt", "عملية بيع محفوظة", 0, "invoices")}
-    ${metricCard("ديون العملاء", money(dashboard.customerDebt), "users", "رصيد مستحق", 0, "debts")}
-    ${metricCard("تحويلات اليوم", money(transfers.total), "transfer", transfers.count ? `${amount(transfers.count)} تحصيل بتحويل` : "لا توجد تحويلات اليوم", transfers.total, "transfers")}
-    ${metricCard("دفعات اليوم", money(dashboard.todayCustomerPayments), "wallet", "تسديد ديون سابقة", 0, "payments")}
-    ${metricCard("مستحقات الموردين", money(dashboard.supplierDebt), "truck", "شراء آجل غير مسدد", 0, "debts")}
-    ${metricCard("الداخل للصندوق", money(dashboard.todayCashIn), "wallet", "نقد وارد اليوم فقط", dashboard.todayCashIn, "cash")}
+    ${metricCard("مبيعات اليوم", money(dashboard.todaySales), "trend", "قيمة الفواتير المكتملة", dashboard.todaySales)}
+    ${metricCard("مشتريات اليوم", money(dashboard.todayPurchases), "truck", "توريد محفوظ", dashboard.todayPurchases)}
+    ${metricCard("مصروفات اليوم", money(dashboard.todayExpenses), "wallet", "تؤثر على صافي الربح", dashboard.todayExpenses)}
+    ${metricCard("أرباح اليوم", money(dashboard.todayProfit), "chart", "صافي بعد التكلفة والمصروفات", dashboard.todayProfit)}
+    ${metricCard("المنتجات", amountLatin(dashboard.productCount), "package", "منتجات فعّالة")}
+    ${metricCard("قيمة المخزون", money(dashboard.inventoryValue), "layers", "وفق سعر الشراء")}
+    ${metricCard("فواتير اليوم", amountLatin(dashboard.todayInvoiceCount), "receipt", "عملية بيع محفوظة")}
+    ${metricCard("ديون العملاء", money(dashboard.customerDebt), "users", "رصيد مستحق")}
+    ${metricCard("تحويلات اليوم", money(transfers.total), "transfer", transfers.count ? `${amount(transfers.count)} تحصيل بتحويل` : "لا توجد تحويلات اليوم", transfers.total)}
+    ${metricCard("دفعات اليوم", money(dashboard.todayCustomerPayments), "wallet", "تسديد ديون سابقة")}
+    ${metricCard("مستحقات الموردين", money(dashboard.supplierDebt), "truck", "شراء آجل غير مسدد")}
+    ${metricCard("الداخل للصندوق", money(dashboard.todayCashIn), "wallet", "نقد وارد اليوم فقط", dashboard.todayCashIn)}
   </section>
   <section class="dashboard-split">
     ${isPharmacy() ? `<article class="panel panel--low-stock"><div class="panel__head"><div><span class="eyebrow">تنبيه صيدلي</span><h2>صلاحيات تحتاج متابعة</h2></div><button class="text-button" data-action="navigate" data-view="inventory">عرض المخزون ${icon("arrow", 16)}</button></div>${expiring.length ? `<div class="warning-list">${expiring.map((batch) => { const days = Math.ceil((new Date(`${batch.expiryDate}T00:00:00`).getTime() - todayAtMidnight) / 86400000); return `<button class="warning-row" data-action="open-product" data-id="${batch.productId}"><div class="warning-row__icon">${icon("alert", 18)}</div><div><strong>${escapeHtml(batch.product.name)}</strong><small>تشغيلة ${escapeHtml(batch.batchNumber || "—")} · المتبقي ${amount(batch.remainingQuantity)} ${escapeHtml(batch.product.unit)} · تنتهي ${batch.expiryDate}</small></div><strong class="${days <= 30 ? "is-negative" : ""}">${days < 0 ? "منتهٍ" : `بعد ${amount(days)} يوم`}</strong></button>`; }).join("")}</div>` : `<p class="panel__empty">لا توجد تشغيلات تنتهي خلال 90 يومًا.</p>`}</article>` : ""}
@@ -237,8 +237,8 @@ function dashboardMarkup() {
   </section>`;
 }
 
-function metricCard(label, value, iconName, helper, rawValue = 0, tone = "") {
-  return `<article class="metric-card ${tone ? `metric-card--${tone}` : ""} ${toNumber(rawValue) < 0 ? "is-negative" : ""}"><div class="metric-card__icon">${icon(iconName, 19)}</div><div><small>${label}</small><strong>${value}</strong><span>${helper}</span></div></article>`;
+function metricCard(label, value, iconName, helper, rawValue = 0) {
+  return `<article class="metric-card ${toNumber(rawValue) < 0 ? "is-negative" : ""}"><div class="metric-card__icon">${icon(iconName, 19)}</div><div><small>${label}</small><strong>${value}</strong><span>${helper}</span></div></article>`;
 }
 function packageFieldLabels(packageUnit, stockUnit = "حبة") { const labels = { "حبة": "الحبات", "علبة": "العلب", "كرتون": "الكراتين", "كيس": "الأكياس", "حزمة": "الحزم", "ربطة": "الربطات", "صندوق": "الصناديق", "شريط": "الشرائط", "عبوة": "العبوات", "دزينة": "الدزينات", "قطعة": "القطع", "طقم": "الأطقم", "جهاز": "الأجهزة" }; const label = labels[packageUnit] || "العبوات"; return { quantity: `عدد ${label}`, units: `${stockUnit}/${packageUnit}`, cost: `سعر ${packageUnit}` }; }
 
@@ -1027,7 +1027,6 @@ async function openPurchaseDialog(purchaseIdOrDraft = null) {
     if (!isPharmacy()) return;
     linesHost.querySelectorAll(".purchase-line").forEach((row, index) => { if (row.querySelector("[data-purchase-batch-number]")) return; const line = lines[index]; row.querySelector(".purchase-line__total")?.insertAdjacentHTML("beforebegin", `<label>رقم التشغيلة<input data-purchase-batch-number="${index}" dir="ltr" required value="${escapeHtml(line.batchNumber || "")}" /></label><label>تاريخ الانتهاء<input data-purchase-expiry-date="${index}" type="date" required value="${escapeHtml(line.expiryDate || "")}" /></label>`); });
   };
-  const purchaseFieldsObserver = new MutationObserver(hydrateBusinessPurchaseFields); purchaseFieldsObserver.observe(linesHost, { childList: true, subtree: true });
   linesHost.addEventListener("input", (event) => { const index = Number(event.target.dataset.purchaseBatchNumber ?? event.target.dataset.purchaseExpiryDate); if (!Number.isFinite(index)) return; if (event.target.dataset.purchaseBatchNumber !== undefined) lines[index].batchNumber = event.target.value.trim(); if (event.target.dataset.purchaseExpiryDate !== undefined) lines[index].expiryDate = event.target.value; });
   const getDraft = () => ({ supplierId: form.supplierId.value, notes: form.notes.value, paymentType: form.paymentType.value, paidAmount: paidInput.value, paymentMethod: form.paymentMethod.value, lines: lines.map((line) => ({ ...line })) });
   const refreshPackMath = (line) => Object.assign(line, calculatePackagePurchase({ packageQuantity: line.packageQuantity, unitsPerPackage: line.unitsPerPackage, packageCost: line.packageCost }));
@@ -1035,6 +1034,7 @@ async function openPurchaseDialog(purchaseIdOrDraft = null) {
   const packageLabels = (packageUnit) => ({ "حبة": { quantity: "عدد الحبات", units: "حبة/حبة", cost: "سعر الحبة" }, "علبة": { quantity: "عدد العلب", units: "حبة/علبة", cost: "سعر العلبة" }, "كرتون": { quantity: "عدد الكراتين", units: "حبة/كرتون", cost: "سعر الكرتون" }, "كيس": { quantity: "عدد الأكياس", units: "حبة/كيس", cost: "سعر الكيس" }, "حزمة": { quantity: "عدد الحزم", units: "حبة/حزمة", cost: "سعر الحزمة" }, "ربطة": { quantity: "عدد الربطات", units: "حبة/ربطة", cost: "سعر الربطة" }, "صندوق": { quantity: "عدد الصناديق", units: "حبة/صندوق", cost: "سعر الصندوق" } }[packageUnit] || { quantity: "عدد العبوات", units: "حبات/عبوة", cost: "سعر العبوة" });
   const renderLines = () => {
     linesHost.innerHTML = lines.length ? lines.map((line, index) => { const labels = packageLabels(line.packageUnit); return `<article class="purchase-line purchase-line--pack"><div><strong>${escapeHtml(line.productName)}</strong><small>سيضاف ${amount(line.quantity)} ${escapeHtml(line.unit)} إلى المخزون</small></div><label>نوع العبوة<select data-purchase-package-unit="${index}">${PACKAGE_UNITS.map((unit) => `<option value="${unit}" ${line.packageUnit === unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label><label>${labels.quantity}<input data-purchase-package-quantity="${index}" type="number" inputmode="decimal" min="0.001" step="0.001" value="${line.packageQuantity || ""}" /></label><label>${labels.units}<input data-purchase-units-per-package="${index}" type="number" inputmode="numeric" min="1" step="1" value="${line.unitsPerPackage || ""}" /></label><label>${labels.cost}<input data-purchase-package-cost="${index}" type="number" inputmode="decimal" min="0" step="0.01" value="${line.packageCost || ""}" /></label><label>سعر الحبة<output>${money(line.unitCost)}</output></label><label>سعر البيع للحبة<input data-purchase-sale-price="${index}" type="number" inputmode="decimal" min="0" step="0.01" value="${line.salePrice || ""}" /></label><strong class="purchase-line__total">${money(line.total)}</strong><button data-remove-purchase-line="${index}" class="icon-button icon-button--danger" type="button" aria-label="حذف">${icon("close", 17)}</button></article>`; }).join("") : `<div class="inline-empty">أضف منتجًا واحدًا على الأقل.</div>`;
+    hydrateBusinessPurchaseFields();
     syncPurchase();
     linesHost.querySelectorAll("[data-purchase-package-unit]").forEach((input) => input.addEventListener("change", (event) => { lines[Number(event.currentTarget.dataset.purchasePackageUnit)].packageUnit = event.currentTarget.value; renderLines(); }));
     [["[data-purchase-package-quantity]", "purchasePackageQuantity", "packageQuantity"], ["[data-purchase-units-per-package]", "purchaseUnitsPerPackage", "unitsPerPackage"], ["[data-purchase-package-cost]", "purchasePackageCost", "packageCost"]].forEach(([selector, datasetKey, key]) => linesHost.querySelectorAll(selector).forEach((input) => input.addEventListener("change", (event) => { const index = Number(event.currentTarget.dataset[datasetKey]); lines[index][key] = Math.max(0, toNumber(event.currentTarget.value)); refreshPackMath(lines[index]); renderLines(); })));
