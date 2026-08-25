@@ -125,6 +125,15 @@ test("شراء غير الصيدلية يقبل تاريخ انتهاء اختي
   await db.resetAllData();
 });
 
+test("يمكن تعديل تاريخ انتهاء المنتج مباشرة من صفحة المنتجات", async () => {
+  await db.resetAllData();
+  const product = await db.createProduct({ name: "منتج بتاريخ يدوي", unit: "حبة", purchasePrice: 30, salePrice: 50, quantity: 5, minimumStock: 1, nearestExpiryDate: "2099-12-31" });
+  assert.equal(product.nearestExpiryDate, "2099-12-31");
+  const updated = await db.updateProduct(product.id, { name: product.name, barcode: "", internalCode: "", category: "عام", purchasePrice: 30, salePrice: 50, minimumStock: 1, unit: "حبة", nearestExpiryDate: "2100-01-31" });
+  assert.equal(updated.nearestExpiryDate, "2100-01-31");
+  await db.resetAllData();
+});
+
 test("بيع الصيدلية يستهلك التشغيلة الأقرب انتهاءً أولًا ويترك الأحدث للمبيعات التالية", async () => {
   await db.resetAllData();
   await db.saveSettings({ storeName: "صيدلية التشغيلة", businessType: "صيدلية", currency: "YER" });

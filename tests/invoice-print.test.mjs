@@ -131,6 +131,13 @@ test("تظهر صلاحية الشراء في المخزون بتحذير برت
   assert.match(styles, /\.expiry-status--danger \{ color:#8b1d31; background:#fde6e9; border-color:#cf4f63;/);
 });
 
+test("يبدأ شريط الهاتف بالمبيعات ثم الفواتير ثم المشتريات ويعرض تاريخ الانتهاء في نموذج المنتج", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /const mobileNavigationOrder = \["sales", "invoices", "purchases"\]/);
+  assert.match(app, /<nav class="bottom-nav" aria-label="التنقل الرئيسي">\$\{renderItems\(bottomItems\)\}<\/nav>/);
+  assert.match(app, /input\("nearestExpiryDate", "تاريخ الانتهاء", "date", product\?\.nearestExpiryDate \?\? ""\)/);
+});
+
 test("يعرض اختصاري حساب المورد والاتصال بجانب المنتج المرتبط به في قوائم المنتج والمخزون والبيع", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
