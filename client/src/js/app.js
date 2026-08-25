@@ -2,7 +2,7 @@
 /* اتجاه التصميم: دفتر التاجر الهادئ — تفاعلات سريعة، RTL واضح، وماسح منتج لا يقطع سياق النموذج. */
 import { ACCOUNT_ROLES, BUSINESS_PROFILES, BUSINESS_TYPES, CURRENCIES, DAILY_EXPENSE_CATEGORIES, DEFAULT_CURRENCY_CODE, EXPENSE_CATEGORIES, MONTHLY_EXPENSE_CATEGORIES, NAV_ITEMS, PACKAGE_UNITS, PAYMENT_METHODS, UNITS } from "./constants.js";
 import { db } from "./database.js";
-import { calculatePackagePurchase, calculateSaleTotals, calculateTransferCollections, dateKey, roundMoney, stockStatus, toNumber } from "./domain.js";
+import { calculateDiscountAmount, calculatePackagePurchase, calculateSaleTotals, calculateTransferCollections, dateKey, roundMoney, stockStatus, toNumber } from "./domain.js";
 import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { renderCustomerAccountHtml } from "./customer-account-print.js";
@@ -431,8 +431,10 @@ function salesMarkup() {
 
 function cartLine(line) {
   const product = state.products.find((item) => item.id === line.productId);
-  const lineTotal = roundMoney(toNumber(line.unitPrice) * toNumber(line.quantity));
-  return `<article class="cart-line"><div class="cart-line__detail"><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(line.name)}</strong><small>${money(line.unitPrice)} × ${amount(line.quantity)}</small></div><strong data-cart-line-total="${line.productId}">${money(lineTotal)}</strong><div class="quantity-control quantity-control--dark"><button aria-label="إنقاص" data-action="cart-decrement" data-id="${line.productId}">${icon("minus", 15)}</button><input data-cart-quantity="${line.productId}" type="number" inputmode="decimal" min="1" max="${toNumber(product?.quantity)}" step="1" value="${line.quantity}" /><button aria-label="زيادة" data-action="cart-increment" data-id="${line.productId}">${icon("plus", 15)}</button></div><button class="remove-line" aria-label="حذف من السلة" data-action="cart-remove" data-id="${line.productId}">${icon("close", 16)}</button></article>`;
+  const unitsPerPackage = Math.max(1, Math.floor(toNumber(line.unitsPerPackage ?? product?.unitsPerPackage) || 1)); const packageUnit = line.packageUnit || product?.purchasePackageUnit || "كرتون"; const soldAsPackage = Boolean(line.soldAsPackage && unitsPerPackage > 1); const cartonCount = Math.max(1, Math.round(toNumber(line.quantity) / unitsPerPackage)); const totals = calculateSaleTotals([line]); const canSellCarton = unitsPerPackage > 1 && toNumber(product?.quantity) >= unitsPerPackage;
+  const quantityInput = soldAsPackage ? `<input data-cart-carton-count="${line.productId}" type="number" inputmode="numeric" min="1" max="${Math.floor(toNumber(product?.quantity) / unitsPerPackage)}" step="1" value="${cartonCount}" aria-label="عدد الكراتين" />` : `<input data-cart-quantity="${line.productId}" type="number" inputmode="decimal" min="1" max="${toNumber(product?.quantity)}" step="1" value="${line.quantity}" aria-label="عدد الحبات" />`;
+  const cashierHint = state.currentUser?.role === "cashier" ? "حد الكاشير: 10% من قيمة السطر." : "مثال: 100 أو 10%";
+  return `<article class="cart-line ${soldAsPackage ? "cart-line--package" : ""}"><div class="cart-line__detail"><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(line.name)}</strong><small>${money(line.unitPrice)} × ${amount(line.quantity)} ${escapeHtml(product?.unit || "حبة")}${soldAsPackage ? ` · ${amount(cartonCount)} ${escapeHtml(packageUnit)}` : ""}</small></div><strong data-cart-line-total="${line.productId}">${money(totals.total)}</strong><div class="cart-line__controls"><div class="quantity-control quantity-control--dark"><button aria-label="إنقاص ${soldAsPackage ? "كرتون" : "حبة"}" data-action="cart-decrement" data-id="${line.productId}">${icon("minus", 15)}</button>${quantityInput}<button aria-label="زيادة ${soldAsPackage ? "كرتون" : "حبة"}" data-action="cart-increment" data-id="${line.productId}">${icon("plus", 15)}</button></div>${unitsPerPackage > 1 ? `<button class="carton-toggle ${soldAsPackage ? "is-active" : ""}" data-action="toggle-carton-sale" data-id="${line.productId}" ${canSellCarton ? "" : "disabled"} aria-pressed="${soldAsPackage}" aria-label="${soldAsPackage ? "العودة للبيع بالحبات" : `بيع ${packageUnit}`}" title="${soldAsPackage ? "العودة للبيع بالحبات" : `بيع ${packageUnit}: ${unitsPerPackage} حبة`}">${icon("package", 17)}</button>` : ""}</div>${soldAsPackage ? `<div class="cart-line__package"><span>${escapeHtml(packageUnit)} =</span><label><input data-cart-carton-size="${line.productId}" type="number" inputmode="numeric" min="1" max="${toNumber(product?.quantity)}" step="1" value="${unitsPerPackage}" /> حبة</label><small>يمكن تعديل عدد الحبات في هذا البيع فقط.</small></div>` : ""}<label class="cart-line__discount">خصم السطر<input data-cart-line-discount="${line.productId}" type="text" inputmode="decimal" value="${escapeHtml(line.discount || "")}" placeholder="0 أو 10%" autocomplete="off" /><small>${cashierHint}${toNumber(totals.discount) ? ` · الخصم الحالي ${money(totals.discount)}` : ""}</small></label><button class="remove-line" aria-label="حذف من السلة" data-action="cart-remove" data-id="${line.productId}">${icon("close", 16)}</button></article>`;
 }
 
 function invoicesMarkup() {
@@ -708,6 +710,9 @@ function bindEvents() {
     setCartQuantity(event.currentTarget.dataset.cartQuantity, event.currentTarget.value, { renderNow: false });
     window.setTimeout(render, 0);
   }));
+  root.querySelectorAll("[data-cart-carton-count]").forEach((input) => input.addEventListener("change", (event) => { setCartonCount(event.currentTarget.dataset.cartCartonCount, event.currentTarget.value); }));
+  root.querySelectorAll("[data-cart-carton-size]").forEach((input) => input.addEventListener("change", (event) => { setCartonSize(event.currentTarget.dataset.cartCartonSize, event.currentTarget.value); }));
+  root.querySelectorAll("[data-cart-line-discount]").forEach((input) => input.addEventListener("change", (event) => { setCartLineDiscount(event.currentTarget.dataset.cartLineDiscount, event.currentTarget.value); }));
   syncMobileNavigation();
 }
 
@@ -781,6 +786,7 @@ async function handleActionUnsafe(event) {
   if (action === "count-stock") { openStockCountDialog(await db.getProduct(id)); return; }
   if (action === "open-scanner") { openScanner(event.currentTarget.dataset.mode); return; }
   if (action === "add-cart") { addToCart(id); return; }
+  if (action === "toggle-carton-sale") { toggleCartonSale(id); return; }
   if (action === "cart-increment") { changeCart(id, 1); return; }
   if (action === "cart-decrement") { changeCart(id, -1); return; }
   if (action === "cart-remove") { state.cart = state.cart.filter((line) => line.productId !== id); if (!state.cart.length) state.cartDiscount = ""; render(); return; }
@@ -831,7 +837,7 @@ function addToCart(productId) {
   const existing = state.cart.find((item) => item.productId === productId);
   if (existing && existing.quantity >= product.quantity) { showToast("الكمية المتوفرة غير كافية", "error"); return false; }
   if (existing) existing.quantity += 1;
-  else state.cart.push({ productId: product.id, name: product.name, unitPrice: product.salePrice, quantity: 1 });
+  else state.cart.push({ productId: product.id, name: product.name, unitPrice: product.salePrice, quantity: 1, discount: "", packageUnit: product.purchasePackageUnit || "كرتون", unitsPerPackage: Math.max(1, toNumber(product.unitsPerPackage) || 1), soldAsPackage: false });
   state.saleQuery = "";
   render();
   return true;
@@ -841,8 +847,9 @@ function changeCart(productId, delta) {
   const product = state.products.find((item) => item.id === productId);
   const line = state.cart.find((item) => item.productId === productId);
   if (!product || !line) return;
-  if (delta > 0 && line.quantity >= product.quantity) { showToast("الكمية المتوفرة غير كافية", "error"); return; }
-  line.quantity += delta;
+  const step = line.soldAsPackage ? Math.max(1, toNumber(line.unitsPerPackage)) : 1;
+  if (delta > 0 && toNumber(line.quantity) + step > product.quantity) { showToast("الكمية المتوفرة غير كافية", "error"); return; }
+  line.quantity += delta * step;
   if (line.quantity <= 0) state.cart = state.cart.filter((item) => item.productId !== productId);
   render();
 }
@@ -856,6 +863,38 @@ function setCartQuantity(productId, quantity, { renderNow = true } = {}) {
   if (next > toNumber(product.quantity)) { showToast("الكمية المتوفرة غير كافية", "error"); if (renderNow) render(); return; }
   line.quantity = next;
   if (renderNow) render();
+}
+
+function toggleCartonSale(productId) {
+  const product = state.products.find((item) => item.id === productId); const line = state.cart.find((item) => item.productId === productId); if (!product || !line) return;
+  const unitsPerPackage = Math.max(1, Math.floor(toNumber(line.unitsPerPackage ?? product.unitsPerPackage) || 1));
+  if (unitsPerPackage <= 1) { showToast("لم تُسجل للمُنتج حبات داخل الكرتون في المشتريات بعد.", "error"); return; }
+  if (line.soldAsPackage) { line.soldAsPackage = false; render(); return; }
+  if (toNumber(product.quantity) < unitsPerPackage) { showToast(`لا توجد كمية كافية لبيع ${line.packageUnit || "كرتون"} كامل.`, "error"); return; }
+  const cartonCount = Math.max(1, Math.ceil(toNumber(line.quantity) / unitsPerPackage)); const quantity = cartonCount * unitsPerPackage;
+  if (quantity > toNumber(product.quantity)) { showToast("الكمية المتوفرة لا تكفي لعدد الكراتين المطلوب.", "error"); return; }
+  line.soldAsPackage = true; line.unitsPerPackage = unitsPerPackage; line.packageUnit = line.packageUnit || product.purchasePackageUnit || "كرتون"; line.quantity = quantity; render();
+}
+
+function setCartonCount(productId, cartonCount) {
+  const product = state.products.find((item) => item.id === productId); const line = state.cart.find((item) => item.productId === productId); if (!product || !line) return;
+  const count = Math.max(1, Math.floor(toNumber(cartonCount))); const unitsPerPackage = Math.max(1, Math.floor(toNumber(line.unitsPerPackage) || 1)); const quantity = count * unitsPerPackage;
+  if (quantity > toNumber(product.quantity)) { showToast("الكمية المتوفرة لا تكفي لعدد الكراتين.", "error"); render(); return; }
+  line.quantity = quantity; line.soldAsPackage = true; render();
+}
+
+function setCartonSize(productId, units) {
+  const product = state.products.find((item) => item.id === productId); const line = state.cart.find((item) => item.productId === productId); if (!product || !line) return;
+  const nextUnits = Math.max(1, Math.floor(toNumber(units))); const cartonCount = Math.max(1, Math.round(toNumber(line.quantity) / Math.max(1, toNumber(line.unitsPerPackage)))); const quantity = cartonCount * nextUnits;
+  if (quantity > toNumber(product.quantity)) { showToast("عدد الحبات المعدل يتجاوز المخزون المتاح.", "error"); render(); return; }
+  line.unitsPerPackage = nextUnits; line.quantity = quantity; line.soldAsPackage = true; render();
+}
+
+function setCartLineDiscount(productId, value) {
+  const line = state.cart.find((item) => item.productId === productId); if (!line) return;
+  const raw = String(value || "").trim(); const lineSubtotal = roundMoney(toNumber(line.unitPrice) * toNumber(line.quantity)); const requested = calculateDiscountAmount(raw, lineSubtotal); const cashierLimit = roundMoney(lineSubtotal * 0.1);
+  if (state.currentUser?.role === "cashier" && requested > cashierLimit) { const isPercentage = /[%٪]\s*$/.test(raw); line.discount = isPercentage ? "10%" : String(cashierLimit); showToast("أقصى خصم للكاشير هو 10% من قيمة السطر.", "error"); render(); return; }
+  line.discount = raw; render();
 }
 
 function openDialog(content) {
@@ -1112,18 +1151,19 @@ async function toggleTheme() { try { const theme = state.settings?.theme === "da
 
 function openCheckoutDialog() {
   if (state.currentUser?.role === "cashier" && !state.activeCashierShift) { showToast("سجل المبلغ المستلم من الصندوق قبل إتمام أول عملية بيع.", "error"); openCashierShiftStartDialog(); return; }
-  const initial = calculateSaleTotals(state.cart);
+  const initial = calculateSaleTotals(state.cart); const isCashierSale = state.currentUser?.role === "cashier";
   const paymentMethodToggle = `<fieldset class="payment-method-toggle"><legend>طريقة التحصيل</legend><input type="hidden" name="paymentMethod" value="نقدي" /><button class="payment-method-toggle__button is-selected is-cash" type="button" data-sale-payment-method="نقدي">كاش</button><button class="payment-method-toggle__button is-transfer" type="button" data-sale-payment-method="تحويل">تحويل</button></fieldset>`;
   const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تثبيت الفاتورة</span><h2>مراجعة البيع</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="checkout-lines">${initial.lines.map((line) => `<div><span>${escapeHtml(line.name)} × ${amount(line.quantity)}</span><strong>${money(line.total)}</strong></div>`).join("")}</div><form id="checkout-form" class="form-grid"><label>الخصم العام<input name="discount" type="text" inputmode="decimal" placeholder="0 أو 20%" value="" autocomplete="off" /><small class="field-hint">أدخل مبلغًا مثل 100 أو نسبة مثل 20%</small></label><div class="delivery-charge-type delivery-compact form-full"><label class="delivery-compact__amount">خدمة التوصيل<input name="deliveryFee" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" /></label><div class="delivery-compact__choices" role="radiogroup" aria-label="خدمة التوصيل على"><label class="delivery-choice delivery-choice--store"><input name="deliveryChargeType" type="radio" value="store" checked /> <span>على المحل</span></label><label class="delivery-choice delivery-choice--customer"><input name="deliveryChargeType" type="radio" value="customer" /> <span>على العميل</span></label></div></div>${paymentMethodToggle}<fieldset class="payment-type form-full"><legend>نوع الدفع</legend><label><input name="paymentType" type="radio" value="نقدي" checked /> نقدي</label><label><input name="paymentType" type="radio" value="آجل" /> آجل</label></fieldset><label id="credit-customer-field" class="form-full" hidden>العميل<select name="customerId"><option value="">اختر العميل</option>${state.customers.map((customer) => `<option value="${customer.id}">${escapeHtml(customer.name)}${toNumber(customer.balance) ? ` — رصيد ${money(customer.balance)}` : ""}</option>`).join("")}</select></label><label class="form-full">المبلغ المدفوع<input id="paid-amount" name="paidAmount" type="number" inputmode="decimal" min="0" max="${initial.total}" step="0.01" value="${initial.total}" required /></label><div class="credit-summary form-full" id="credit-summary" hidden><span>المبلغ المتبقي</span><strong id="remaining-amount">${money(0)}</strong><small id="payment-status">مدفوعة</small></div><div class="checkout-total form-full"><span>الإجمالي النهائي</span><strong id="checkout-total">${money(initial.total)}</strong></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>رجوع</button><button type="submit" class="button button--primary checkout-submit">تأكيد البيع ${icon("check", 17)}</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
-  const form = overlay.querySelector("#checkout-form"); const paidInput = overlay.querySelector("#paid-amount"); const creditField = overlay.querySelector("#credit-customer-field"); const creditSummary = overlay.querySelector("#credit-summary");
+  const form = overlay.querySelector("#checkout-form"); const paidInput = overlay.querySelector("#paid-amount"); const creditField = overlay.querySelector("#credit-customer-field"); const creditSummary = overlay.querySelector("#credit-summary"); const submitButton = form.querySelector(".checkout-submit");
+  const cashierLimitNote = document.createElement("p"); cashierLimitNote.id = "cashier-discount-limit"; cashierLimitNote.className = "scanner-session-note form-full"; cashierLimitNote.hidden = !isCashierSale; form.discount.closest("label").insertAdjacentElement("afterend", cashierLimitNote);
   const setPaymentMethod = (method) => { form.paymentMethod.value = method; overlay.querySelectorAll("[data-sale-payment-method]").forEach((button) => button.classList.toggle("is-selected", button.dataset.salePaymentMethod === method)); };
   overlay.querySelectorAll("[data-sale-payment-method]").forEach((button) => button.addEventListener("click", () => setPaymentMethod(button.dataset.salePaymentMethod)));
   const totalsForForm = () => { const totals = calculateSaleTotals(state.cart, form.discount.value); const delivery = form.deliveryChargeType.value === "customer" ? Math.max(0, toNumber(form.deliveryFee.value)) : 0; return { ...totals, total: roundMoney(totals.total + delivery) }; };
-  const syncCheckout = () => { state.cartDiscount = form.discount.value; const totals = totalsForForm(); const isCredit = form.paymentType.value === "آجل"; const deliveryForCustomer = form.deliveryChargeType.value === "customer" && Math.max(0, toNumber(form.deliveryFee.value)) > 0; paidInput.max = totals.total; paidInput.disabled = isCredit; paidInput.value = isCredit ? 0 : totals.total; const remaining = Math.max(0, totals.total - toNumber(paidInput.value)); overlay.querySelector("#checkout-total").textContent = money(totals.total); overlay.querySelector("#remaining-amount").textContent = money(remaining); overlay.querySelector("#payment-status").textContent = isCredit ? "غير مدفوعة — يُسجل التحصيل لاحقًا من حساب العميل" : deliveryForCustomer ? "مدفوعة بما فيها التوصيل" : "مدفوعة"; creditField.hidden = !isCredit; creditSummary.hidden = !isCredit; };
+  const syncCheckout = () => { state.cartDiscount = form.discount.value; const totals = totalsForForm(); const isCredit = form.paymentType.value === "آجل"; const deliveryForCustomer = form.deliveryChargeType.value === "customer" && Math.max(0, toNumber(form.deliveryFee.value)) > 0; const cashierLimit = roundMoney(totals.subtotal * 0.1); const exceedsCashierLimit = isCashierSale && totals.discount > cashierLimit; paidInput.max = totals.total; paidInput.disabled = isCredit; paidInput.value = isCredit ? 0 : totals.total; const remaining = Math.max(0, totals.total - toNumber(paidInput.value)); overlay.querySelector("#checkout-total").textContent = money(totals.total); overlay.querySelector("#remaining-amount").textContent = money(remaining); overlay.querySelector("#payment-status").textContent = isCredit ? "غير مدفوعة — يُسجل التحصيل لاحقًا من حساب العميل" : deliveryForCustomer ? "مدفوعة بما فيها التوصيل" : "مدفوعة"; if (isCashierSale) { cashierLimitNote.textContent = exceedsCashierLimit ? `الخصم الحالي ${money(totals.discount)} يتجاوز سقف الكاشير ${money(cashierLimit)}.` : `خصم السطور والخصم العام: ${money(totals.discount)} من سقف الكاشير ${money(cashierLimit)}.`; cashierLimitNote.classList.toggle("is-negative", exceedsCashierLimit); } submitButton.disabled = exceedsCashierLimit; creditField.hidden = !isCredit; creditSummary.hidden = !isCredit; };
   form.querySelectorAll("[name=paymentType]").forEach((input) => input.addEventListener("change", syncCheckout)); form.querySelectorAll("[name=deliveryChargeType]").forEach((input) => input.addEventListener("change", syncCheckout)); form.discount.addEventListener("input", syncCheckout); form.deliveryFee.addEventListener("input", syncCheckout);
   syncCheckout();
-  form.addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); try { const sale = await db.completeSale({ items: state.cart, ...values, cashierShiftId: state.activeCashierShift?.id || "", cashierId: state.currentUser?.role === "cashier" ? state.currentUser.id : "", cashierName: state.currentUser?.role === "cashier" ? state.currentUser.name : "" }); state.cart = []; state.cartDiscount = ""; await refresh(); closeDialog(); state.view = "invoices"; render(); showToast(sale.paymentType === "آجل" ? `حُفظت الفاتورة ${sale.invoiceNumber} وربطت بحساب العميل` : `تم حفظ الفاتورة ${sale.invoiceNumber} وخصم المخزون`); } catch (error) { showToast(error.message, "error"); } });
+  form.addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); try { const sale = await db.completeSale({ items: state.cart, ...values, sellerRole: state.currentUser?.role || "", cashierShiftId: state.activeCashierShift?.id || "", cashierId: state.currentUser?.role === "cashier" ? state.currentUser.id : "", cashierName: state.currentUser?.role === "cashier" ? state.currentUser.name : "" }); state.cart = []; state.cartDiscount = ""; await refresh(); closeDialog(); state.view = "invoices"; render(); showToast(sale.paymentType === "آجل" ? `حُفظت الفاتورة ${sale.invoiceNumber} وربطت بحساب العميل` : `تم حفظ الفاتورة ${sale.invoiceNumber} وخصم المخزون`); } catch (error) { showToast(error.message, "error"); } });
 }
 
 async function openInvoiceDialog(saleId) {

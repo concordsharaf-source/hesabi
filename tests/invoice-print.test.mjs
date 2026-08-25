@@ -461,14 +461,16 @@ test("تظهر خدمة التوصيل وخيار تحميلها على العم
   assert.match(app, /checkout-launch/);
 });
 
-test("يعرض الخصم العام فقط في مراجعة البيع ويخفي خصم السطر والسعر المبدئي", async () => {
+test("يعرض خصم السطر والخصم العام بصيغة مبلغ أو نسبة مع سقف خاص بالكاشير", async () => {
   const [app, domain, style] = await Promise.all([readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"), readFile(new URL("../client/src/js/domain.js", import.meta.url), "utf8"), readFile(new URL("../client/src/style.css", import.meta.url), "utf8")]);
   assert.match(domain, /calculateDiscountAmount/);
   assert.match(domain, /raw\.endsWith\("%"\)/);
   assert.match(app, /name="discount"/);
   assert.match(app, /placeholder="0 أو 20%"/);
   assert.doesNotMatch(app, /data-cart-discount/);
-  assert.doesNotMatch(app, /data-cart-line-discount/);
+  assert.match(app, /data-cart-line-discount/);
+  assert.match(app, /أقصى خصم للكاشير هو 10% من قيمة السطر/);
+  assert.match(app, /sellerRole: state\.currentUser\?\.role/);
   assert.doesNotMatch(app, /الإجمالي المبدئي/);
   assert.match(style, /inventory-summary div,\.account-summary>div/);
   assert.match(style, /\.delivery-compact \{ display:grid; grid-template-columns:repeat\(3,minmax\(0,1fr\)\); align-items:end;/);

@@ -312,3 +312,25 @@ test("يرحّل صندوق الكاشير إلى الخزنة مرة واحدة
   await assert.rejects(() => db.createExpense({ cashierSalaryAdvance: true, cashierId: cashier.id, amount: 991, date: closed.date }), /تتجاوز المتبقي/);
   await db.resetAllData();
 });
+
+test("بيع الكرتون يخصم حباته من المخزون ويسمح للكاشير بخصم حتى 10% فقط بالقيمة أو النسبة", async () => {
+  await db.resetAllData();
+  const cashier = await db.createAccount({ username: "carton-cashier", name: "كاشير الكرتون", role: "cashier", pin: "1357" });
+  const cartonProduct = await db.createProduct({ name: "مشروب كرتون", unit: "حبة", purchasePrice: 50, salePrice: 100, quantity: 0, minimumStock: 0 });
+  await db.createPurchase({ items: [{ productId: cartonProduct.id, packageQuantity: 1, unitsPerPackage: 12, packageCost: 600, packageUnit: "كرتون", salePrice: 100 }] });
+  const storedProduct = await db.getProduct(cartonProduct.id);
+  assert.deepEqual({ quantity: storedProduct.quantity, package: storedProduct.purchasePackageUnit, units: storedProduct.unitsPerPackage }, { quantity: 12, package: "كرتون", units: 12 });
+
+  const cartonSale = await db.completeSale({ items: [{ productId: cartonProduct.id, quantity: 12, discount: "10%", soldAsPackage: true, packageUnit: "كرتون", unitsPerPackage: 12 }], discount: "", paidAmount: 1080, paymentMethod: "نقدي", cashierId: cashier.id, cashierName: cashier.name, sellerRole: "cashier" });
+  const cartonInvoice = await db.getInvoice(cartonSale.id);
+  assert.deepEqual({ subtotal: cartonSale.subtotal, discount: cartonSale.discount, total: cartonSale.total }, { subtotal: 1200, discount: 120, total: 1080 });
+  assert.deepEqual({ quantity: cartonInvoice.items[0].quantity, soldAsPackage: cartonInvoice.items[0].soldAsPackage, packageQuantity: cartonInvoice.items[0].packageQuantity, unitsPerPackage: cartonInvoice.items[0].unitsPerPackage, packageUnit: cartonInvoice.items[0].packageUnit }, { quantity: 12, soldAsPackage: true, packageQuantity: 1, unitsPerPackage: 12, packageUnit: "كرتون" });
+  assert.equal((await db.getProduct(cartonProduct.id)).quantity, 0);
+
+  const cappedProduct = await db.createProduct({ name: "منتج سقف الخصم", unit: "حبة", purchasePrice: 30, salePrice: 100, quantity: 10, minimumStock: 0 });
+  await assert.rejects(() => db.completeSale({ items: [{ productId: cappedProduct.id, quantity: 1, discount: "11%" }], discount: "", paidAmount: 89, paymentMethod: "نقدي", cashierId: cashier.id, sellerRole: "cashier" }), /أقصى خصم للكاشير هو 10%/);
+  await assert.rejects(() => db.completeSale({ items: [{ productId: cappedProduct.id, quantity: 1, discount: "101" }], discount: "", paidAmount: 0, paymentMethod: "نقدي", cashierId: cashier.id, sellerRole: "cashier" }), /أقصى خصم للكاشير هو 10%/);
+  const adminSale = await db.completeSale({ items: [{ productId: cappedProduct.id, quantity: 1, discount: "20%" }], discount: "", paidAmount: 80, paymentMethod: "نقدي", sellerRole: "admin" });
+  assert.equal(adminSale.total, 80);
+  await db.resetAllData();
+});
