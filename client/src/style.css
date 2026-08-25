@@ -72,7 +72,7 @@ h1,h2,h3,strong { letter-spacing:-.02em; }
 .warning-row strong { font-size:12px; }
 .warning-row small { color:var(--muted); font-size:10px; }
 .status { display:inline-flex; align-items:center; gap:4px; width:max-content; padding:4px 7px; border-radius:7px; font-size:10px; font-weight:800; }
-.status--available { color:#1a6d48; background:#e4f3e8; }.status--low { color:#986224; background:var(--gold-pale); }.status--empty { color:#a74340; background:var(--danger-pale); }
+.status--available { color:#1a6d48; background:#e4f3e8; }.status--low,.status--empty { color:#fff; background:#b51f3a; border:1px solid #7d1028; box-shadow:0 2px 0 #7d1028; }
 .action-panel { padding:22px 18px; background:linear-gradient(145deg, rgba(31,107,89,.98), rgba(23,76,63,.98)); color:#fff; }
 .action-panel .eyebrow { color:#dfc188; }.action-panel h2 { font-size:21px; }.action-panel p { margin:8px 0 17px; color:rgba(255,255,255,.75); font-size:12px; line-height:1.8; }
 .quick-actions { display:grid; gap:8px; }.quick-actions button { display:flex; align-items:center; gap:9px; width:100%; padding:10px 0; color:#fff; text-align:right; background:transparent; border-bottom:1px solid rgba(255,255,255,.14); font-weight:700; font-size:12px; }.quick-actions button:last-child { border:0; }
@@ -212,10 +212,11 @@ label { font-size:15px; }
 
 /* بطاقات الإجماليات: نمط زمردي موحد عالي التباين بدل الأخضر الفاتح المتفاوت. */
 .inventory-summary div,.account-summary>div { color:#fff; background:linear-gradient(145deg,#1f6b59,#174c3f); border:1px solid rgba(255,255,255,.12); box-shadow:0 10px 22px rgba(23,76,63,.18); }
-.inventory-summary div+div { color:#fff; background:linear-gradient(145deg,#1f6b59,#174c3f); }
+.inventory-summary div+div { color:#fff; background:linear-gradient(145deg,#c42a47,#84132b); border-color:#f28a9c; box-shadow:0 10px 22px rgba(132,19,43,.25); }
 .inventory-summary span,.account-summary span { color:rgba(255,255,255,.78); }
 .inventory-summary strong,.account-summary strong { color:#fff; }
 [data-theme="dark"] .inventory-summary div,[data-theme="dark"] .inventory-summary div+div,[data-theme="dark"] .account-summary>div { color:#fff; background:linear-gradient(145deg,#246e58,#174c3f); border-color:#6da88d; box-shadow:0 12px 25px rgba(0,0,0,.3); }
+[data-theme="dark"] .inventory-summary div+div { background:linear-gradient(145deg,#c42a47,#84132b); border-color:#ff9eb0; box-shadow:0 12px 25px rgba(0,0,0,.38); }
 [data-theme="dark"] .inventory-summary span,[data-theme="dark"] .account-summary span { color:#e9fff2; }
 [data-theme="dark"] .inventory-summary strong,[data-theme="dark"] .account-summary strong { color:#fff; }
 .cart-total__summary { display:grid !important; grid-template-columns:minmax(0,1fr); align-items:start; gap:10px; }

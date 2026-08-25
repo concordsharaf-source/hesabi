@@ -108,6 +108,13 @@ test("اختيار منتج في فاتورة الشراء يهيئ حقول ا�
   assert.match(app, /const addPurchaseProduct = \(product\)[\s\S]*?renderLines\(\);/);
 });
 
+test("يعرض تنبيه المخزون المنخفض أو النافد بلون قرمزي واضح في الملخص والوسم", async () => {
+  const styles = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  assert.match(styles, /\.status--low,\.status--empty \{ color:#fff; background:#b51f3a; border:1px solid #7d1028;/);
+  assert.match(styles, /\.inventory-summary div\+div \{ color:#fff; background:linear-gradient\(145deg,#c42a47,#84132b\);/);
+  assert.match(styles, /\[data-theme="dark"\] \.inventory-summary div\+div \{ background:linear-gradient\(145deg,#c42a47,#84132b\);/);
+});
+
 test("يعرض اختصاري حساب المورد والاتصال بجانب المنتج المرتبط به في قوائم المنتج والمخزون والبيع", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
