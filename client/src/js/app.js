@@ -40,6 +40,7 @@ const icon = (name, size = 20) => {
     rotate: '<path d="M21 12a9 9 0 0 0-15.5-6.2L3 8M3 3v5h5M3 12a9 9 0 0 0 15.5 6.2L21 16m0 5v-5h-5"/>',
     restore: '<path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/><path d="M12 8v4l3 2"/>',
     download: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
+    key: '<circle cx="7.5" cy="15.5" r="3.5"/><path d="m10.3 12.7 8.2-8.2 2.2 2.2-1.7 1.7 1.6 1.6-2 2-1.6-1.6-3.9 3.9"/>',
     phone: '<path d="M22 16.9v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.8a2 2 0 0 1-.45 2.11L8.11 9.89a16 16 0 0 0 6 6l1.26-1.26a2 2 0 0 1 2.11-.45c.9.35 1.84.59 2.8.72A2 2 0 0 1 22 16.9Z"/>',
     moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
@@ -532,7 +533,7 @@ function settingsMarkup() {
 
 function loginMarkup() {
   const users = state.accounts.filter((account) => account.isActive);
-  return `<main class="setup-page login-page"><section class="setup-art"><div class="setup-art__brand"><img src="${markImage}" alt="" /><span class="brand-wordmark">حسابي</span><small>سجلّ المتجر اليومي</small></div><div class="setup-art__status"><span class="presence-dot"></span><span>بيانات المتجر تبقى على هذا الجهاز</span></div><div class="setup-art__copy"><p class="eyebrow">دخول آمن</p><h1>اختر حسابك<br />وابدأ وردية العمل.</h1><p>حساب الأدمن يدير الإدخال والأرباح والإحصائيات، وحساب الكاشير مخصص للمبيعات والفواتير.</p><div class="setup-art__stamps"><span>أدمن</span><span>كاشير</span><span>مبيعات</span></div></div></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-sheet__brand"><img src="${markImage}" alt="" /><div><strong>تسجيل الدخول</strong><span>${escapeHtml(state.settings?.storeName || "حسابي")}</span></div></div><div class="setup-form"><span class="eyebrow">مرحبًا بعودتك</span><h2>الدخول إلى الحساب</h2><p>أدخل اسم المستخدم ورمز الدخول المكوّن من أرقام.</p><form id="login-form"><label>اسم المستخدم<input name="username" autocomplete="username" required minlength="3" maxlength="30" autofocus placeholder="مثال: admin" /></label><label>رمز الدخول<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" required minlength="4" maxlength="12" placeholder="••••" /></label><button class="button button--primary button--wide" type="submit">دخول إلى حسابي ${icon("arrow", 18)}</button></form><div class="account-hints"><strong>الحسابات المتاحة</strong>${users.map((account) => `<button type="button" class="account-hint" data-action="fill-login" data-username="${escapeHtml(account.username)}"><span>${escapeHtml(account.name)}</span><small>${escapeHtml(account.username)} · ${roleLabel(account.role)}</small></button>`).join("")}</div><small class="offline-note"><span class="presence-dot"></span>يسجل الدخول محليًا ولا يحتاج اتصالًا بالإنترنت</small></div></div></section></main>`;
+  return `<main class="setup-page login-page"><section class="setup-art"><div class="setup-art__brand"><img src="${markImage}" alt="" /><span class="brand-wordmark">حسابي</span><small>سجلّ المتجر اليومي</small></div><div class="setup-art__status"><span class="presence-dot"></span><span>بيانات المتجر تبقى على هذا الجهاز</span></div><div class="setup-art__copy"><p class="eyebrow">دخول آمن</p><h1>اختر حسابك<br />وابدأ وردية العمل.</h1><p>حساب الأدمن يدير الإدخال والأرباح والإحصائيات، وحساب الكاشير مخصص للمبيعات والفواتير.</p><div class="setup-art__stamps"><span>أدمن</span><span>كاشير</span><span>مبيعات</span></div></div></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-sheet__brand"><img src="${markImage}" alt="" /><div><strong>تسجيل الدخول</strong><span>${escapeHtml(state.settings?.storeName || "حسابي")}</span></div></div><div class="setup-form"><span class="eyebrow">مرحبًا بعودتك</span><h2>الدخول إلى الحساب</h2><p>أدخل اسم المستخدم ورمز الدخول المكوّن من أرقام.</p><form id="login-form"><label>اسم المستخدم<input name="username" autocomplete="username" required minlength="3" maxlength="30" autofocus placeholder="مثال: admin" /></label><label>رمز الدخول<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" required minlength="4" maxlength="12" placeholder="••••" /></label><button class="button button--primary button--wide" type="submit">دخول إلى حسابي ${icon("arrow", 18)}</button></form><button type="button" class="login-recovery-link" data-action="open-admin-recovery">نسيت رمز الأدمن؟ استخدم مفتاح الطوارئ</button><div class="account-hints"><strong>الحسابات المتاحة</strong>${users.map((account) => `<button type="button" class="account-hint" data-action="fill-login" data-username="${escapeHtml(account.username)}"><span>${escapeHtml(account.name)}</span><small>${escapeHtml(account.username)} · ${roleLabel(account.role)}</small></button>`).join("")}</div><small class="offline-note"><span class="presence-dot"></span>يسجل الدخول محليًا ولا يحتاج اتصالًا بالإنترنت</small></div></div></section></main>`;
 }
 
 function requiredPinMarkup() {
@@ -541,8 +542,8 @@ function requiredPinMarkup() {
 
 function accountsMarkup() {
   const accounts = state.accounts;
-  return `${topbarMarkup("الحسابات والصلاحيات", "أدر حسابات فريقك وحدد من يرى البيانات المالية ومن يقتصر على البيع.", `<button class="button button--primary" data-action="new-account">${icon("plus", 18)}<span>إضافة حساب</span></button>`)}
-  <section class="panel account-list"><div class="panel__head"><div><span class="eyebrow">فريق المتجر</span><h2>الحسابات المحلية</h2></div><small>الأدمن: كامل الصلاحيات · الكاشير: المبيعات والفواتير فقط</small></div>${accounts.map((account) => `<article class="account-row"><div class="account-row__icon">${icon("users", 20)}</div><div class="account-row__main"><strong>${escapeHtml(account.name)}</strong><small dir="ltr">${escapeHtml(account.username)}</small></div><span class="account-badge account-badge--${account.role}">${roleLabel(account.role)}</span><span class="status status--${account.isActive ? "available" : "empty"}">${account.isActive ? "نشط" : "موقوف"}</span><div class="entity-row__actions"><button class="icon-button" data-action="change-account-pin" data-id="${account.id}" aria-label="تغيير رمز دخول ${escapeHtml(account.name)}">${icon("edit", 18)}</button><button class="icon-button" data-action="open-account" data-id="${account.id}" aria-label="تعديل ${escapeHtml(account.name)}">${icon("dots", 18)}</button></div></article>`).join("")}</section>`;
+  return `${topbarMarkup("الحسابات والصلاحيات", "أدر حسابات فريقك وحدد من يرى البيانات المالية ومن يقتصر على البيع.", `<button class="button button--secondary" data-action="open-admin-recovery-key">${icon("key", 17)}<span>مفتاح طوارئ</span></button><button class="button button--primary" data-action="new-account">${icon("plus", 18)}<span>إضافة حساب</span></button>`)}
+  <section class="panel account-list"><div class="panel__head"><div><span class="eyebrow">فريق المتجر</span><h2>الحسابات المحلية</h2></div><small>الأدمن: كامل الصلاحيات · الكاشير: المبيعات والفواتير فقط</small></div>${accounts.map((account) => `<article class="account-row"><div class="account-row__icon">${icon("users", 20)}</div><div class="account-row__main"><strong>${escapeHtml(account.name)}</strong><small dir="ltr">${escapeHtml(account.username)}</small></div><span class="account-badge account-badge--${account.role}">${roleLabel(account.role)}</span><span class="status status--${account.isActive ? "available" : "empty"}">${account.isActive ? "نشط" : "موقوف"}</span><div class="entity-row__actions"><button class="icon-button" data-action="reset-account-pin" data-id="${account.id}" aria-label="إعادة تعيين رمز دخول ${escapeHtml(account.name)}">${icon("key", 18)}</button><button class="icon-button" data-action="open-account" data-id="${account.id}" aria-label="تعديل ${escapeHtml(account.name)}">${icon("dots", 18)}</button></div></article>`).join("")}</section>`;
 }
 
 function recoveryNoticeMarkup(failedView) {
@@ -700,6 +701,7 @@ async function handleActionUnsafe(event) {
   const action = event.currentTarget.dataset.action;
   const id = event.currentTarget.dataset.id;
   if (action === "fill-login") { const input = root.querySelector("#login-form [name=username]"); if (input) { input.value = event.currentTarget.dataset.username; root.querySelector("#login-form [name=pin]")?.focus(); } return; }
+  if (action === "open-admin-recovery") { openAdminRecoveryDialog(); return; }
   if (action === "logout") { openLogoutConfirmDialog(); return; }
   if (action === "account-session") { openAccountSessionDialog(); return; }
   if (action === "navigate") { const view = event.currentTarget.dataset.view; if (!canAccessView(state.currentUser, view)) { adminOnlyMessage(); return; } state.view = view; render(); if (["settings", "data-management"].includes(view) && isAdmin(state.currentUser)) void refreshCloudBackups({ quiet: true }); return; }
@@ -754,7 +756,8 @@ async function handleActionUnsafe(event) {
   if (action === "reset-data") { resetAllData(); return; }
   if (action === "new-account") { openAccountDialog(); return; }
   if (action === "open-account") { openAccountDialog(state.accounts.find((account) => account.id === id)); return; }
-  if (action === "change-account-pin") { openAccountPinDialog(state.accounts.find((account) => account.id === id)); return; }
+  if (action === "reset-account-pin") { openAccountPinDialog(state.accounts.find((account) => account.id === id)); return; }
+  if (action === "open-admin-recovery-key") { openAdminRecoveryKeyDialog(); return; }
 }
 
 function addToCart(productId) {
@@ -830,20 +833,51 @@ function openAccountDialog(account = null) {
   });
 }
 
+function recoveryKeyText() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(8)), (byte) => byte.toString(16).padStart(2, "0")).join("").toUpperCase();
+}
+
+function formatRecoveryKey(value) {
+  return String(value || "").replace(/[^A-Z0-9]/gi, "").toUpperCase().match(/.{1,4}/g)?.join("-") || "";
+}
+
+function openAdminRecoveryKeyDialog() {
+  const recoveryKey = recoveryKeyText();
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حماية مجانية محلية</span><h2>مفتاح طوارئ الأدمن</h2><p class="dialog__subtext">اكتب هذا المفتاح واحفظه خارج الهاتف. لا يُعرض أو يُخزن كنص داخل التطبيق، ويُستخدم فقط إذا نُسي رمز الأدمن.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="admin-recovery-key-form" class="form-grid"><label>مفتاح الطوارئ الجديد<input class="recovery-key-display" name="recoveryKey" value="${recoveryKey}" dir="ltr" readonly aria-describedby="recovery-key-note" /></label><small id="recovery-key-note" class="recovery-key-note">انسخه يدويًا الآن؛ عند حفظه سيُحتفظ ببصمته فقط، ولا يمكن استخراج المفتاح منه لاحقًا.</small><label>رمز الأدمن الحالي<input name="currentPin" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" autofocus /></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ مفتاح الطوارئ ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#admin-recovery-key-form").addEventListener("submit", async (event) => {
+    event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget));
+    try { await db.saveAdminRecoveryKey({ adminId: state.currentUser.id, currentPin: values.currentPin, recoveryKey: values.recoveryKey }); closeDialog(); showToast("تم حفظ مفتاح الطوارئ. احتفظ به خارج الهاتف."); }
+    catch (error) { showToast(error.message || "تعذر حفظ مفتاح الطوارئ.", "error"); }
+  });
+}
+
+function openAdminRecoveryDialog() {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">استرداد محلي مجاني</span><h2>نسيت رمز الأدمن؟</h2><p class="dialog__subtext">أدخل اسم مستخدم الأدمن ومفتاح الطوارئ الذي أنشأته مسبقًا، ثم اختر رمزًا جديدًا. لا يمكن استرداد الرمز القديم أو تجاوز المفتاح.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="admin-recovery-form" class="form-grid"><label>اسم مستخدم الأدمن<input name="username" dir="ltr" autocomplete="username" required minlength="3" maxlength="30" placeholder="admin" autofocus /></label><label>مفتاح الطوارئ<input name="recoveryKey" class="recovery-key-input" dir="ltr" autocomplete="off" required minlength="16" maxlength="19" placeholder="ABCD-EF12-3456-7890" /></label><label>رمز الدخول الجديد<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" /></label><label>تأكيد الرمز الجديد<input name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" /></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">إعادة تعيين الرمز ${icon("key", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#admin-recovery-form").addEventListener("submit", async (event) => {
+    event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget));
+    if (values.pin !== values.pinConfirm) { showToast("رمزا الدخول غير متطابقين.", "error"); return; }
+    try { await db.resetAdminPinWithRecovery(values); state.currentUser = await db.authenticateAccount({ username: values.username, pin: values.pin }); await db.savePersistentSession(state.currentUser.id); state.accounts = await db.listAccounts(); state.view = "dashboard"; await refresh(); closeDialog(); render(); showToast("تمت استعادة دخول الأدمن برمز جديد."); }
+    catch (error) { showToast(error.message || "تعذر استرداد الدخول.", "error"); }
+  });
+}
+
 function openAccountPinDialog(account) {
   if (!account) return;
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">رمز الدخول</span><h2>تغيير رمز ${escapeHtml(account.name)}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="account-pin-form" class="form-grid"><label>رمز الدخول الجديد<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" autofocus /></label><label>تأكيد الرمز<input name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" /></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ الرمز ${icon("check", 17)}</button></div></form>`);
+  const cashier = account.role === "cashier";
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">إعادة تعيين آمنة</span><h2>إعادة تعيين رمز ${escapeHtml(account.name)}</h2><p class="dialog__subtext">سلّم الرمز المؤقت لصاحب الحساب فقط.${cashier ? " سيُطلب منه اختيار رمز جديد عند دخوله." : ""}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="account-pin-form" class="form-grid"><label>الرمز المؤقت الجديد<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" autofocus /></label><label>تأكيد الرمز المؤقت<input name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" /></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ الرمز المؤقت ${icon("check", 17)}</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelector("#account-pin-form").addEventListener("submit", async (event) => {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.currentTarget));
     if (values.pin !== values.pinConfirm) { showToast("رمزا الدخول غير متطابقين.", "error"); return; }
     try {
-      await db.changeAccountPin(account.id, values.pin);
+      await db.resetAccountPinByAdmin(account.id, values.pin);
       state.accounts = await db.listAccounts();
-      if (account.id === state.currentUser?.id) state.currentUser = { ...state.currentUser, mustChangePin: false };
-      closeDialog(); render(); showToast("تم تغيير رمز الدخول.");
-    } catch (error) { showToast(error.message || "تعذر تغيير رمز الدخول.", "error"); }
+      if (account.id === state.currentUser?.id) state.currentUser = { ...state.currentUser, mustChangePin: cashier };
+      closeDialog(); render(); showToast(cashier ? "تم حفظ رمز مؤقت؛ سيختار الكاشير رمزًا جديدًا عند دخوله." : "تمت إعادة تعيين رمز الأدمن.");
+    } catch (error) { showToast(error.message || "تعذر إعادة تعيين رمز الدخول.", "error"); }
   });
 }
 
