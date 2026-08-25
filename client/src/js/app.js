@@ -49,7 +49,7 @@ const icon = (name, size = 20) => {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ""}</svg>`;
 };
 
-const state = { view: "dashboard", lastStableView: "dashboard", settings: null, accounts: [], currentUser: null, products: [], productSuppliers: {}, sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
+const state = { view: "dashboard", lastStableView: "dashboard", settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], products: [], productSuppliers: {}, sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
 const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "invoices", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "invoices", "purchases"].includes(id))];
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
@@ -176,8 +176,10 @@ function openExitConfirmDialog() {
 }
 
 async function completeLocalLogout() {
+  if (state.activeCashierShift) { openCashierHandoverDialog({ logout: true }); return; }
   await db.clearPersistentSession();
   state.currentUser = null;
+  state.activeCashierShift = null;
   state.cart = [];
   state.view = "sales";
   closeDialog();
@@ -186,13 +188,39 @@ async function completeLocalLogout() {
 }
 
 async function switchLocalUser() {
+  if (state.activeCashierShift) { openCashierHandoverDialog({ logout: false }); return; }
   await db.clearPersistentSession();
   state.currentUser = null;
+  state.activeCashierShift = null;
   state.cart = [];
   state.view = "sales";
   closeDialog();
   render();
   showToast("اختر المستخدم التالي لتسجيل الدخول.");
+}
+
+async function leaveAfterCashierShift({ logout }) {
+  await db.clearPersistentSession();
+  state.currentUser = null;
+  state.activeCashierShift = null;
+  state.cart = [];
+  state.view = "sales";
+  closeDialog();
+  render();
+  showToast(logout ? "تم إغلاق الوردية وتسجيل الخروج." : "تم إغلاق الوردية. اختر المستخدم التالي لتسجيل الدخول.");
+}
+
+function openCashierShiftStartDialog() {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">استلام الصندوق</span><h2>بدء وردية ${escapeHtml(state.currentUser?.name || "الكاشير")}</h2><p class="dialog__subtext">اكتب المبلغ النقدي الذي استلمته من الصندوق قبل بدء المبيعات. يحسب التطبيق مبيعات ورديتك ويقارنه بجرد الإغلاق للأدمن.</p></div><button class="icon-button" data-dialog-close aria-label="إلغاء">${icon("close", 20)}</button></div><form id="cashier-shift-start-form" class="form-grid"><label>المبلغ المستلم من الصندوق<input name="receivedCash" type="number" inputmode="decimal" min="0" step="0.01" value="0" required autofocus /></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">بدء الوردية ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelector("#cashier-shift-start-form").addEventListener("submit", async (event) => { event.preventDefault(); try { state.activeCashierShift = await db.startCashierShift({ accountId: state.currentUser.id, accountName: state.currentUser.name, receivedCash: new FormData(event.currentTarget).get("receivedCash") }); await refresh(); closeDialog(); render(); showToast("تم تسجيل استلام الصندوق وبدء ورديتك."); } catch (error) { showToast(error.message || "تعذر بدء وردية الصندوق.", "error"); } });
+}
+
+function openCashierHandoverDialog({ logout }) {
+  const shift = state.activeCashierShift;
+  if (!shift) return logout ? completeLocalLogout() : switchLocalUser();
+  closeDialog();
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">جرد وتسليم الصندوق</span><h2>إغلاق وردية ${escapeHtml(state.currentUser?.name || "الكاشير")}</h2><p class="dialog__subtext">اكتب المبلغ النقدي الموجود فعليًا في الصندوق الآن. سيقارن المدير لاحقًا بينه وبين المبلغ المستلم ومبيعاتك النقدية.</p></div><button class="icon-button" data-dialog-close aria-label="إلغاء">${icon("close", 20)}</button></div><div class="cashier-shift-handover__received"><span>المبلغ المستلم أول الوردية</span><strong>${money(shift.receivedCash)}</strong></div><form id="cashier-shift-close-form" class="form-grid"><label>الجرد النقدي الفعلي<input name="countedCash" type="number" inputmode="decimal" min="0" step="0.01" required autofocus /></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">تأكيد الجرد والتسليم ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelector("#cashier-shift-close-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const closed = await db.closeCashierShift({ shiftId: shift.id, countedCash: new FormData(event.currentTarget).get("countedCash") }); await refresh(); await leaveAfterCashierShift({ logout }); const difference = toNumber(closed.difference); showToast(difference === 0 ? "تم إغلاق الوردية دون فرق في الصندوق." : difference < 0 ? `تم تسجيل عجز ${money(Math.abs(difference))}.` : `تم تسجيل زيادة ${money(difference)}.`); } catch (error) { showToast(error.message || "تعذر حفظ جرد الوردية.", "error"); } });
 }
 
 function openLogoutConfirmDialog() {
@@ -201,7 +229,8 @@ function openLogoutConfirmDialog() {
 }
 
 function openAccountSessionDialog() {
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">الحساب الحالي</span><h2>${escapeHtml(state.currentUser?.name || "حسابي")}</h2><p class="dialog__subtext">يمكنك الانتقال إلى مستخدم آخر أو تسجيل الخروج من هذا الجهاز. تبقى بيانات المتجر محفوظة محليًا.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="dialog__actions"><button id="switch-local-user" class="button button--secondary" type="button">${icon("users", 17)} تبديل المستخدم</button><button id="open-local-logout-confirm" class="button button--danger" type="button">تسجيل الخروج</button></div>`);
+  const cashierShiftNote = state.activeCashierShift ? `<p class="dialog__subtext cashier-shift-note">لديك وردية صندوق مفتوحة. سيطلب منك جرد المبلغ قبل تبديل المستخدم أو تسجيل الخروج.</p>` : "";
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">الحساب الحالي</span><h2>${escapeHtml(state.currentUser?.name || "حسابي")}</h2><p class="dialog__subtext">يمكنك الانتقال إلى مستخدم آخر أو تسجيل الخروج من هذا الجهاز. تبقى بيانات المتجر محفوظة محليًا.</p>${cashierShiftNote}</div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="dialog__actions"><button id="switch-local-user" class="button button--secondary" type="button">${icon("users", 17)} تبديل المستخدم</button><button id="open-local-logout-confirm" class="button button--danger" type="button">تسجيل الخروج</button></div>`);
   overlay.querySelector("#switch-local-user").addEventListener("click", () => void switchLocalUser());
   overlay.querySelector("#open-local-logout-confirm").addEventListener("click", openLogoutConfirmDialog);
 }
@@ -225,7 +254,8 @@ function expiryStatusMarkup(product) {
 }
 
 async function refresh() {
-  [state.products, state.productSuppliers, state.sales, state.suppliers, state.supplierPayments, state.customers, state.customerPayments, state.purchases, state.expenses, state.stockMovements, state.cashMovements, state.cashbox, state.dashboard] = await Promise.all([db.listProducts(), db.listProductSupplierLinks(), db.listSales(), db.listSuppliers(), db.listSupplierPayments(), db.listCustomers(), db.listCustomerPayments(), db.listPurchases(), db.listExpenses(), db.listStockMovements(), db.listCashMovements({ from: state.cashFrom, to: state.cashTo }), db.getCashbox({ from: state.cashFrom, to: state.cashTo }), db.getDashboard()]);
+  [state.products, state.productSuppliers, state.sales, state.suppliers, state.supplierPayments, state.customers, state.customerPayments, state.purchases, state.expenses, state.stockMovements, state.cashMovements, state.cashbox, state.dashboard, state.cashierShifts] = await Promise.all([db.listProducts(), db.listProductSupplierLinks(), db.listSales(), db.listSuppliers(), db.listSupplierPayments(), db.listCustomers(), db.listCustomerPayments(), db.listPurchases(), db.listExpenses(), db.listStockMovements(), db.listCashMovements({ from: state.cashFrom, to: state.cashTo }), db.getCashbox({ from: state.cashFrom, to: state.cashTo }), db.getDashboard(), db.listCashierShifts()]);
+  state.activeCashierShift = state.currentUser?.role === "cashier" ? await db.getActiveCashierShift(state.currentUser.id) : null;
   state.analytics = await db.getAnalytics({ from: state.reportFrom, to: state.reportTo });
   state.todayTransfers = calculateTransferCollections({ sales: state.sales.filter((sale) => dateKey(sale.date) === dateKey()), customerPayments: state.customerPayments.filter((payment) => dateKey(payment.date) === dateKey()) });
 }
@@ -501,6 +531,12 @@ function cashboxMarkup() {
   <section class="report-grid"><article class="panel report-card"><span class="eyebrow">مصادر الداخل</span><div><span>مبيعات نقدية</span><strong>${money(cash.cashSales)}</strong></div><div><span>دفعات العملاء</span><strong>${money(cash.customerPayments)}</strong></div><div><span>إيداعات يدوية</span><strong>${money(cash.deposits)}</strong></div><div><span>مرتجعات شراء</span><strong>${money(cash.purchaseReturns)}</strong></div></article><article class="panel report-card"><span class="eyebrow">مصادر الخارج</span><div><span>مشتريات نقدية</span><strong>${money(cash.cashPurchases)}</strong></div><div><span>دفعات الموردين</span><strong>${money(cash.supplierPayments)}</strong></div><div><span>مصروفات</span><strong>${money(cash.expenses)}</strong></div><div><span>سحوبات يدوية</span><strong>${money(cash.withdrawals)}</strong></div></article><article class="panel report-card"><span class="eyebrow">حركات الصندوق اليدوية</span>${state.cashMovements.length ? state.cashMovements.map((movement) => `<div><span>${movementLabel[movement.type]}<small>${movement.date}${movement.notes ? ` · ${escapeHtml(movement.notes)}` : ""}</small></span><strong class="${movement.type === "WITHDRAWAL" ? "is-negative" : ""}">${movement.type === "WITHDRAWAL" ? "−" : "+"}${money(movement.amount)}</strong></div>`).join("") : `<p>لا توجد إيداعات أو سحوبات يدوية ضمن الفترة.</p>`}</article></section>`;
 }
 
+function cashierShiftSummaryMarkup() {
+  const shifts = state.cashierShifts || [];
+  const tone = (difference) => toNumber(difference) < 0 ? "is-negative" : toNumber(difference) > 0 ? "is-positive" : "";
+  return `<section class="panel cashier-shift-summary"><div class="panel__head"><div><span class="eyebrow">تفاصيل اليوم</span><h2>ورديات الكاشير وتسليم الصندوق</h2></div><small>${amount(shifts.length)} وردية</small></div><p class="panel__subtext">سجل دخول وخروج الكاشير، والمبلغ المستلم، والمبيعات النقدية، وجرد الإغلاق. يظهر العجز بالأحمر والزيادة بالأخضر.</p>${shifts.length ? `<div class="cashier-shift-list">${shifts.map((shift) => `<article class="cashier-shift-row"><div><strong>${escapeHtml(shift.accountName || "كاشير")}</strong><small>دخول: ${dateTime(shift.startedAt)}${shift.closedAt ? ` · خروج: ${dateTime(shift.closedAt)}` : " · وردية مفتوحة"}</small></div><div><small>استلم</small><strong>${money(shift.receivedCash)}</strong></div><div><small>دخل نقدي</small><strong>${money(shift.cashSales)}</strong></div><div><small>المتوقع</small><strong>${money(shift.expectedCash)}</strong></div><div><small>الجرد الفعلي</small><strong>${shift.countedCash === null || shift.countedCash === undefined ? "—" : money(shift.countedCash)}</strong></div><div><small>العجز / الزيادة</small><strong class="${tone(shift.difference)}">${shift.difference === null || shift.difference === undefined ? "—" : `${toNumber(shift.difference) > 0 ? "+" : ""}${money(shift.difference)}`}</strong></div></article>`).join("")}</div>` : `<div class="inline-empty">لا توجد ورديات كاشير مسجلة اليوم.</div>`}</section>`;
+}
+
 function transfersMarkup() {
   const inRange = (date) => (!state.cashFrom || dateKey(date) >= state.cashFrom) && (!state.cashTo || dateKey(date) <= state.cashTo);
   const incoming = [...state.sales.filter((sale) => inRange(sale.date) && sale.paymentMethod === "تحويل" && toNumber(sale.initialPaidAmount ?? sale.paidAmount) > 0).map((sale) => ({ date: sale.date, label: `فاتورة بيع ${sale.invoiceNumber}`, detail: sale.customerName || "تحصيل بيع", amount: toNumber(sale.initialPaidAmount ?? sale.paidAmount) })), ...state.customerPayments.filter((payment) => inRange(payment.date) && payment.paymentMethod === "تحويل").map((payment) => ({ date: payment.date, label: `دفعة عميل ${payment.customerName}`, detail: payment.invoiceNumber || payment.notes || "تحصيل دين", amount: toNumber(payment.amount) }))].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -594,6 +630,7 @@ function renderApplication() {
   if (!canAccessView(state.currentUser, state.view)) state.view = isAdmin(state.currentUser) ? "dashboard" : "sales";
   const body = { dashboard: dashboardMarkup, products: productsMarkup, inventory: inventoryMarkup, sales: salesMarkup, invoices: invoicesMarkup, customers: customersMarkup, "customer-payments": customerPaymentsMarkup, suppliers: suppliersMarkup, "supplier-payments": supplierPaymentsMarkup, purchases: purchasesMarkup, expenses: expensesMarkup, cashbox: cashboxMarkup, transfers: transfersMarkup, reports: reportsMarkup, accounts: accountsMarkup, settings: settingsMarkup, "data-management": dataManagementMarkup }[state.view]?.() || dashboardMarkup();
   root.innerHTML = `<div class="app-shell">${navMarkup()}<main class="workspace">${body}</main>${salesScannerFabMarkup()}</div>`;
+  if (state.view === "cashbox" && isAdmin(state.currentUser)) root.querySelector(".workspace")?.insertAdjacentHTML("beforeend", cashierShiftSummaryMarkup());
   bindEvents();
   state.lastStableView = state.view;
 }
@@ -685,8 +722,10 @@ async function handleLogin(event) {
   try {
     state.currentUser = await db.authenticateAccount(values);
     await db.savePersistentSession(state.currentUser.id);
+    await refresh();
     state.view = state.currentUser.role === "admin" ? "dashboard" : "sales";
     render();
+    if (state.currentUser.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog);
     showToast(`مرحبًا ${state.currentUser.name}`);
   } catch (error) { showToast(error.message || "تعذر تسجيل الدخول.", "error"); }
 }
@@ -1030,6 +1069,7 @@ async function resetAllData() { if (!window.confirm("سيُمسح كل السج�
 async function toggleTheme() { try { const theme = state.settings?.theme === "dark" ? "light" : "dark"; await db.saveSettings({ ...state.settings, theme }); state.settings = await db.getSettings(); applyTheme(); render(); showToast(theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح"); } catch (error) { showToast(error.message, "error"); } }
 
 function openCheckoutDialog() {
+  if (state.currentUser?.role === "cashier" && !state.activeCashierShift) { showToast("سجل المبلغ المستلم من الصندوق قبل إتمام أول عملية بيع.", "error"); openCashierShiftStartDialog(); return; }
   const initial = calculateSaleTotals(state.cart);
   const paymentMethodToggle = `<fieldset class="payment-method-toggle"><legend>طريقة التحصيل</legend><input type="hidden" name="paymentMethod" value="نقدي" /><button class="payment-method-toggle__button is-selected is-cash" type="button" data-sale-payment-method="نقدي">كاش</button><button class="payment-method-toggle__button is-transfer" type="button" data-sale-payment-method="تحويل">تحويل</button></fieldset>`;
   const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تثبيت الفاتورة</span><h2>مراجعة البيع</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="checkout-lines">${initial.lines.map((line) => `<div><span>${escapeHtml(line.name)} × ${amount(line.quantity)}</span><strong>${money(line.total)}</strong></div>`).join("")}</div><form id="checkout-form" class="form-grid"><label>الخصم العام<input name="discount" type="text" inputmode="decimal" placeholder="0 أو 20%" value="" autocomplete="off" /><small class="field-hint">أدخل مبلغًا مثل 100 أو نسبة مثل 20%</small></label><div class="delivery-charge-type delivery-compact form-full"><label class="delivery-compact__amount">خدمة التوصيل<input name="deliveryFee" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" /></label><div class="delivery-compact__choices" role="radiogroup" aria-label="خدمة التوصيل على"><label class="delivery-choice delivery-choice--store"><input name="deliveryChargeType" type="radio" value="store" checked /> <span>على المحل</span></label><label class="delivery-choice delivery-choice--customer"><input name="deliveryChargeType" type="radio" value="customer" /> <span>على العميل</span></label></div></div>${paymentMethodToggle}<fieldset class="payment-type form-full"><legend>نوع الدفع</legend><label><input name="paymentType" type="radio" value="نقدي" checked /> نقدي</label><label><input name="paymentType" type="radio" value="آجل" /> آجل</label></fieldset><label id="credit-customer-field" class="form-full" hidden>العميل<select name="customerId"><option value="">اختر العميل</option>${state.customers.map((customer) => `<option value="${customer.id}">${escapeHtml(customer.name)}${toNumber(customer.balance) ? ` — رصيد ${money(customer.balance)}` : ""}</option>`).join("")}</select></label><label class="form-full">المبلغ المدفوع<input id="paid-amount" name="paidAmount" type="number" inputmode="decimal" min="0" max="${initial.total}" step="0.01" value="${initial.total}" required /></label><div class="credit-summary form-full" id="credit-summary" hidden><span>المبلغ المتبقي</span><strong id="remaining-amount">${money(0)}</strong><small id="payment-status">مدفوعة</small></div><div class="checkout-total form-full"><span>الإجمالي النهائي</span><strong id="checkout-total">${money(initial.total)}</strong></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>رجوع</button><button type="submit" class="button button--primary checkout-submit">تأكيد البيع ${icon("check", 17)}</button></div></form>`);
@@ -1041,7 +1081,7 @@ function openCheckoutDialog() {
   const syncCheckout = () => { state.cartDiscount = form.discount.value; const totals = totalsForForm(); const isCredit = form.paymentType.value === "آجل"; const deliveryForCustomer = form.deliveryChargeType.value === "customer" && Math.max(0, toNumber(form.deliveryFee.value)) > 0; paidInput.max = totals.total; paidInput.disabled = isCredit; paidInput.value = isCredit ? 0 : totals.total; const remaining = Math.max(0, totals.total - toNumber(paidInput.value)); overlay.querySelector("#checkout-total").textContent = money(totals.total); overlay.querySelector("#remaining-amount").textContent = money(remaining); overlay.querySelector("#payment-status").textContent = isCredit ? "غير مدفوعة — يُسجل التحصيل لاحقًا من حساب العميل" : deliveryForCustomer ? "مدفوعة بما فيها التوصيل" : "مدفوعة"; creditField.hidden = !isCredit; creditSummary.hidden = !isCredit; };
   form.querySelectorAll("[name=paymentType]").forEach((input) => input.addEventListener("change", syncCheckout)); form.querySelectorAll("[name=deliveryChargeType]").forEach((input) => input.addEventListener("change", syncCheckout)); form.discount.addEventListener("input", syncCheckout); form.deliveryFee.addEventListener("input", syncCheckout);
   syncCheckout();
-  form.addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); try { const sale = await db.completeSale({ items: state.cart, ...values }); state.cart = []; state.cartDiscount = ""; await refresh(); closeDialog(); state.view = "invoices"; render(); showToast(sale.paymentType === "آجل" ? `حُفظت الفاتورة ${sale.invoiceNumber} وربطت بحساب العميل` : `تم حفظ الفاتورة ${sale.invoiceNumber} وخصم المخزون`); } catch (error) { showToast(error.message, "error"); } });
+  form.addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); try { const sale = await db.completeSale({ items: state.cart, ...values, cashierShiftId: state.activeCashierShift?.id || "", cashierId: state.currentUser?.role === "cashier" ? state.currentUser.id : "", cashierName: state.currentUser?.role === "cashier" ? state.currentUser.name : "" }); state.cart = []; state.cartDiscount = ""; await refresh(); closeDialog(); state.view = "invoices"; render(); showToast(sale.paymentType === "آجل" ? `حُفظت الفاتورة ${sale.invoiceNumber} وربطت بحساب العميل` : `تم حفظ الفاتورة ${sale.invoiceNumber} وخصم المخزون`); } catch (error) { showToast(error.message, "error"); } });
 }
 
 async function openInvoiceDialog(saleId) {
@@ -1536,5 +1576,5 @@ function stopScanner() {
 export async function bootApp(target) {
   root = target;
   installRuntimeGuards();
-  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
+  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }

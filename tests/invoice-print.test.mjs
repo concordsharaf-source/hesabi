@@ -60,6 +60,25 @@ test("تنزيل PDF تلقائيًا عند غياب دعم مشاركة الم
   assert.match(pdfExport, /downloadPdfFile\(file\);\n  return "downloaded"/);
 });
 
+test("يوثق تسليم الصندوق عند تبديل الحساب ويعرض للأدمن ورديات الكاشير وعجزها", async () => {
+  const [app, database, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(database, /const DB_VERSION = 9/);
+  assert.match(database, /makeIndexedStore\(database, "cashierShifts"/);
+  assert.match(database, /async startCashierShift/);
+  assert.match(database, /async closeCashierShift/);
+  assert.match(database, /cashierShiftId: normalize\(cashierShiftId\)/);
+  assert.match(app, /function openCashierShiftStartDialog\(/);
+  assert.match(app, /function openCashierHandoverDialog\(/);
+  assert.match(app, /function cashierShiftSummaryMarkup\(/);
+  assert.match(app, /cashierShiftId: state\.activeCashierShift\?\.id \|\| ""/);
+  assert.match(app, /if \(state\.view === "cashbox" && isAdmin\(state\.currentUser\)\)/);
+  assert.match(css, /\.cashier-shift-row \{ display:grid;/);
+});
+
 test("يدعم البحث المباشر برقم الفاتورة ويعرض عددي المنتجات والفواتير بأرقام إنجليزية في الرئيسية", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
   assert.match(app, /invoiceQuery: ""/);

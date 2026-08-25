@@ -230,3 +230,21 @@ test("ينشئ النسخة السحابية المجزأة ثم يستعيده�
   assert.equal((await db.getProduct(product.id)).quantity, 7);
   await db.resetAllData();
 });
+
+test("تسجل وردية الكاشير استلام الصندوق ومبيعاته النقدية والعجز عند التسليم", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "متجر الورديات", businessType: "بقالة", currency: "YER" });
+  const cashier = await db.createAccount({ username: "shift-cashier", name: "كاشير الوردية", role: "cashier", pin: "1357" });
+  const product = await db.createProduct({ name: "منتج وردية", unit: "حبة", purchasePrice: 30, salePrice: 100, quantity: 3, minimumStock: 0 });
+  const shift = await db.startCashierShift({ accountId: cashier.id, accountName: cashier.name, receivedCash: 500 });
+  const sale = await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], discount: 0, paidAmount: 100, paymentMethod: "نقدي", cashierShiftId: shift.id, cashierId: cashier.id, cashierName: cashier.name });
+  const closed = await db.closeCashierShift({ shiftId: shift.id, countedCash: 590 });
+  assert.equal(sale.cashierShiftId, shift.id);
+  assert.equal(closed.cashSales, 100);
+  assert.equal(closed.expectedCash, 600);
+  assert.equal(closed.countedCash, 590);
+  assert.equal(closed.difference, -10);
+  assert.equal(closed.status, "CLOSED");
+  assert.equal((await db.listCashierShifts()).length, 1);
+  await db.resetAllData();
+});

@@ -44,6 +44,13 @@ try {
     }
     throw new Error(`لم يظهر العنصر ${selector}.`);
   };
+  const waitForGone = async (selector) => {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      if (!await evaluate(`Boolean(document.querySelector(${JSON.stringify(selector)}))`)) return;
+      await sleep(150);
+    }
+    throw new Error(`لم يختف العنصر ${selector}.`);
+  };
   await command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   await waitFor("#setup-form");
   await evaluate(`(() => { const form = document.querySelector('#setup-form'); form.elements.storeName.value = 'متجر اختبار'; form.requestSubmit(); })()`);
@@ -130,8 +137,37 @@ try {
     const viewResult = await evaluate(`new Promise((resolve) => { document.querySelector('[data-bottom-nav] [data-view="${view}"]').click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim() }), 250); })`);
     assert.deepEqual(viewResult, { active: view, title });
   }
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="accounts"]').click()`);
+  await waitFor('[data-action="new-account"]');
+  await evaluate(`document.querySelector('[data-action="new-account"]').click()`);
+  await waitFor('#account-form');
+  await evaluate(`(() => { const form = document.querySelector('#account-form'); form.elements.name.value = 'كاشير اختبار الوردية'; form.elements.username.value = 'shift-cashier'; form.elements.pin.value = '1357'; form.elements.role.value = 'cashier'; form.requestSubmit(); })()`);
+  await waitForGone('#account-form');
+  await waitFor('[data-action="account-session"]');
+  await evaluate(`document.querySelector('[data-action="account-session"]').click()`);
+  await waitFor('#switch-local-user');
+  await evaluate(`document.querySelector('#switch-local-user').click()`);
+  await waitFor('#login-form');
+  await evaluate(`(() => { const form = document.querySelector('#login-form'); form.elements.username.value = 'shift-cashier'; form.elements.pin.value = '1357'; form.requestSubmit(); })()`);
+  await waitFor('#cashier-shift-start-form');
+  await evaluate(`(() => { const form = document.querySelector('#cashier-shift-start-form'); form.elements.receivedCash.value = '200'; form.requestSubmit(); })()`);
+  await waitForGone('#cashier-shift-start-form');
+  await waitFor('[data-action="account-session"]');
+  await evaluate(`document.querySelector('[data-action="account-session"]').click()`);
+  await waitFor('#switch-local-user');
+  await evaluate(`document.querySelector('#switch-local-user').click()`);
+  await waitFor('#cashier-shift-close-form');
+  await evaluate(`(() => { const form = document.querySelector('#cashier-shift-close-form'); form.elements.countedCash.value = '190'; form.requestSubmit(); })()`);
+  await waitForGone('#cashier-shift-close-form');
+  await waitFor('#login-form');
+  await evaluate(`(() => { const form = document.querySelector('#login-form'); form.elements.username.value = 'admin'; form.elements.pin.value = '1234'; form.requestSubmit(); })()`);
+  await waitFor('[data-bottom-nav] [data-view="cashbox"]');
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="cashbox"]').click()`);
+  await waitFor('.cashier-shift-summary');
+  const shiftSummary = await evaluate(`(() => { const row = document.querySelector('.cashier-shift-row'); return { name: row.querySelector('strong')?.textContent.trim(), hasShortage: Boolean(row.querySelector('.is-negative')), hasLogin: row.textContent.includes('دخول:'), hasLogout: row.textContent.includes('خروج:') }; })()`);
+  assert.deepEqual(shiftSummary, { name: 'كاشير اختبار الوردية', hasShortage: true, hasLogin: true, hasLogout: true });
   socket.close();
-  console.log("اجتازت صفحات الرئيسية والمبيعات والفواتير والمشتريات والمخزون اختبار التنقل التفاعلي.");
+  console.log("اجتازت صفحات التطبيق وتبديل الكاشير وتسليم الصندوق اختبار التنقل التفاعلي.");
 } finally {
   chrome.kill("SIGTERM");
   await new Promise((resolve) => chrome.once("exit", resolve));
