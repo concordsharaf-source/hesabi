@@ -1,4 +1,4 @@
-const CACHE_NAME = "hesabi-pwa-v21";
+const CACHE_NAME = "hesabi-pwa-v22";
 const SCOPE_PATH = new URL(self.registration.scope).pathname;
 const APP_SHELL = [SCOPE_PATH, `${SCOPE_PATH}manifest.json`, `${SCOPE_PATH}service-worker.js`];
 const isSameOrigin = (request) => new URL(request.url).origin === self.location.origin;
@@ -47,10 +47,10 @@ self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   if (!isSameOrigin(event.request)) return;
   if (event.request.mode === "navigate") {
-    event.respondWith(caches.match(SCOPE_PATH).then((cached) => cached || fetch(event.request).then((response) => {
+    event.respondWith(fetch(event.request, { cache: "no-store" }).then((response) => {
       if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(SCOPE_PATH, response.clone()));
       return response;
-    })));
+    }).catch(() => caches.match(SCOPE_PATH).then((cached) => cached || Response.error())));
     return;
   }
   event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
