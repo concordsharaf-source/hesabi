@@ -64,8 +64,13 @@ try {
   await waitFor('[data-bottom-nav] [data-view="inventory"]');
   const result = await evaluate(`new Promise((resolve) => { const inventory = document.querySelector('[data-bottom-nav] [data-view="inventory"]'); inventory.click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim(), inventoryVisible: Boolean(document.querySelector('.inventory-list')), expiryAlertVisible: Boolean(document.querySelector('.expiry-inventory-alert')), expiryStatusVisible: Boolean(document.querySelector('.expiry-status')) }), 350); })`);
   assert.deepEqual(result, { active: "inventory", title: "المخزون", inventoryVisible: true, expiryAlertVisible: true, expiryStatusVisible: true });
+  const views = [["dashboard", "نظرة على يومك"], ["sales", "بيع جديد"], ["invoices", "الفواتير"], ["purchases", "المشتريات"], ["inventory", "المخزون"]];
+  for (const [view, title] of views) {
+    const viewResult = await evaluate(`new Promise((resolve) => { document.querySelector('[data-bottom-nav] [data-view="${view}"]').click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim() }), 250); })`);
+    assert.deepEqual(viewResult, { active: view, title });
+  }
   socket.close();
-  console.log("تم فتح المخزون وبقي نشطًا بعد النقر من شريط الهاتف.");
+  console.log("اجتازت صفحات الرئيسية والمبيعات والفواتير والمشتريات والمخزون اختبار التنقل التفاعلي.");
 } finally {
   chrome.kill("SIGTERM");
   await new Promise((resolve) => chrome.once("exit", resolve));

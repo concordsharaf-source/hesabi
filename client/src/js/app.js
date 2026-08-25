@@ -46,13 +46,14 @@ const icon = (name, size = 20) => {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ""}</svg>`;
 };
 
-const state = { view: "dashboard", settings: null, accounts: [], currentUser: null, products: [], productSuppliers: {}, sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
+const state = { view: "dashboard", lastStableView: "dashboard", settings: null, accounts: [], currentUser: null, products: [], productSuppliers: {}, sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
 const isPharmacy = () => state.settings?.businessType === "صيدلية";
 const profileOptions = (kind, current = "") => [...new Set([...(businessProfile()[kind] || []), current].filter(Boolean))];
 let root;
 let exitGuardInstalled = false;
 let exitAllowed = false;
+let runtimeGuardsInstalled = false;
 const roleLabel = (role) => ACCOUNT_ROLES.find((item) => item.id === role)?.label || "كاشير";
 const adminOnlyMessage = () => showToast("هذه العملية متاحة لحساب الأدمن فقط.", "error");
 
@@ -115,6 +116,17 @@ function showToast(message, type = "success") {
   host.appendChild(toast);
   requestAnimationFrame(() => toast.classList.add("toast--visible"));
   window.setTimeout(() => { toast.classList.remove("toast--visible"); window.setTimeout(() => toast.remove(), 200); }, 3300);
+}
+
+function installRuntimeGuards() {
+  if (runtimeGuardsInstalled) return;
+  runtimeGuardsInstalled = true;
+  const notify = (error) => {
+    console.error("[Hesabi runtime error]", error);
+    showToast("حدث خلل غير متوقع، لكن بياناتك المحلية محفوظة. يمكنك متابعة العمل أو إعادة المحاولة.", "error");
+  };
+  window.addEventListener("error", (event) => notify(event.error || event.message));
+  window.addEventListener("unhandledrejection", (event) => notify(event.reason));
 }
 
 function installExitGuard() {
@@ -495,7 +507,36 @@ function accountsMarkup() {
   <section class="panel account-list"><div class="panel__head"><div><span class="eyebrow">فريق المتجر</span><h2>الحسابات المحلية</h2></div><small>الأدمن: كامل الصلاحيات · الكاشير: المبيعات والفواتير فقط</small></div>${accounts.map((account) => `<article class="account-row"><div class="account-row__icon">${icon("users", 20)}</div><div class="account-row__main"><strong>${escapeHtml(account.name)}</strong><small dir="ltr">${escapeHtml(account.username)}</small></div><span class="account-badge account-badge--${account.role}">${roleLabel(account.role)}</span><span class="status status--${account.isActive ? "available" : "empty"}">${account.isActive ? "نشط" : "موقوف"}</span><div class="entity-row__actions"><button class="icon-button" data-action="change-account-pin" data-id="${account.id}" aria-label="تغيير رمز دخول ${escapeHtml(account.name)}">${icon("edit", 18)}</button><button class="icon-button" data-action="open-account" data-id="${account.id}" aria-label="تعديل ${escapeHtml(account.name)}">${icon("dots", 18)}</button></div></article>`).join("")}</section>`;
 }
 
-function render() {
+function recoveryNoticeMarkup(failedView) {
+  const label = NAV_ITEMS.find((item) => item.id === failedView)?.label || "القسم";
+  return `<section class="runtime-recovery" role="alert"><div>${icon("alert", 19)}<div><strong>تعذر فتح ${escapeHtml(label)} مؤقتًا</strong><small>تم إبقاؤك في قسم يعمل وبياناتك المحلية لم تتغير.</small></div></div><button class="button button--secondary" type="button" data-runtime-retry="${escapeHtml(failedView)}">إعادة المحاولة</button></section>`;
+}
+
+function bindRecoveryControls(scope = root) {
+  scope.querySelector("[data-runtime-retry]")?.addEventListener("click", (event) => { state.view = event.currentTarget.dataset.runtimeRetry || state.lastStableView; render(); });
+  scope.querySelector("[data-runtime-safe-view]")?.addEventListener("click", () => { state.view = isAdmin(state.currentUser) ? "dashboard" : "sales"; render(); });
+}
+
+function renderRecovery(error) {
+  const failedView = state.view;
+  const safeView = isAdmin(state.currentUser) ? "dashboard" : "sales";
+  console.error("[Hesabi render recovery]", { failedView, error });
+  if (state.currentUser && failedView !== safeView) {
+    state.view = safeView;
+    try {
+      renderApplication();
+      root.querySelector(".workspace")?.insertAdjacentHTML("afterbegin", recoveryNoticeMarkup(failedView));
+      bindRecoveryControls();
+      return;
+    } catch (fallbackError) { console.error("[Hesabi recovery fallback error]", fallbackError); }
+  }
+  const label = NAV_ITEMS.find((item) => item.id === failedView)?.label || "القسم";
+  root.innerHTML = `<main class="fatal-state runtime-fatal"><div class="runtime-fatal__icon">${icon("alert", 28)}</div><h1>تعذر فتح ${escapeHtml(label)} مؤقتًا</h1><p>لم نحذف أي بيانات محلية. يمكنك إعادة المحاولة أو العودة إلى قسم آمن.</p><div class="dialog__actions"><button id="runtime-retry" class="button button--primary" type="button">إعادة المحاولة</button><button id="runtime-safe-view" class="button button--secondary" type="button">العودة إلى قسم آمن</button></div></main>`;
+  root.querySelector("#runtime-retry")?.addEventListener("click", () => { state.view = failedView; render(); });
+  bindRecoveryControls();
+}
+
+function renderApplication() {
   if (!state.settings?.setupCompleted) { root.innerHTML = setupMarkup(); injectSetupRestoreControl(); bindEvents(); return; }
   if (!state.currentUser) { root.innerHTML = loginMarkup(); bindEvents(); return; }
   if (state.currentUser.mustChangePin) { root.innerHTML = requiredPinMarkup(); bindEvents(); return; }
@@ -503,6 +544,12 @@ function render() {
   const body = { dashboard: dashboardMarkup, products: productsMarkup, inventory: inventoryMarkup, sales: salesMarkup, invoices: invoicesMarkup, customers: customersMarkup, "customer-payments": customerPaymentsMarkup, suppliers: suppliersMarkup, "supplier-payments": supplierPaymentsMarkup, purchases: purchasesMarkup, expenses: expensesMarkup, cashbox: cashboxMarkup, transfers: transfersMarkup, reports: reportsMarkup, accounts: accountsMarkup, settings: settingsMarkup }[state.view]?.() || dashboardMarkup();
   root.innerHTML = `<div class="app-shell">${navMarkup()}<main class="workspace">${body}</main>${salesScannerFabMarkup()}</div>`;
   bindEvents();
+  state.lastStableView = state.view;
+}
+
+function render() {
+  try { renderApplication(); }
+  catch (error) { renderRecovery(error); }
 }
 
 function injectSetupRestoreControl() {
@@ -607,6 +654,11 @@ async function changeRequiredPin(event) {
 }
 
 async function handleAction(event) {
+  try { await handleActionUnsafe(event); }
+  catch (error) { console.error("[Hesabi action error]", error); showToast("تعذرت العملية دون تعديل بياناتك. أعد المحاولة.", "error"); }
+}
+
+async function handleActionUnsafe(event) {
   const action = event.currentTarget.dataset.action;
   const id = event.currentTarget.dataset.id;
   if (action === "fill-login") { const input = root.querySelector("#login-form [name=username]"); if (input) { input.value = event.currentTarget.dataset.username; root.querySelector("#login-form [name=pin]")?.focus(); } return; }
@@ -1407,5 +1459,6 @@ function stopScanner() {
 
 export async function bootApp(target) {
   root = target;
-  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); installExitGuard(); } catch (error) { root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>${escapeHtml(error.message)}</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
+  installRuntimeGuards();
+  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }
