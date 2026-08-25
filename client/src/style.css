@@ -158,6 +158,17 @@ html[data-theme="dark"], html[data-theme="dark"] body { background:radial-gradie
   [data-theme="dark"] .sidebar__account { background:#1b382e; border-color:#4a8068; }[data-theme="dark"] .sidebar__account .text-button { color:#e5fff0; }[data-theme="dark"] .sidebar__footer { color:#c5ddd1; }
 }
 
+/* بطاقة إعدادات المتجر: لا تتمدد بطول بطاقة ترتيب الهاتف، والحقول تتبع تسلسلاً واضحًا. */
+.settings-page .report-grid { align-items:start; }
+@media (min-width:960px) {
+  .settings-page #settings-form { align-self:start; align-content:start; gap:16px 18px; padding:0 22px 22px; }
+  .settings-page #settings-form>.panel__head { padding:19px 22px 15px; margin:0 -22px 2px; border-bottom:1px solid var(--line); }
+  .settings-page #settings-form>label:first-of-type { grid-column:1 / -1; }
+  .settings-page #settings-form>.dialog__actions { margin:2px 0 0; padding-top:14px; border-top:1px solid var(--line); }
+  .settings-page #settings-form>.dialog__actions .button { min-width:190px; }
+}
+[data-theme="dark"] .settings-page #settings-form>.panel__head,[data-theme="dark"] .settings-page #settings-form>.dialog__actions { border-color:#3e6756; }
+
 /* تحصيل البيع: زران متساويان يبرزان وسيلة الدفع المختارة بوضوح. */
 .cloud-backup-card { align-content:start; }.cloud-backup-card__note { display:grid !important; justify-content:initial !important; gap:3px !important; padding:10px 11px; color:var(--green-deep) !important; background:var(--green-pale); border:1px solid rgba(31,107,89,.14); border-radius:11px; font-size:10px !important; line-height:1.7; }.cloud-backup-card__note span { color:var(--muted); }.cloud-backup-list { display:grid; gap:0; margin-top:3px; border-top:1px solid var(--line); }.cloud-backup-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 0; border-bottom:1px solid var(--line); }.cloud-backup-row:last-child { border-bottom:0; }.cloud-backup-row>div:first-child { min-width:0; }.cloud-backup-row strong,.cloud-backup-row small { display:block; }.cloud-backup-row strong { overflow-wrap:anywhere; color:var(--ink); font-size:12px; }.cloud-backup-row small { color:var(--muted); font-size:9px; }.cloud-backup-row__actions { display:flex; flex:0 0 auto; align-items:center; gap:2px; }.cloud-backup-row__actions .button { min-height:36px; padding-inline:10px; font-size:11px; }.cloud-backup-error { padding:9px 10px; margin:0; color:var(--danger); background:var(--danger-pale); border-radius:10px; font-size:10px; line-height:1.7; }
 @media (max-width:599px) { .cloud-backup-row { align-items:flex-start; flex-direction:column; }.cloud-backup-row__actions { width:100%; justify-content:flex-end; }.cloud-backup-row__actions .button { flex:1 1 auto; } }

@@ -210,6 +210,14 @@ test("توحّد واجهة سطح المكتب حقول النماذج وتبر
   assert.match(css, /\[data-theme="dark"\] \.sidebar \.nav-item\.is-active \{ color:#fff; background:linear-gradient\(145deg,#238465,#14513f\);/);
 });
 
+test("ترتب بطاقة بيانات المتجر مستقلة عن بطاقة ترتيب الهاتف على سطح المكتب", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  assert.match(css, /\.settings-page \.report-grid \{ align-items:start; \}/);
+  assert.match(css, /\.settings-page #settings-form>\.panel__head \{ padding:19px 22px 15px; margin:0 -22px 2px; border-bottom:1px solid var\(--line\); \}/);
+  assert.match(css, /\.settings-page #settings-form>label:first-of-type \{ grid-column:1 \/ -1; \}/);
+  assert.match(css, /\.settings-page #settings-form>\.dialog__actions \{ margin:2px 0 0; padding-top:14px; border-top:1px solid var\(--line\); \}/);
+});
+
 test("تعكس أسهم ترتيب شريط الهاتف اتجاه التقديم والتأخير بصريًا دون تغيير الإجراء", async () => {
   const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
   assert.match(css, /\.mobile-nav-settings__actions \[data-direction="-1"\] svg \{ transform:rotate\(180deg\); \}/);
