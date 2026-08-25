@@ -156,7 +156,7 @@ test("يبدأ شريط الهاتف بترتيب افتراضي قابل للت
   assert.match(styles, /\.bottom-nav::\-webkit-scrollbar \{ display:none; \}/);
   assert.match(styles, /\[data-theme="dark"\] \.mobile-nav-settings__item strong \{ color:#fff; \}/);
   assert.match(styles, /\[data-theme="dark"\] \.mobile-nav-settings__actions \.icon-button \{ color:#fff4f6; background:linear-gradient\(145deg,#c42a47,#84132b\);/);
-  assert.match(app, /input\("nearestExpiryDate", "تاريخ الانتهاء", "date", product\?\.nearestExpiryDate \?\? ""\)/);
+  assert.match(app, /input\("nearestExpiryDate", "تاريخ الانتهاء \(YYYY-MM-DD\)", "text", product\?\.nearestExpiryDate \?\? ""/);
 });
 
 test("لا يكرر تعريف حالة الواجهة مفاتيح فلترة دفعات الموردين", async () => {
@@ -252,7 +252,7 @@ test("تحتوي نوافذ سطح المكتب حقول الشراء والنم
   assert.match(css, /\.dialog \.purchase-line--pack>button \{ grid-column:2; justify-self:end; \}/);
 });
 
-test("تظهر تواريخ الانتهاء باتجاه تاريخ ثابت وتحدد الحقول الرقمية قيمتها عند التركيز", async () => {
+test("تستخدم تواريخ الانتهاء صيغة ISO ثابتة وتحدد الحقول الرقمية قيمتها عند التركيز", async () => {
   const [app, css] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
@@ -262,6 +262,10 @@ test("تظهر تواريخ الانتهاء باتجاه تاريخ ثابت و
   assert.match(app, /document\.addEventListener\("focusin", selectNumericFieldValue, true\)/);
   assert.match(app, /document\.addEventListener\("pointerup", selectNumericFieldValue, true\)/);
   assert.match(css, /input\[type="date"\] \{ direction:ltr; text-align:left; unicode-bidi:plaintext; \}/);
+  assert.match(app, /تاريخ الانتهاء \(YYYY-MM-DD\).*class=iso-date-input dir=ltr inputmode=numeric/);
+  assert.match(app, /data-purchase-expiry-date="\$\{index\}" type="text" dir="ltr" inputmode="numeric"/);
+  assert.match(app, /name="expiryDate" type="text" dir="ltr" inputmode="numeric"/);
+  assert.match(css, /\.iso-date-input \{ direction:ltr !important; text-align:left !important; unicode-bidi:plaintext;/);
 });
 
 test("تعكس أسهم ترتيب شريط الهاتف اتجاه التقديم والتأخير بصريًا دون تغيير الإجراء", async () => {
