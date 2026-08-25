@@ -122,6 +122,7 @@ test("تظهر صلاحية الشراء في المخزون بتحذير برت
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
   assert.match(app, /function expiryStatus\(product, today = dateKey\(\)\)/);
+  assert.match(app, /const formatDate = \(value\) => \{/);
   assert.match(app, /days <= 30 \? "danger" : "warning"/);
   assert.match(app, /تنبيه انتهاء الصلاحية/);
   assert.match(app, /data-purchase-expiry-date/);

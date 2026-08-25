@@ -52,8 +52,18 @@ try {
   await waitFor("#required-pin-form");
   await evaluate(`(() => { const form = document.querySelector('#required-pin-form'); form.elements.pin.value = '1234'; form.elements.pinConfirm.value = '1234'; form.requestSubmit(); })()`);
   await waitFor('[data-bottom-nav] [data-view="inventory"]');
-  const result = await evaluate(`new Promise((resolve) => { const inventory = document.querySelector('[data-bottom-nav] [data-view="inventory"]'); inventory.click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim(), inventoryVisible: Boolean(document.querySelector('.inventory-list')) }), 350); })`);
-  assert.deepEqual(result, { active: "inventory", title: "المخزون", inventoryVisible: true });
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="products"]').click()`);
+  await waitFor('[data-action="new-product"]');
+  await evaluate(`document.querySelector('[data-action="new-product"]').click()`);
+  await waitFor('#product-form');
+  await evaluate(`(() => { const date = new Date(); date.setDate(date.getDate() + 20); const expiry = date.toISOString().slice(0, 10); const form = document.querySelector('#product-form'); form.elements.name.value = 'منتج قريب الانتهاء'; form.elements.purchasePrice.value = '30'; form.elements.salePrice.value = '50'; form.elements.quantity.value = '5'; form.elements.minimumStock.value = '1'; form.elements.nearestExpiryDate.value = expiry; form.requestSubmit(); })()`);
+  await waitFor('.product-card [data-action="open-product"]');
+  await evaluate(`document.querySelector('.product-card [data-action="open-product"]').click()`);
+  await waitFor('#product-form');
+  await evaluate(`(() => { const date = new Date(); date.setDate(date.getDate() + 10); document.querySelector('#product-form').elements.nearestExpiryDate.value = date.toISOString().slice(0, 10); document.querySelector('#product-form').requestSubmit(); })()`);
+  await waitFor('[data-bottom-nav] [data-view="inventory"]');
+  const result = await evaluate(`new Promise((resolve) => { const inventory = document.querySelector('[data-bottom-nav] [data-view="inventory"]'); inventory.click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim(), inventoryVisible: Boolean(document.querySelector('.inventory-list')), expiryAlertVisible: Boolean(document.querySelector('.expiry-inventory-alert')), expiryStatusVisible: Boolean(document.querySelector('.expiry-status')) }), 350); })`);
+  assert.deepEqual(result, { active: "inventory", title: "المخزون", inventoryVisible: true, expiryAlertVisible: true, expiryStatusVisible: true });
   socket.close();
   console.log("تم فتح المخزون وبقي نشطًا بعد النقر من شريط الهاتف.");
 } finally {

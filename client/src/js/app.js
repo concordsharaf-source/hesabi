@@ -65,6 +65,10 @@ const signedMoney = (value) => `<strong class="${toNumber(value) < 0 ? "is-negat
 const amount = (value) => new Intl.NumberFormat("ar-SA", { maximumFractionDigits: 2 }).format(toNumber(value));
 const amountLatin = (value) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2, useGrouping: false }).format(toNumber(value));
 const dateTime = (value) => new Intl.DateTimeFormat("ar-SA", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+const formatDate = (value) => {
+  const date = new Date(`${String(value || "")}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? String(value || "") : new Intl.DateTimeFormat("ar-EG-u-ca-gregory", { year: "numeric", month: "short", day: "numeric" }).format(date);
+};
 const escapeHtml = (value = "") => String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#039;", '"': "&quot;" })[character]);
 const phoneHref = (phone) => {
   const raw = String(phone || "").trim();
