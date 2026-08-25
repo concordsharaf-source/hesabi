@@ -80,6 +80,18 @@ try {
   await waitFor('#product-form');
   await evaluate(`(() => { const date = new Date(); date.setDate(date.getDate() + 10); document.querySelector('#product-form').elements.nearestExpiryDate.value = date.toISOString().slice(0, 10); document.querySelector('#product-form').requestSubmit(); })()`);
   await waitFor('[data-bottom-nav] [data-view="inventory"]');
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]').click()`);
+  await waitFor('[data-action="new-purchase"]');
+  await evaluate(`document.querySelector('[data-action="new-purchase"]').click()`);
+  await waitFor('#purchase-product-search');
+  await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); search.value = 'منتج قريب الانتهاء'; search.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  await waitFor('[data-add-purchase-product]');
+  await evaluate(`document.querySelector('[data-add-purchase-product]').click()`);
+  await waitFor('[data-purchase-sale-price="0"]');
+  const priorProductPurchaseLine = await evaluate(`(() => { const salePrice = document.querySelector('[data-purchase-sale-price="0"]'); const row = salePrice.closest('.purchase-line'); return { salePrice: salePrice.value, rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length }; })()`);
+  assert.deepEqual(priorProductPurchaseLine, { salePrice: '50', rowDisplay: 'grid', fieldCount: 7 });
+  await evaluate(`document.querySelector('#dialog-backdrop [data-dialog-close]').click()`);
+  await waitFor('[data-action="new-purchase"]');
   const result = await evaluate(`new Promise((resolve) => { const inventory = document.querySelector('[data-bottom-nav] [data-view="inventory"]'); inventory.click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim(), inventoryVisible: Boolean(document.querySelector('.inventory-list')), expiryAlertVisible: Boolean(document.querySelector('.expiry-inventory-alert')), expiryStatusVisible: Boolean(document.querySelector('.expiry-status')) }), 350); })`);
   assert.deepEqual(result, { active: "inventory", title: "المخزون", inventoryVisible: true, expiryAlertVisible: true, expiryStatusVisible: true });
   await evaluate(`document.querySelector('[data-bottom-nav] [data-view="settings"]').click()`);

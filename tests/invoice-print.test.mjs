@@ -218,6 +218,18 @@ test("ترتب بطاقة بيانات المتجر مستقلة عن بطاقة
   assert.match(css, /\.settings-page #settings-form>\.dialog__actions \{ margin:2px 0 0; padding-top:14px; border-top:1px solid var\(--line\); \}/);
 });
 
+test("تورث فاتورة الشراء سعر بيع الحبة للمنتج السابق وتستخدم شبكة مكتبية منظمة", async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /values\.salePrice === undefined \|\| values\.salePrice === "" \? product\.salePrice \?\? product\.defaultSalePrice \?\? product\.price \?\? 0 : values\.salePrice/);
+  assert.match(app, /salePrice: toNumber\(salePrice\)/);
+  assert.match(css, /\.purchase-line \{ grid-template-columns:repeat\(4,minmax\(0,1fr\)\); align-items:end; gap:12px; padding:16px; \}/);
+  assert.match(css, /\.purchase-line>div:first-child \{ grid-column:1 \/ -1;/);
+  assert.match(css, /\.purchase-line \.purchase-line__total \{ display:grid; grid-column:span 2;/);
+});
+
 test("تعكس أسهم ترتيب شريط الهاتف اتجاه التقديم والتأخير بصريًا دون تغيير الإجراء", async () => {
   const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
   assert.match(css, /\.mobile-nav-settings__actions \[data-direction="-1"\] svg \{ transform:rotate\(180deg\); \}/);
