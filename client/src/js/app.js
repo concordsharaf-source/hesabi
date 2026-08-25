@@ -202,7 +202,7 @@ async function refresh() {
 function navMarkup() {
   const accessibleItems = NAV_ITEMS.filter((item) => canAccessView(state.currentUser, item.id));
   const renderItems = (items) => items.map((item) => `<button class="nav-item ${state.view === item.id ? "is-active" : ""}" data-action="navigate" data-view="${item.id}">${icon(item.icon)}<span>${item.label}</span></button>`).join("");
-  const mobileNavigationOrder = ["sales", "invoices", "purchases"];
+  const mobileNavigationOrder = ["dashboard", "sales", "invoices", "purchases"];
   const bottomItems = [...mobileNavigationOrder.map((id) => accessibleItems.find((item) => item.id === id)).filter(Boolean), ...accessibleItems.filter((item) => !mobileNavigationOrder.includes(item.id))];
   const items = renderItems(accessibleItems);
   return `<aside class="sidebar">
