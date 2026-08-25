@@ -24,12 +24,13 @@ import {
   toNumber,
 } from "./domain.js";
 import { ACTIVE_SESSION_META_ID, toPersistentSessionUser } from "./session.js";
+import { randomId } from "./ids.js";
 
 const DB_NAME = "hesabi-pwa";
 const DB_VERSION = 8;
 let databasePromise;
 
-const uid = (prefix) => `${prefix}-${crypto.randomUUID()}`;
+const uid = (prefix) => `${prefix}-${randomId()}`;
 const requestAsPromise = (request) => new Promise((resolve, reject) => {
   request.onsuccess = () => resolve(request.result);
   request.onerror = () => reject(request.error || new Error("تعذر تنفيذ العملية المحلية."));
@@ -42,10 +43,14 @@ const transactionDone = (transaction) => new Promise((resolve, reject) => {
 const normalize = (value) => String(value || "").trim();
 const normalizeUsername = (value) => normalize(value).toLocaleLowerCase("ar");
 const validatePin = (value) => /^\d{4,12}$/.test(String(value || ""));
-const makeSalt = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+const secureCrypto = () => {
+  if (!globalThis.crypto?.getRandomValues || !globalThis.crypto?.subtle?.digest) throw new Error("هذا الجهاز لا يدعم الحماية المطلوبة لرمز الدخول. افتح حسابي من متصفح حديث أو حدّث التطبيق.");
+  return globalThis.crypto;
+};
+const makeSalt = () => Array.from(secureCrypto().getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
 const hashPin = async (pin, salt) => {
   const bytes = new TextEncoder().encode(`${salt}:${String(pin)}`);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  const digest = await secureCrypto().subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
 const accountRole = (role) => role === "admin" ? "admin" : "cashier";

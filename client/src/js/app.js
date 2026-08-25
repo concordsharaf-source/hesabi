@@ -9,6 +9,7 @@ import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { getExitGuardAction, leaveAfterExitConfirmation, primeExitGuardHistory } from "./navigation-guard.js";
 import { createReportPdfFile, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf } from "./pdf-export.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
+import { shortRandomId } from "./ids.js";
 import { CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isNewContinuousBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 
 const icon = (name, size = 20) => {
@@ -48,7 +49,7 @@ const icon = (name, size = 20) => {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ""}</svg>`;
 };
 
-const state = { view: "dashboard", lastStableView: "dashboard", settings: null, accounts: [], currentUser: null, products: [], productSuppliers: {}, sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
+const state = { view: "dashboard", lastStableView: "dashboard", settings: null, accounts: [], currentUser: null, products: [], productSuppliers: {}, sales: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], expenses: [], stockMovements: [], cashMovements: [], cashbox: null, dashboard: null, analytics: null, cart: [], productQuery: "", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "" } };
 const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "invoices", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "invoices", "purchases"].includes(id))];
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
@@ -840,14 +841,16 @@ function openPhoneRecoveryDialog() {
     event.preventDefault(); const form = event.currentTarget; const rawPhone = String(new FormData(form).get("phone") || "").trim(); const phone = rawPhone.replace(/[^0-9+]/g, "");
     if (phone.replace(/\D/g, "").length < 7) { showToast("أدخل رقم جوال صحيحًا.", "error"); return; }
     const submit = form.querySelector("button[type=submit]"); submit.disabled = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 15000);
     try {
-      const requestId = crypto.randomUUID().slice(0, 8).toUpperCase(); const payload = new FormData();
+      const requestId = shortRandomId(); const payload = new FormData();
       payload.append("رقم_الطلب", requestId); payload.append("اسم_المتجر", state.settings?.storeName || "حسابي"); payload.append("رقم_الجوال", phone); payload.append("وقت_الطلب", new Date().toLocaleString("ar-EG")); payload.append("التعليمات", "اتصل بصاحب الرقم للتحقق، ثم أعد تعيين رمز مؤقت من صفحة الحسابات والصلاحيات. لا ترسل الرمز عبر البريد."); payload.append("_subject", `طلب استرداد حسابي #${requestId}`); payload.append("_template", "table");
-      const response = await fetch(RECOVERY_REQUEST_ENDPOINT, { method: "POST", headers: { Accept: "application/json" }, body: payload });
+      const response = await fetch(RECOVERY_REQUEST_ENDPOINT, { method: "POST", headers: { Accept: "application/json" }, body: payload, signal: controller.signal });
       if (!response.ok) throw new Error("تعذر إرسال الطلب الآن. حاول لاحقًا.");
       closeDialog(); showToast(`تم إرسال طلبك برقم ${requestId}. سيتواصل معك مالك المتجر للتحقق.`);
-    } catch (error) { showToast(error.message || "تعذر إرسال طلب الاسترداد.", "error"); }
-    finally { submit.disabled = false; }
+    } catch (error) { showToast(error?.name === "AbortError" ? "انتهت مهلة الإرسال. تحقق من الإنترنت ثم حاول مرة أخرى." : (error?.message || "تعذر إرسال طلب الاسترداد."), "error"); }
+    finally { window.clearTimeout(timeout); submit.disabled = false; }
   });
 }
 

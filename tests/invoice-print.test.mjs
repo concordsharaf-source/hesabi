@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { renderThermalInvoiceHtml } from "../client/src/js/invoice-print.js";
 import { renderCustomerAccountHtml } from "../client/src/js/customer-account-print.js";
+import { randomId, shortRandomId } from "../client/src/js/ids.js";
 
 const escapeHtml = (value = "") => String(value).replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" })[character]);
 
@@ -150,6 +151,41 @@ test("يبدأ شريط الهاتف بترتيب افتراضي قابل للت
   assert.match(styles, /\[data-theme="dark"\] \.mobile-nav-settings__item strong \{ color:#fff; \}/);
   assert.match(styles, /\[data-theme="dark"\] \.mobile-nav-settings__actions \.icon-button \{ color:#fff4f6; background:linear-gradient\(145deg,#c42a47,#84132b\);/);
   assert.match(app, /input\("nearestExpiryDate", "تاريخ الانتهاء", "date", product\?\.nearestExpiryDate \?\? ""\)/);
+});
+
+test("لا يكرر تعريف حالة الواجهة مفاتيح فلترة دفعات الموردين", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  const initialState = app.match(/const state = \{[^;]+\};/)?.[0] || "";
+  assert.equal((initialState.match(/supplierPaymentFrom:/g) || []).length, 1);
+  assert.equal((initialState.match(/supplierPaymentTo:/g) || []).length, 1);
+});
+
+test("تستخدم المعرفات بديلًا متوافقًا بدل الاعتماد المباشر على randomUUID", async () => {
+  const [app, database, firebaseBackup, ids] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/firebase-backup.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/ids.js", import.meta.url), "utf8"),
+  ]);
+  assert.doesNotMatch(`${app}\n${database}\n${firebaseBackup}`, /crypto\.randomUUID/);
+  assert.match(ids, /globalThis\.crypto\?\.randomUUID/);
+  assert.match(database, /const secureCrypto = \(\) =>/);
+  assert.match(database, /secureCrypto\(\)\.getRandomValues/);
+  assert.match(database, /secureCrypto\(\)\.subtle\.digest/);
+});
+
+test("ينشئ مساعد المعرفات معرفًا كاملاً وآخر قصيرًا صالحين للاستخدام", () => {
+  assert.ok(randomId().length >= 8);
+  assert.match(shortRandomId(), /^[A-F0-9]{8}$/);
+});
+
+test("يحمي طلب استرداد الهاتف من تعليق الشبكة بمهلة ورسالة إعادة محاولة", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /const controller = new AbortController\(\);/);
+  assert.match(app, /window\.setTimeout\(\(\) => controller\.abort\(\), 15000\)/);
+  assert.match(app, /signal: controller\.signal/);
+  assert.match(app, /انتهت مهلة الإرسال\. تحقق من الإنترنت ثم حاول مرة أخرى\./);
+  assert.match(app, /window\.clearTimeout\(timeout\); submit\.disabled = false/);
 });
 
 test("تفصل الإعدادات إدارة البيانات في صفحة مخصصة لتصدير واستيراد النسخ", async () => {

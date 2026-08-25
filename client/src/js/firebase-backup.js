@@ -2,6 +2,7 @@ import { getApp, getApps, initializeApp } from "firebase/app";
 import { browserLocalPersistence, createUserWithEmailAndPassword, getAuth, setPersistence, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { collection, deleteDoc, doc, getDoc, getDocs, getFirestore, setDoc } from "firebase/firestore";
 import { CLOUD_BACKUP_MAX_ENCODED_BYTES, createCloudBackupPackage, decodeCloudBackupPackage } from "./cloud-backup-codec.js";
+import { shortRandomId } from "./ids.js";
 
 export const CLOUD_BACKUP_RETENTION_LIMIT = 3;
 
@@ -46,7 +47,7 @@ function readableAuthError(error) {
 
 function ownerRef(firestore, uid) { return doc(firestore, "backupOwners", uid); }
 function backupRef(firestore, uid, backupId) { return doc(firestore, "backupOwners", uid, "backups", backupId); }
-function backupId() { return `backup_${new Date().toISOString().replace(/[:.]/g, "-")}_${crypto.randomUUID().slice(0, 8)}`; }
+function backupId() { return `backup_${new Date().toISOString().replace(/[:.]/g, "-")}_${shortRandomId()}`; }
 
 async function requireUser() {
   const { auth, firestore } = await getServices();
