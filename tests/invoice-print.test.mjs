@@ -423,7 +423,8 @@ test("تفصل الإعدادات إدارة البيانات في صفحة مخ
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
   assert.match(app, /function dataManagementMarkup\(\)/);
-  assert.match(app, /data-view="data-management"/);
+  assert.match(app, /view: "data-management"/);
+  assert.match(app, /function settingsHubCard\(/);
   assert.match(app, /تصدير واستيراد البيانات/);
   assert.match(app, /data-action="export-backup"/);
   assert.match(app, /for="restore-file"/);

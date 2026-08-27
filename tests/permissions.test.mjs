@@ -18,6 +18,9 @@ test("يقتصر الكاشير على المبيعات والفواتير", () 
   assert.equal(canAccessView(cashier, "dashboard"), false);
   assert.equal(canAccessView(cashier, "products"), false);
   assert.equal(canAccessView(cashier, "reports"), false);
+  assert.equal(canAccessView(cashier, "general-settings"), false);
+  assert.equal(canAccessView(cashier, "brand-settings"), false);
+  assert.equal(canAccessView(cashier, "navigation-settings"), false);
 });
 
 test("يقيّد الرفع والاستعادة السحابية بالأدمن فقط", () => {
