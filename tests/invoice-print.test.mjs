@@ -72,6 +72,26 @@ test("يحصر شعار المتجر في ملف محلي آمن ويعرضه ف
   assert.match(css, /\[data-theme="dark"\] \.store-logo-preview/);
 });
 
+test("يوضح شاشة البداية ويستقبل قارئ الباركود المكتبي دون اعتراض حقول الإدخال", async () => {
+  const [app, css, scannerSession] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/scanner-session.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /function installDesktopBarcodeReader\(\)/);
+  assert.match(app, /function handleDesktopBarcodeRead\(code\)/);
+  assert.match(app, /event\.target instanceof Element/);
+  assert.match(app, /document\.querySelector\("\.dialog-backdrop, #scanner-backdrop"\)/);
+  assert.match(app, /desktop-barcode-reader-note/);
+  assert.match(app, /installDesktopBarcodeReader\(\);/);
+  assert.match(scannerSession, /DESKTOP_BARCODE_MAX_KEY_INTERVAL_MS/);
+  assert.match(scannerSession, /isDesktopBarcodeWedge/);
+  assert.match(scannerSession, /shouldAcceptDesktopBarcode/);
+  assert.match(css, /شاشة البداية: الدفتر مرئي فوق خلفية محايدة/);
+  assert.match(css, /#fbf7ec/);
+  assert.match(css, /\[data-theme="dark"\] \.setup-page/);
+});
+
 test("تنزيل PDF تلقائيًا عند غياب دعم مشاركة الملفات أو فشل طلب المشاركة", async () => {
   const pdfExport = await readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8");
   assert.match(pdfExport, /function downloadPdfFile\(file\)/);

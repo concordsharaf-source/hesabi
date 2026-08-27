@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BARCODE_RELEASE_DELAY_MS, CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isNewContinuousBarcode, shouldReleaseContinuousBarcode } from "../client/src/js/scanner-session.js";
+import { BARCODE_RELEASE_DELAY_MS, CAMERA_SCAN_INTERVAL_MS, DESKTOP_BARCODE_DUPLICATE_WINDOW_MS, getCameraAssistOptions, getScannerCameraConstraints, isDesktopBarcodeWedge, isNewContinuousBarcode, shouldAcceptDesktopBarcode, shouldReleaseContinuousBarcode } from "../client/src/js/scanner-session.js";
 
 test("يطلب الماسح الكاميرا الخلفية بدقة وإيقاع مناسبين للهواتف الضعيفة", () => {
   const constraints = getScannerCameraConstraints();
@@ -33,4 +33,13 @@ test("لا يحرر رمز المسح المتواصل إلا بعد غيابه 
   assert.equal(shouldReleaseContinuousBarcode("628100000001", 10_000, 10_000 + BARCODE_RELEASE_DELAY_MS - 1), false);
   assert.equal(shouldReleaseContinuousBarcode("628100000001", 10_000, 10_000 + BARCODE_RELEASE_DELAY_MS), true);
   assert.equal(shouldReleaseContinuousBarcode("", 10_000, 20_000), false);
+});
+
+test("يتعرف قارئ الباركود المكتبي السريع ويتجاهل الكتابة البطيئة والتكرار اللحظي", () => {
+  assert.equal(isDesktopBarcodeWedge({ code: "628100000001", startedAt: 1_000, completedAt: 1_080 }), true);
+  assert.equal(isDesktopBarcodeWedge({ code: "12", startedAt: 1_000, completedAt: 1_030 }), false);
+  assert.equal(isDesktopBarcodeWedge({ code: "628100000001", startedAt: 1_000, completedAt: 2_200 }), false);
+  assert.equal(shouldAcceptDesktopBarcode({ code: "628100000001", lastCode: "", lastAcceptedAt: 0, now: 1_000 }), true);
+  assert.equal(shouldAcceptDesktopBarcode({ code: "628100000001", lastCode: "628100000001", lastAcceptedAt: 1_000, now: 1_000 + DESKTOP_BARCODE_DUPLICATE_WINDOW_MS - 1 }), false);
+  assert.equal(shouldAcceptDesktopBarcode({ code: "628100000001", lastCode: "628100000001", lastAcceptedAt: 1_000, now: 1_000 + DESKTOP_BARCODE_DUPLICATE_WINDOW_MS }), true);
 });

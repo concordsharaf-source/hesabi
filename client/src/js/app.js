@@ -10,7 +10,7 @@ import { getExitGuardAction, leaveAfterExitConfirmation, primeExitGuardHistory }
 import { createReportPdfFile, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf } from "./pdf-export.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 import { shortRandomId } from "./ids.js";
-import { CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isNewContinuousBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
+import { CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isDesktopBarcodeWedge, isNewContinuousBarcode, shouldAcceptDesktopBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 
 const icon = (name, size = 20) => {
   const paths = {
@@ -59,6 +59,8 @@ let root;
 let exitGuardInstalled = false;
 let exitAllowed = false;
 let runtimeGuardsInstalled = false;
+let desktopBarcodeReaderInstalled = false;
+const desktopBarcodeReader = { code: "", startedAt: 0, lastKeyAt: 0, resetTimer: null, lastCode: "", lastAcceptedAt: 0 };
 const roleLabel = (role) => ACCOUNT_ROLES.find((item) => item.id === role)?.label || "كاشير";
 const adminOnlyMessage = () => showToast("هذه العملية متاحة لحساب الأدمن فقط.", "error");
 
@@ -447,7 +449,7 @@ function salesMarkup() {
   const matches = state.products.filter((product) => !query || [product.name, product.barcode, product.internalCode].some((value) => value?.toLocaleLowerCase("ar").includes(query))).slice(0, 7);
   const totals = calculateSaleTotals(state.cart);
   return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.")}
-  <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div>
+  <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div><p class="desktop-barcode-reader-note">${icon("scan", 15)} قارئ الباركود المتصل بالكمبيوتر يعمل مباشرةً في صفحة المبيعات؛ امسح الرمز ثم Enter أو Tab.</p>
   <div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => `<div class="sale-product-line"><button class="sale-product ${product.quantity <= 0 ? "is-disabled" : ""}" data-action="add-cart" data-id="${product.id}" ${product.quantity <= 0 ? "disabled" : ""}><div><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)} متاح</small></div><span>${money(product.salePrice)}</span><i>${icon("plus", 18)}</i></button>${productSupplierActions(product)}</div>`).join("") : `<div class="no-match"><strong>لا توجد نتيجة</strong><span>تحقق من الاسم أو الباركود أو أضف منتجًا جديدًا.</span><button class="text-button" data-action="new-product">إنشاء منتج</button></div>`}</div></div>
   <aside class="cart-panel"><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div>${state.cart.length ? `<button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div>
   <div class="cart-lines">${state.cart.length ? state.cart.map(cartLine).join("") : `<div class="cart-empty">${icon("cart", 30)}<p>اختر منتجًا من القائمة لتبدأ البيع.</p></div>`}</div>
@@ -756,6 +758,63 @@ function bindSearchInput(selector, stateKey) {
     restored?.focus();
     restored?.setSelectionRange(value.length, value.length);
   });
+}
+
+function resetDesktopBarcodeReader() {
+  window.clearTimeout(desktopBarcodeReader.resetTimer);
+  desktopBarcodeReader.code = "";
+  desktopBarcodeReader.startedAt = 0;
+  desktopBarcodeReader.lastKeyAt = 0;
+  desktopBarcodeReader.resetTimer = null;
+}
+
+async function handleDesktopBarcodeRead(code) {
+  if (!state.currentUser || !canAccessView(state.currentUser, "sales") || state.scanner) return;
+  const normalized = String(code || "").trim();
+  const product = state.products.find((item) => [item.barcode, item.internalCode].some((value) => String(value || "").trim() === normalized));
+  state.view = "sales";
+  if (!product) {
+    state.saleQuery = normalized;
+    render();
+    showToast("لم نجد هذا الباركود. راجع الرمز أو أضف المنتج أولًا.", "error");
+    return;
+  }
+  const added = addToCart(product.id);
+  if (!added) return;
+  playScannerSuccessSound();
+  notifyBarcodeRead();
+  showToast(`أُضيف ${product.name} إلى السلة`);
+}
+
+function installDesktopBarcodeReader() {
+  if (desktopBarcodeReaderInstalled) return;
+  desktopBarcodeReaderInstalled = true;
+  window.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey || state.scanner) return;
+    if (document.querySelector(".dialog-backdrop, #scanner-backdrop")) { resetDesktopBarcodeReader(); return; }
+    const target = event.target instanceof Element ? event.target.closest("input, textarea, select, [contenteditable=true]") : null;
+    if (target) return;
+    const now = Date.now();
+    if (event.key === "Enter" || event.key === "Tab") {
+      const code = desktopBarcodeReader.code;
+      const startedAt = desktopBarcodeReader.startedAt;
+      resetDesktopBarcodeReader();
+      if (!isDesktopBarcodeWedge({ code, startedAt, completedAt: now })) return;
+      event.preventDefault();
+      if (!shouldAcceptDesktopBarcode({ code, lastCode: desktopBarcodeReader.lastCode, lastAcceptedAt: desktopBarcodeReader.lastAcceptedAt, now })) return;
+      desktopBarcodeReader.lastCode = String(code).trim();
+      desktopBarcodeReader.lastAcceptedAt = now;
+      void handleDesktopBarcodeRead(code);
+      return;
+    }
+    if (!/^[0-9A-Za-z._-]$/.test(event.key)) { resetDesktopBarcodeReader(); return; }
+    if (desktopBarcodeReader.lastKeyAt && now - desktopBarcodeReader.lastKeyAt > 180) resetDesktopBarcodeReader();
+    if (!desktopBarcodeReader.code) desktopBarcodeReader.startedAt = now;
+    desktopBarcodeReader.code += event.key;
+    desktopBarcodeReader.lastKeyAt = now;
+    window.clearTimeout(desktopBarcodeReader.resetTimer);
+    desktopBarcodeReader.resetTimer = window.setTimeout(resetDesktopBarcodeReader, 320);
+  }, true);
 }
 
 function bindEvents() {
@@ -1792,5 +1851,6 @@ function stopScanner() {
 export async function bootApp(target) {
   root = target;
   installRuntimeGuards();
+  installDesktopBarcodeReader();
   try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }

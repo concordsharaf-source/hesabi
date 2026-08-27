@@ -1,5 +1,8 @@
 export const BARCODE_RELEASE_DELAY_MS = 650;
 export const CAMERA_SCAN_INTERVAL_MS = 120;
+export const DESKTOP_BARCODE_MIN_LENGTH = 4;
+export const DESKTOP_BARCODE_MAX_KEY_INTERVAL_MS = 90;
+export const DESKTOP_BARCODE_DUPLICATE_WINDOW_MS = 250;
 
 const finiteNumber = (value) => Number.isFinite(Number(value));
 
@@ -47,3 +50,15 @@ export const isNewContinuousBarcode = (lastCode, rawCode) => {
 };
 
 export const shouldReleaseContinuousBarcode = (lastCode, absentSince, now = Date.now()) => Boolean(lastCode) && Number(absentSince) > 0 && now - Number(absentSince) >= BARCODE_RELEASE_DELAY_MS;
+
+/** قارئات USB/Bluetooth المعتادة تحاكي لوحة المفاتيح وتُرسل الرمز سريعًا ثم Enter أو Tab. */
+export const isDesktopBarcodeWedge = ({ code = "", startedAt = 0, completedAt = 0 } = {}) => {
+  const normalized = String(code || "").trim();
+  const elapsed = Number(completedAt) - Number(startedAt);
+  return normalized.length >= DESKTOP_BARCODE_MIN_LENGTH && Number.isFinite(elapsed) && elapsed >= 0 && elapsed <= Math.max(320, normalized.length * DESKTOP_BARCODE_MAX_KEY_INTERVAL_MS);
+};
+
+export const shouldAcceptDesktopBarcode = ({ code = "", lastCode = "", lastAcceptedAt = 0, now = Date.now() } = {}) => {
+  const normalized = String(code || "").trim();
+  return Boolean(normalized) && (normalized !== String(lastCode || "").trim() || Number(now) - Number(lastAcceptedAt) >= DESKTOP_BARCODE_DUPLICATE_WINDOW_MS);
+};

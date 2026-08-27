@@ -81,7 +81,7 @@ try {
   await waitFor('[data-action="new-product"]');
   await evaluate(`document.querySelector('[data-action="new-product"]').click()`);
   await waitFor('#product-form');
-  await evaluate(`(() => { const date = new Date(); date.setDate(date.getDate() + 20); const expiry = date.toISOString().slice(0, 10); const form = document.querySelector('#product-form'); form.elements.name.value = 'منتج قريب الانتهاء'; form.elements.purchasePrice.value = '30'; form.elements.salePrice.value = '50'; form.elements.quantity.value = '5'; form.elements.minimumStock.value = '1'; form.elements.nearestExpiryDate.value = expiry; form.requestSubmit(); })()`);
+  await evaluate(`(() => { const date = new Date(); date.setDate(date.getDate() + 20); const expiry = date.toISOString().slice(0, 10); const form = document.querySelector('#product-form'); form.elements.name.value = 'منتج قريب الانتهاء'; form.elements.barcode.value = '628100000001'; form.elements.purchasePrice.value = '30'; form.elements.salePrice.value = '50'; form.elements.quantity.value = '5'; form.elements.minimumStock.value = '1'; form.elements.nearestExpiryDate.value = expiry; form.requestSubmit(); })()`);
   await waitFor('.product-card [data-action="open-product"]');
   await evaluate(`document.querySelector('.product-card [data-action="open-product"]').click()`);
   await waitFor('#product-form');
@@ -106,33 +106,25 @@ try {
       await evaluate(`document.querySelector('.topbar [data-action="new-purchase"]').click()`);
       await sleep(180);
     }
-    purchaseSearchEntered = await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); if (!search) return false; search.value = 'منتج قريب الانتهاء'; search.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+    purchaseSearchEntered = await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); if (!search) return false; search.value = '628100000001'; search.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
     if (!purchaseSearchEntered) await sleep(180);
   }
   assert.ok(purchaseSearchEntered, 'تعذر الوصول إلى حقل بحث الشراء بعد إعادة تحميل واجهة PWA.');
-  let purchaseProductResultVisible = false;
-  for (let attempt = 0; attempt < 4 && !purchaseProductResultVisible; attempt += 1) {
-    purchaseProductResultVisible = await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); if (!search) return false; search.value = 'منتج قريب الانتهاء'; search.dispatchEvent(new Event('input', { bubbles: true })); return Boolean(document.querySelector('[data-add-purchase-product]')); })()`);
-    for (let check = 0; check < 20 && !purchaseProductResultVisible; check += 1) {
-      purchaseProductResultVisible = await evaluate(`Boolean(document.querySelector('[data-add-purchase-product]'))`);
-      if (!purchaseProductResultVisible) await sleep(120);
-    }
-    if (!purchaseProductResultVisible && !await evaluate(`Boolean(document.querySelector('#purchase-product-search'))`)) {
-      await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]')?.click()`);
-      await waitFor('.topbar [data-action="new-purchase"]');
-      await evaluate(`document.querySelector('.topbar [data-action="new-purchase"]').click()`);
-      await waitFor('#purchase-product-search');
+  let purchaseProductSelected = false;
+  for (let attempt = 0; attempt < 8 && !purchaseProductSelected; attempt += 1) {
+    purchaseProductSelected = await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); if (!search) return false; search.value = '628100000001'; search.dispatchEvent(new Event('input', { bubbles: true })); const result = document.querySelector('[data-add-purchase-product]'); if (!result) return false; result.click(); return true; })()`);
+    if (!purchaseProductSelected) {
+      if (!await evaluate(`Boolean(document.querySelector('#purchase-product-search'))`)) {
+        await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]')?.click()`);
+        await waitFor('.topbar [data-action="new-purchase"]');
+        await evaluate(`document.querySelector('.topbar [data-action="new-purchase"]').click()`);
+        await waitFor('#purchase-product-search');
+      }
+      await sleep(150);
     }
   }
-  assert.ok(purchaseProductResultVisible, 'لم تظهر نتيجة المنتج في بحث فاتورة الشراء.');
-  await evaluate(`document.querySelector('[data-add-purchase-product]').click()`);
-  await waitFor('[data-purchase-sale-price="0"]');
-  let priorProductPurchaseLine;
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    priorProductPurchaseLine = await evaluate(`(() => { const salePrice = document.querySelector('[data-purchase-sale-price="0"]'); const row = salePrice?.closest('.purchase-line'); const directPrice = row?.querySelector('[data-purchase-sale-price-visible="0"]'); if (!salePrice || !row || !directPrice) return null; const visibleStyle = getComputedStyle(directPrice); return { salePrice: salePrice.value, visiblePrice: directPrice.textContent.trim(), overlayVisibleBeforeFocus: visibleStyle.display === 'flex' && visibleStyle.opacity === '1' && visibleStyle.pointerEvents === 'none', rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length }; })()`);
-    if (priorProductPurchaseLine) break;
-    await sleep(120);
-  }
+  assert.ok(purchaseProductSelected, 'تعذر اختيار نتيجة المنتج بعد إعادة عرض البحث.');
+  const priorProductPurchaseLine = await evaluate(`(() => { const salePrice = document.querySelector('[data-purchase-sale-price="0"]'); const row = salePrice?.closest('.purchase-line'); const directPrice = row?.querySelector('[data-purchase-sale-price-visible="0"]'); if (!salePrice || !row || !directPrice) return null; const visibleStyle = getComputedStyle(directPrice); return { salePrice: salePrice.value, visiblePrice: directPrice.textContent.trim(), overlayVisibleBeforeFocus: visibleStyle.display === 'flex' && visibleStyle.opacity === '1' && visibleStyle.pointerEvents === 'none', rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length }; })()`);
   assert.ok(priorProductPurchaseLine, 'لم يستقر سطر شراء المنتج السابق بعد إعادة العرض.');
   assert.deepEqual(priorProductPurchaseLine, { salePrice: '50', visiblePrice: '50', overlayVisibleBeforeFocus: true, rowDisplay: 'grid', fieldCount: 7 });
   const dateInputBehavior = await evaluate(`(() => { const input = document.querySelector('[data-purchase-expiry-date="0"]'); return { type: input.type, value: input.value, direction: getComputedStyle(input).direction }; })()`);
@@ -142,14 +134,9 @@ try {
   const desktopDialogBounds = await evaluate(`(() => { const dialog = document.querySelector('.dialog'); const purchaseLine = document.querySelector('.purchase-line--pack'); const dialogBox = dialog.getBoundingClientRect(); const lineBox = purchaseLine.getBoundingClientRect(); return { dialogScrollFits: dialog.scrollWidth <= dialog.clientWidth, lineFitsDialog: lineBox.left >= dialogBox.left && lineBox.right <= dialogBox.right, formFitsDialog: document.querySelector('#purchase-form').scrollWidth <= dialog.clientWidth }; })()`);
   assert.deepEqual(desktopDialogBounds, { dialogScrollFits: true, lineFitsDialog: true, formFitsDialog: true });
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-  await evaluate(`(() => { const select = document.querySelector('[data-purchase-package-unit="0"]'); select.value = 'كرتون'; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-  await waitFor('[data-purchase-units-per-package="0"]');
-  await evaluate(`(() => { const change = (selector, value) => { const input = document.querySelector(selector); input.value = value; input.dispatchEvent(new Event('change', { bubbles: true })); }; change('[data-purchase-package-quantity="0"]', '1'); })()`);
-  await waitFor('[data-purchase-units-per-package="0"]');
-  await evaluate(`(() => { const input = document.querySelector('[data-purchase-units-per-package="0"]'); input.value = '12'; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-  await waitFor('[data-purchase-package-cost="0"]');
-  await evaluate(`(() => { const input = document.querySelector('[data-purchase-package-cost="0"]'); input.value = '360'; input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-  await waitFor('[data-purchase-sale-price="0"]');
+  const purchaseInputsReady = await evaluate(`(() => ({ packageUnit: Boolean(document.querySelector('[data-purchase-package-unit="0"]')), packageQuantity: Boolean(document.querySelector('[data-purchase-package-quantity="0"]')), units: Boolean(document.querySelector('[data-purchase-units-per-package="0"]')), cost: Boolean(document.querySelector('[data-purchase-package-cost="0"]')), sale: Boolean(document.querySelector('[data-purchase-sale-price="0"]')) }))()`);
+  assert.deepEqual(purchaseInputsReady, { packageUnit: true, packageQuantity: true, units: true, cost: true, sale: true });
+  await evaluate(`(() => { const change = (selector, value, eventName = 'change') => { const input = document.querySelector(selector); input.value = value; input.dispatchEvent(new Event(eventName, { bubbles: true })); }; change('[data-purchase-package-unit="0"]', 'كرتون'); change('[data-purchase-package-quantity="0"]', '1'); change('[data-purchase-units-per-package="0"]', '12'); change('[data-purchase-package-cost="0"]', '360'); })()`);
   await evaluate(`(() => { const input = document.querySelector('[data-purchase-sale-price="0"]'); input.value = '50'; input.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#purchase-form').requestSubmit(); })()`);
   await waitForGone('#purchase-form');
   await waitFor('[data-action="new-purchase"]');
@@ -378,8 +365,16 @@ try {
   for (let attempt = 0; attempt < 40 && !(await evaluate(`document.querySelector('.store-logo-preview strong')?.textContent.includes('شعار مخصص')`)); attempt += 1) await sleep(150);
   const localLogo = await evaluate(`(() => ({ preview: document.querySelector('.store-logo-preview img')?.src.startsWith('data:image/webp'), reset: Boolean(document.querySelector('[data-action="clear-store-logo"]')), favicon: document.querySelector('link[rel="icon"]')?.href.startsWith('data:image/webp'), overflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth }))()`);
   assert.deepEqual(localLogo, { preview: true, reset: true, favicon: true, overflow: true });
+  await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
+  await evaluate(`document.querySelector('[data-action="clear-cart"]')?.click()`);
+  await evaluate(`(() => { const send = (key) => window.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })); for (const key of '628100000001') send(key); send('Enter'); for (const key of '628100000001') send(key); send('Enter'); })()`);
+  await waitFor('#sale-search');
+  for (let attempt = 0; attempt < 40 && !(await evaluate(`Boolean(document.querySelector('.cart-line'))`)); attempt += 1) await sleep(150);
+  const desktopBarcodeReader = await evaluate(`(() => { const line = [...document.querySelectorAll('.cart-line')].find((item) => item.textContent.includes('منتج قريب الانتهاء')); return { desktopWidth: window.innerWidth >= 1000, salePage: document.querySelector('.workspace h1')?.textContent.trim(), count: document.querySelectorAll('.cart-line').length, quantity: line?.querySelector('[data-cart-quantity]')?.value, hasReaderNote: document.querySelector('.desktop-barcode-reader-note')?.textContent.includes('قارئ الباركود المتصل بالكمبيوتر') || false }; })()`);
+  assert.deepEqual(desktopBarcodeReader, { desktopWidth: true, salePage: 'بيع جديد', count: 1, quantity: '1', hasReaderNote: true });
+  await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   if (new URL(target).hostname === 'localhost') {
-    const customLogoPdf = await evaluate(`(async () => { const pdf = await import('/src/js/pdf-export.js'); const logoDataUrl = document.querySelector('.store-logo-preview img').src; const invoice = { invoiceNumber: 'INV-LOGO', date: '2026-08-27T10:00:00.000Z', paymentType: 'نقدي', paymentStatus: 'مدفوعة', paymentMethod: 'نقدي', items: [{ productName: 'منتج اختبار', unit: 'حبة', quantity: 1, unitPrice: 50, total: 50 }], subtotal: 50, discount: 0, deliveryFee: 0, total: 50, paidAmount: 50, remainingAmount: 0 }; const file = await pdf.createThermalInvoicePdfFile({ invoice, customer: null, storeName: 'متجر اختبار', logoDataUrl, formatMoney: (value) => String(value), formatAmount: (value) => String(value), formatDateTime: () => '27 أغسطس 2026', paymentLabel: 'كاش', filename: 'logo-invoice.pdf' }); return { type: file.type, size: file.size }; })()`);
+    const customLogoPdf = await evaluate(`(async () => { const pdf = await import('/src/js/pdf-export.js'); const logoDataUrl = document.querySelector('link[rel="icon"]')?.href; const invoice = { invoiceNumber: 'INV-LOGO', date: '2026-08-27T10:00:00.000Z', paymentType: 'نقدي', paymentStatus: 'مدفوعة', paymentMethod: 'نقدي', items: [{ productName: 'منتج اختبار', unit: 'حبة', quantity: 1, unitPrice: 50, total: 50 }], subtotal: 50, discount: 0, deliveryFee: 0, total: 50, paidAmount: 50, remainingAmount: 0 }; const file = await pdf.createThermalInvoicePdfFile({ invoice, customer: null, storeName: 'متجر اختبار', logoDataUrl, formatMoney: (value) => String(value), formatAmount: (value) => String(value), formatDateTime: () => '27 أغسطس 2026', paymentLabel: 'كاش', filename: 'logo-invoice.pdf' }); return { type: file.type, size: file.size }; })()`);
     assert.equal(customLogoPdf.type, 'application/pdf');
     assert.ok(customLogoPdf.size > 800, 'تعذر إنشاء PDF الفاتورة مع شعار المتجر المحلي.');
   }
