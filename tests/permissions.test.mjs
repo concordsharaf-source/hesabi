@@ -38,3 +38,12 @@ test("يمنع الكاشير من إنشاء المنتجات والتقاري�
   assert.equal(canUseAction(cashier, "checkout"), true);
   assert.equal(canUseAction(cashier, "open-invoice"), true);
 });
+
+test("يحصر الجرد الدوري واعتماد لقطاته في الأدمن", () => {
+  assert.equal(canAccessView(admin, "periodic-inventory"), true);
+  assert.equal(canAccessView(cashier, "periodic-inventory"), false);
+  assert.equal(canUseAction(admin, "save-periodic-inventory"), true);
+  assert.equal(canUseAction(admin, "open-periodic-inventory"), true);
+  assert.equal(canUseAction(cashier, "save-periodic-inventory"), false);
+  assert.equal(canUseAction(cashier, "open-periodic-inventory"), false);
+});

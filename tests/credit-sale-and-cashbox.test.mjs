@@ -358,3 +358,52 @@ test("توريد الحوالة الواردة للخزنة يدعم الجزء 
   await assert.rejects(() => db.depositIncomingTransferToVault({ sourceType: "SALE_TRANSFER", sourceId: sale.id, amount: 1 }), /أكبر من المتبقي/);
   await db.resetAllData();
 });
+
+test("الجرد الدوري يحفظ لقطة محاسبية شهرية ونصف سنوية وسنوية بلا حركة نقدية أو تغيير للمخزون", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "متجر الجرد", businessType: "بقالة", currency: "YER", openingCash: 0 });
+  const sellable = await db.createProduct({ name: "منتج جرد", unit: "حبة", purchasePrice: 40, salePrice: 100, quantity: 10, minimumStock: 0 });
+  const supplyProduct = await db.createProduct({ name: "منتج مستحق", unit: "حبة", purchasePrice: 60, salePrice: 90, quantity: 0, minimumStock: 0 });
+  const customer = await db.createCustomer({ name: "عميل الجرد" });
+  const supplier = await db.createSupplier({ name: "مورد الجرد" });
+  await db.completeSale({ items: [{ productId: sellable.id, quantity: 2 }], discount: 0, paidAmount: 200, paymentMethod: "نقدي", sellerRole: "admin" });
+  await db.completeSale({ items: [{ productId: sellable.id, quantity: 1 }], discount: 0, paidAmount: 0, paymentMethod: "نقدي", paymentType: "آجل", customerId: customer.id, sellerRole: "admin" });
+  await db.completeSale({ items: [{ productId: sellable.id, quantity: 1 }], discount: 0, paidAmount: 100, paymentMethod: "تحويل", sellerRole: "admin" });
+  await db.createPurchase({ supplierId: supplier.id, paymentType: "آجل", paymentMethod: "نقدي", items: [{ productId: supplyProduct.id, packageQuantity: 1, unitsPerPackage: 1, packageCost: 60, packageUnit: "حبة", salePrice: 90 }] });
+  await db.createExpense({ amount: 30, category: "مواصلات", description: "مصروف اختبار", date: new Date().toISOString().slice(0, 10) });
+
+  const today = new Date().toISOString().slice(0, 10);
+  const monthFrom = `${today.slice(0, 7)}-01`;
+  const summary = await db.getPeriodicInventorySummary({ from: monthFrom, to: today });
+  assert.deepEqual({ inventory: summary.inventory.cost, vault: summary.cash.vaultBalance, customerDebt: summary.receivables.customerDebt, supplierPayables: summary.payables.supplierPayables, transferNotDeposited: summary.transfers.incomingNotDeposited }, { inventory: 300, vault: 170, customerDebt: 100, supplierPayables: 60, transferNotDeposited: 100 });
+  assert.deepEqual({ sales: summary.performance.sales, cost: summary.performance.costOfGoods, gross: summary.performance.grossProfit, expenses: summary.performance.expenses, net: summary.performance.netProfit }, { sales: 400, cost: 160, gross: 240, expenses: 30, net: 210 });
+  assert.deepEqual(summary.damage, { amount: 0, count: 0, status: "not-recorded", source: "لا يوجد في التطبيق سجل مستقل للتالف؛ لا يحوّل جرد الكميات أو التعديلات العادية إلى تالف تلقائيًا." });
+  assert.equal(summary.netPosition, 610);
+
+  const beforeQuantity = (await db.getProduct(sellable.id)).quantity;
+  const beforeVault = (await db.getVault()).vaultBalance;
+  const beforeMovementCount = (await db.listCashMovements()).length;
+  const monthly = await db.createPeriodicInventory({ cycle: "monthly", from: monthFrom, to: today, notes: "إقفال شهر الاختبار", approvedByAccountId: "admin-test", approvedByName: "مدير الجرد" });
+  const semiannual = await db.createPeriodicInventory({ cycle: "semiannual", from: `${today.slice(0, 4)}-01-01`, to: today });
+  const annual = await db.createPeriodicInventory({ cycle: "annual", from: `${today.slice(0, 4)}-01-01`, to: today });
+  assert.equal(monthly.metrics.performance.netProfit, 210);
+  assert.equal(monthly.metrics.period.from, monthFrom);
+  assert.equal(semiannual.cycle, "semiannual");
+  assert.equal(annual.cycle, "annual");
+  assert.equal((await db.getProduct(sellable.id)).quantity, beforeQuantity);
+  assert.equal((await db.getVault()).vaultBalance, beforeVault);
+  assert.equal((await db.listCashMovements()).length, beforeMovementCount);
+
+  const revisedMonthly = await db.createPeriodicInventory({ cycle: "monthly", from: monthFrom, to: today });
+  assert.equal(revisedMonthly.comparison.previousAuditId, monthly.id);
+  assert.equal(revisedMonthly.comparison.netProfitDelta, 0);
+  assert.equal((await db.listPeriodicInventories()).length, 4);
+  const backup = await db.exportBackup();
+  assert.equal(backup.databaseVersion, 12);
+  assert.equal(backup.stores.periodicInventories.length, 4);
+  await db.resetAllData();
+  await db.restoreBackup(backup);
+  assert.equal((await db.listPeriodicInventories()).length, 4);
+  await assert.rejects(() => db.createPeriodicInventory({ cycle: "quarterly", from: monthFrom, to: today }), /نوع دورة الجرد غير صالح/);
+  await db.resetAllData();
+});

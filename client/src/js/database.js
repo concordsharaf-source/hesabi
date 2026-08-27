@@ -27,7 +27,7 @@ import { ACTIVE_SESSION_META_ID, toPersistentSessionUser } from "./session.js";
 import { randomId } from "./ids.js";
 
 const DB_NAME = "hesabi-pwa";
-const DB_VERSION = 11;
+const DB_VERSION = 12;
 let databasePromise;
 
 const uid = (prefix) => `${prefix}-${randomId()}`;
@@ -164,6 +164,7 @@ export const db = {
         makeIndexedStore(database, "cashierShifts", [["accountId", "accountId"], ["date", "date"], ["status", "status"]]);
         makeIndexedStore(database, "cashierSalaryDeductions", [["accountId", "accountId"], ["shiftId", "shiftId", { unique: true }], ["month", "month"]]);
         makeIndexedStore(database, "stockCounts", [["productId", "productId"], ["date", "date"]]);
+        makeIndexedStore(database, "periodicInventories", [["cycle", "cycle"], ["periodFrom", "periodFrom"], ["periodTo", "periodTo"], ["createdAt", "createdAt"]]);
         makeIndexedStore(database, "accounts", [["username", "username", { unique: true }], ["role", "role"], ["active", "isActive"]]);
         const salesStore = request.transaction.objectStore("sales");
         if (!salesStore.indexNames.contains("customerId")) salesStore.createIndex("customerId", "customerId");
@@ -379,6 +380,68 @@ export const db = {
 
   async recordStockCount({ productId, actualQuantity, notes = "" }) { const database = await this.open(); const transaction = database.transaction(["products", "stockMovements", "stockCounts"], "readwrite"); const products = transaction.objectStore("products"); const product = await requestAsPromise(products.get(productId)); if (!product || product.isDeleted) throw new Error("المنتج غير متاح للجرد."); const previousQuantity = toNumber(product.quantity); const newQuantity = toNumber(actualQuantity); if (newQuantity < 0) throw new Error("الكمية الفعلية لا يمكن أن تكون سالبة."); const date = nowIso(); const count = { id: uid("stock-count"), productId, productName: product.name, previousQuantity, actualQuantity: newQuantity, difference: adjustmentDelta(previousQuantity, newQuantity), date, notes: normalize(notes) }; products.put({ ...product, quantity: newQuantity, updatedAt: date }); transaction.objectStore("stockCounts").add(count); createStockMovement(transaction.objectStore("stockMovements"), { productId, type: "COUNT", quantity: count.difference, previousQuantity, newQuantity, date, note: normalize(notes) || "تسوية جرد", referenceType: "STOCK_COUNT", referenceId: count.id }); await transactionDone(transaction); return count; },
   async listStockCounts({ productId = "" } = {}) { const database = await this.open(); const store = database.transaction("stockCounts", "readonly").objectStore("stockCounts"); const items = productId ? await requestAsPromise(store.index("productId").getAll(productId)) : await requestAsPromise(store.getAll()); return items.sort((a, b) => new Date(b.date) - new Date(a.date)); },
+
+  async getPeriodicInventorySummary({ from = "", to = "" } = {}) {
+    const periodFrom = normalize(from); const periodTo = normalize(to); const validDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(value);
+    if (!validDate(periodFrom) || !validDate(periodTo) || periodFrom > periodTo) throw new Error("حدد بداية ونهاية صحيحتين لفترة الجرد.");
+    const database = await this.open();
+    const names = ["products", "customers", "suppliers", "sales", "customerPayments", "cashMovements"];
+    const transaction = database.transaction(names, "readonly");
+    const [products, customers, suppliers, sales, customerPayments, cashMovements] = await Promise.all(names.map((name) => requestAsPromise(transaction.objectStore(name).getAll())));
+    await transactionDone(transaction);
+    const [analytics, cashbox, vault] = await Promise.all([this.getAnalytics({ from: periodFrom, to: periodTo }), this.getCashbox(), this.getVault()]);
+    const activeProducts = products.filter((product) => !product.isDeleted);
+    const inventoryCost = roundMoney(activeProducts.reduce((sum, product) => sum + toNumber(product.quantity) * toNumber(product.purchasePrice), 0));
+    const inventoryUnits = roundMoney(activeProducts.reduce((sum, product) => sum + toNumber(product.quantity), 0));
+    const customerDebt = roundMoney(customers.filter((customer) => !customer.isDeleted).reduce((sum, customer) => sum + Math.max(0, toNumber(customer.balance)), 0));
+    const supplierPayables = roundMoney(suppliers.filter((supplier) => !supplier.isDeleted).reduce((sum, supplier) => sum + Math.max(0, toNumber(supplier.balance)), 0));
+    const depositedByTransfer = new Map();
+    cashMovements.filter((movement) => movement.sourceType === "TRANSFER_TO_VAULT").forEach((movement) => {
+      const key = `${movement.transferSourceType}:${movement.transferSourceId}`;
+      depositedByTransfer.set(key, roundMoney((depositedByTransfer.get(key) || 0) + toNumber(movement.amount)));
+    });
+    const transferSources = [
+      ...sales.filter((sale) => sale.paymentMethod === "تحويل" && toNumber(sale.initialPaidAmount ?? sale.paidAmount) > 0).map((sale) => ({ key: `SALE_TRANSFER:${sale.id}`, amount: toNumber(sale.initialPaidAmount ?? sale.paidAmount) })),
+      ...customerPayments.filter((payment) => payment.paymentMethod === "تحويل" && toNumber(payment.amount) > 0).map((payment) => ({ key: `CUSTOMER_PAYMENT_TRANSFER:${payment.id}`, amount: toNumber(payment.amount) })),
+    ];
+    const incomingTransfersNotDeposited = roundMoney(transferSources.reduce((sum, source) => sum + Math.max(0, source.amount - toNumber(depositedByTransfer.get(source.key))), 0));
+    const damage = { amount: 0, count: 0, status: "not-recorded", source: "لا يوجد في التطبيق سجل مستقل للتالف؛ لا يحوّل جرد الكميات أو التعديلات العادية إلى تالف تلقائيًا." };
+    const netPosition = roundMoney(inventoryCost + toNumber(vault.vaultBalance) + toNumber(vault.cashierCashHeld) + customerDebt + incomingTransfersNotDeposited - supplierPayables);
+    return {
+      sourceVersion: 1,
+      generatedAt: nowIso(),
+      period: { from: periodFrom, to: periodTo },
+      inventory: { productCount: activeProducts.length, units: inventoryUnits, cost: inventoryCost },
+      cash: { vaultBalance: roundMoney(vault.vaultBalance), cashierCashHeld: roundMoney(vault.cashierCashHeld), totalRegisteredCash: roundMoney(cashbox.closingBalance), untransferredShiftCount: toNumber(vault.untransferredShiftCount) },
+      receivables: { customerDebt },
+      payables: { supplierPayables },
+      transfers: { incomingNotDeposited: incomingTransfersNotDeposited },
+      performance: { sales: analytics.sales.total, netSales: analytics.profit.netSales, costOfGoods: analytics.profit.netCostOfGoods, grossProfit: analytics.profit.grossProfit, expenses: analytics.expenses.total, netProfit: analytics.profit.netProfit, salesReturns: analytics.sales.returns, purchaseReturns: analytics.purchases.returns, purchaseNet: analytics.purchases.net },
+      damage,
+      netPosition,
+    };
+  },
+  async createPeriodicInventory({ cycle, from, to, notes = "", approvedByAccountId = "", approvedByName = "" } = {}) {
+    const normalizedCycle = ["monthly", "semiannual", "annual"].includes(cycle) ? cycle : "";
+    if (!normalizedCycle) throw new Error("نوع دورة الجرد غير صالح.");
+    const summary = await this.getPeriodicInventorySummary({ from, to });
+    const database = await this.open(); const transaction = database.transaction("periodicInventories", "readwrite"); const store = transaction.objectStore("periodicInventories");
+    const existing = await requestAsPromise(store.getAll());
+    const previous = existing.filter((item) => item.cycle === normalizedCycle).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0] || null;
+    const comparison = previous?.metrics ? {
+      previousAuditId: previous.id,
+      previousCreatedAt: previous.createdAt,
+      inventoryCostDelta: roundMoney(summary.inventory.cost - toNumber(previous.metrics.inventory?.cost)),
+      vaultBalanceDelta: roundMoney(summary.cash.vaultBalance - toNumber(previous.metrics.cash?.vaultBalance)),
+      customerDebtDelta: roundMoney(summary.receivables.customerDebt - toNumber(previous.metrics.receivables?.customerDebt)),
+      supplierPayablesDelta: roundMoney(summary.payables.supplierPayables - toNumber(previous.metrics.payables?.supplierPayables)),
+      netProfitDelta: roundMoney(summary.performance.netProfit - toNumber(previous.metrics.performance?.netProfit)),
+      netPositionDelta: roundMoney(summary.netPosition - toNumber(previous.metrics.netPosition)),
+    } : null;
+    const createdAt = nowIso(); const audit = { id: uid("periodic-inventory"), cycle: normalizedCycle, periodFrom: summary.period.from, periodTo: summary.period.to, notes: normalize(notes).slice(0, 240), approvedByAccountId: normalize(approvedByAccountId), approvedByName: normalize(approvedByName), createdAt, metrics: summary, comparison };
+    store.add(audit); await transactionDone(transaction); return audit;
+  },
+  async listPeriodicInventories() { const database = await this.open(); const items = await requestAsPromise(database.transaction("periodicInventories", "readonly").objectStore("periodicInventories").getAll()); return items.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))); },
 
   async listCashMovements({ from = "", to = "" } = {}) { const database = await this.open(); const items = await requestAsPromise(database.transaction("cashMovements", "readonly").objectStore("cashMovements").getAll()); return items.filter((item) => isWithinDateRange(item.date, from, to)).sort((a, b) => new Date(b.date) - new Date(a.date)); },
   async listTransferVaultDeposits() { const database = await this.open(); const items = await requestAsPromise(database.transaction("cashMovements", "readonly").objectStore("cashMovements").getAll()); return items.filter((item) => item.sourceType === "TRANSFER_TO_VAULT").sort((a, b) => new Date(b.date) - new Date(a.date)); },

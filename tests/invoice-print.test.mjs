@@ -66,7 +66,7 @@ test("يوثق تسليم الصندوق عند تبديل الحساب ويعر
     readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
-  assert.match(database, /const DB_VERSION = 11/);
+  assert.match(database, /const DB_VERSION = 12/);
   assert.match(database, /makeIndexedStore\(database, "cashierShifts"/);
   assert.match(database, /async startCashierShift/);
   assert.match(database, /async closeCashierShift/);
@@ -105,7 +105,7 @@ test("تفصل الخزنة عن صندوق الكاشير وتدعم ترحيل
     readFile(new URL("../client/src/js/permissions.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
-  assert.match(database, /const DB_VERSION = 11/);
+  assert.match(database, /const DB_VERSION = 12/);
   assert.match(database, /makeIndexedStore\(database, "cashierSalaryDeductions"/);
   assert.match(database, /async transferCashierShiftToVault/);
   assert.match(database, /async getVault/);
@@ -140,6 +140,33 @@ test("تبقى الحوالات في صفحتها وتسمح بتوريد الو
   assert.match(app, /توريد التحويل لا يكرر التحصيل/);
   assert.match(permissions, /"deposit-incoming-transfer"/);
   assert.match(css, /\.transfer-vault-note/);
+});
+
+test("يوفر الجرد الدوري لقطة محفوظة ومقارنة من غير إنشاء حركة نقدية أو مخزنية", async () => {
+  const [app, database, permissions, constants, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/permissions.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/constants.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(database, /const DB_VERSION = 12/);
+  assert.match(database, /makeIndexedStore\(database, "periodicInventories"/);
+  assert.match(database, /async getPeriodicInventorySummary/);
+  assert.match(database, /async createPeriodicInventory/);
+  assert.match(database, /async listPeriodicInventories/);
+  assert.match(database, /لا يوجد في التطبيق سجل مستقل للتالف/);
+  assert.match(app, /function periodicInventoryMarkup\(/);
+  assert.match(app, /function openPeriodicInventorySaveDialog\(/);
+  assert.match(app, /function openPeriodicInventoryDialog\(/);
+  assert.match(app, /data-action="save-periodic-inventory"/);
+  assert.match(app, /data-action="open-periodic-inventory"/);
+  assert.match(app, /"periodic-inventory": periodicInventoryMarkup/);
+  assert.match(constants, /id: "periodic-inventory", label: "الجرد الدوري"/);
+  assert.match(permissions, /"save-periodic-inventory"/);
+  assert.match(permissions, /"open-periodic-inventory"/);
+  assert.match(css, /\.periodic-inventory-page/);
+  assert.match(css, /\.periodic-inventory-detail/);
 });
 
 test("يدعم البحث المباشر برقم الفاتورة ويعرض عددي المنتجات والفواتير بأرقام إنجليزية في الرئيسية", async () => {

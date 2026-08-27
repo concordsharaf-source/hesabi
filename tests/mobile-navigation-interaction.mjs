@@ -110,10 +110,30 @@ try {
     if (!purchaseSearchEntered) await sleep(180);
   }
   assert.ok(purchaseSearchEntered, 'تعذر الوصول إلى حقل بحث الشراء بعد إعادة تحميل واجهة PWA.');
-  await waitFor('[data-add-purchase-product]');
+  let purchaseProductResultVisible = false;
+  for (let attempt = 0; attempt < 4 && !purchaseProductResultVisible; attempt += 1) {
+    purchaseProductResultVisible = await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); if (!search) return false; search.value = 'منتج قريب الانتهاء'; search.dispatchEvent(new Event('input', { bubbles: true })); return Boolean(document.querySelector('[data-add-purchase-product]')); })()`);
+    for (let check = 0; check < 20 && !purchaseProductResultVisible; check += 1) {
+      purchaseProductResultVisible = await evaluate(`Boolean(document.querySelector('[data-add-purchase-product]'))`);
+      if (!purchaseProductResultVisible) await sleep(120);
+    }
+    if (!purchaseProductResultVisible && !await evaluate(`Boolean(document.querySelector('#purchase-product-search'))`)) {
+      await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]')?.click()`);
+      await waitFor('.topbar [data-action="new-purchase"]');
+      await evaluate(`document.querySelector('.topbar [data-action="new-purchase"]').click()`);
+      await waitFor('#purchase-product-search');
+    }
+  }
+  assert.ok(purchaseProductResultVisible, 'لم تظهر نتيجة المنتج في بحث فاتورة الشراء.');
   await evaluate(`document.querySelector('[data-add-purchase-product]').click()`);
   await waitFor('[data-purchase-sale-price="0"]');
-  const priorProductPurchaseLine = await evaluate(`(() => { const salePrice = document.querySelector('[data-purchase-sale-price="0"]'); const row = salePrice.closest('.purchase-line'); const directPrice = row.querySelector('[data-purchase-sale-price-visible="0"]'); const visibleStyle = getComputedStyle(directPrice); return { salePrice: salePrice.value, visiblePrice: directPrice.textContent.trim(), overlayVisibleBeforeFocus: visibleStyle.display === 'flex' && visibleStyle.opacity === '1' && visibleStyle.pointerEvents === 'none', rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length }; })()`);
+  let priorProductPurchaseLine;
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    priorProductPurchaseLine = await evaluate(`(() => { const salePrice = document.querySelector('[data-purchase-sale-price="0"]'); const row = salePrice?.closest('.purchase-line'); const directPrice = row?.querySelector('[data-purchase-sale-price-visible="0"]'); if (!salePrice || !row || !directPrice) return null; const visibleStyle = getComputedStyle(directPrice); return { salePrice: salePrice.value, visiblePrice: directPrice.textContent.trim(), overlayVisibleBeforeFocus: visibleStyle.display === 'flex' && visibleStyle.opacity === '1' && visibleStyle.pointerEvents === 'none', rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length }; })()`);
+    if (priorProductPurchaseLine) break;
+    await sleep(120);
+  }
+  assert.ok(priorProductPurchaseLine, 'لم يستقر سطر شراء المنتج السابق بعد إعادة العرض.');
   assert.deepEqual(priorProductPurchaseLine, { salePrice: '50', visiblePrice: '50', overlayVisibleBeforeFocus: true, rowDisplay: 'grid', fieldCount: 7 });
   const dateInputBehavior = await evaluate(`(() => { const input = document.querySelector('[data-purchase-expiry-date="0"]'); return { type: input.type, value: input.value, direction: getComputedStyle(input).direction }; })()`);
   assert.deepEqual(dateInputBehavior, { type: 'date', value: '', direction: 'ltr' });
@@ -144,7 +164,7 @@ try {
   const arrowDirections = await evaluate(`(() => { const previous = document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"] svg'); const next = document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="1"] svg'); return { previous: getComputedStyle(previous).transform, next: getComputedStyle(next).transform }; })()`);
   assert.deepEqual(arrowDirections, { previous: 'matrix(-1, 0, 0, -1, 0, 0)', next: 'none' });
   const reordered = await evaluate(`new Promise((resolve) => { document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"]').click(); setTimeout(() => resolve({ order: [...document.querySelectorAll('[data-bottom-nav] [data-view]')].map((item) => item.dataset.view), settingRows: document.querySelectorAll('.mobile-nav-settings__item').length }), 350); })`);
-  assert.equal(reordered.settingRows, 16);
+  assert.equal(reordered.settingRows, 17);
   assert.ok(reordered.order.indexOf("inventory") < reordered.order.indexOf("products"), "يجب أن ينتقل المخزون خطوة للأمام بعد تغيير الترتيب.");
   await evaluate(`document.querySelector('[data-view="data-management"]').click()`);
   await waitFor('#restore-file');
@@ -295,6 +315,44 @@ try {
   assert.match(cashierSalarySummary.text, /200/);
   assert.match(cashierSalarySummary.text, /10/);
   assert.match(cashierSalarySummary.text, /790/);
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="periodic-inventory"]').click()`);
+  await waitFor('#periodic-inventory-filter');
+  const periodicInventoryPage = await evaluate(`(() => ({ title: document.querySelector('.workspace h1')?.textContent?.trim(), approveVisible: Boolean(document.querySelector('[data-action="save-periodic-inventory"]')), noOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth, sourceNotice: document.querySelector('.periodic-inventory-notice')?.textContent.includes('اللقطة لا تنشئ حركة جديدة') || false, containsDamageDisclosure: document.querySelector('.report-grid')?.textContent.includes('لا يوجد في التطبيق سجل مستقل للتالف') || false, metricLabels: [...document.querySelectorAll('.metric-card')].map((card) => card.textContent.replace(/\s+/g, ' ').trim()) }))()`);
+  assert.equal(periodicInventoryPage.title, 'الجرد المحاسبي الدوري');
+  assert.equal(periodicInventoryPage.approveVisible, true);
+  assert.equal(periodicInventoryPage.noOverflow, true);
+  assert.equal(periodicInventoryPage.sourceNotice, true);
+  assert.equal(periodicInventoryPage.containsDamageDisclosure, true);
+  assert.ok(periodicInventoryPage.metricLabels.some((text) => text.includes('المخزون بالتكلفة')));
+  assert.ok(periodicInventoryPage.metricLabels.some((text) => text.includes('الخزنة الرئيسية')));
+  const selectAuditCycle = async (cycle, expectedFrom) => {
+    await evaluate(`(() => { const form = document.querySelector('#periodic-inventory-filter'); form.elements.cycle.value = ${JSON.stringify(cycle)}; form.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const values = await evaluate(`(() => { const form = document.querySelector('#periodic-inventory-filter'); return { cycle: form.elements.cycle.value, from: form.elements.from.value, to: form.elements.to.value }; })()`);
+      if (values.cycle === cycle && values.from === expectedFrom) return values;
+      await sleep(150);
+    }
+    throw new Error(`لم يكتمل تحديث نطاق الجرد إلى ${cycle}.`);
+  };
+  const todayForAudit = new Date().toISOString().slice(0, 10);
+  const [auditYear, auditMonth] = todayForAudit.split('-').map(Number);
+  const expectedSemiannualFrom = `${auditYear}-${String(auditMonth <= 6 ? 1 : 7).padStart(2, '0')}-01`;
+  assert.deepEqual(await selectAuditCycle('semiannual', expectedSemiannualFrom), { cycle: 'semiannual', from: expectedSemiannualFrom, to: todayForAudit });
+  assert.deepEqual(await selectAuditCycle('annual', `${auditYear}-01-01`), { cycle: 'annual', from: `${auditYear}-01-01`, to: todayForAudit });
+  assert.deepEqual(await selectAuditCycle('monthly', `${auditYear}-${String(auditMonth).padStart(2, '0')}-01`), { cycle: 'monthly', from: `${auditYear}-${String(auditMonth).padStart(2, '0')}-01`, to: todayForAudit });
+  await evaluate(`document.querySelector('[data-action="save-periodic-inventory"]').click()`);
+  await waitFor('#periodic-inventory-save-form');
+  await evaluate(`(() => { const form = document.querySelector('#periodic-inventory-save-form'); form.elements.notes.value = 'جرد هاتف تجريبي'; form.requestSubmit(); })()`);
+  await waitForGone('#periodic-inventory-save-form');
+  await waitFor('.periodic-inventory-row');
+  const savedPeriodicInventory = await evaluate(`(() => { const row = document.querySelector('.periodic-inventory-row'); return { title: row?.textContent.includes('جرد شهري') || false, hasNote: row?.textContent.includes('جرد هاتف تجريبي') || false, hasPosition: /[0-9]/.test(row?.querySelector('.periodic-inventory-row__amount')?.textContent || ''), overflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth }; })()`);
+  assert.deepEqual(savedPeriodicInventory, { title: true, hasNote: false, hasPosition: true, overflow: true });
+  await evaluate(`document.querySelector('.periodic-inventory-row [data-action="open-periodic-inventory"]').click()`);
+  await waitFor('.periodic-inventory-detail');
+  const inventoryAuditDialog = await evaluate(`(() => ({ hasPerformance: document.querySelector('.periodic-inventory-detail')?.textContent.includes('صافي الربح') || false, hasNotes: document.querySelector('.periodic-inventory-detail__notes')?.textContent.includes('جرد هاتف تجريبي') || false, hasDamageDisclosure: document.querySelector('.periodic-inventory-detail')?.textContent.includes('لا يوجد في التطبيق سجل مستقل للتالف') || false }))()`);
+  assert.deepEqual(inventoryAuditDialog, { hasPerformance: true, hasNotes: true, hasDamageDisclosure: true });
+  await evaluate(`document.querySelector('[data-dialog-close]').click()`);
+  await waitForGone('.periodic-inventory-detail');
   socket.close();
   console.log("اجتازت صفحات التطبيق وتبديل الكاشير وتسليم الصندوق اختبار التنقل التفاعلي.");
 } finally {
