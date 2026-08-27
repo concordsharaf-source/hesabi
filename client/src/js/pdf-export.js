@@ -2,14 +2,17 @@ import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
 const PDF_ARABIC_FONT_URL = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage/NotoNaskhArabic-Regular_2c8d8205.ttf";
+const toNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 let canvasArabicFontPromise;
+const waitWithTimeout = (promise, timeout = 3_000) => Promise.race([promise, new Promise((resolve) => window.setTimeout(resolve, timeout))]);
 
 async function loadCanvasArabicFont() {
   if (!canvasArabicFontPromise) {
-    canvasArabicFontPromise = new FontFace("HesabiArabicPdf", `url(${PDF_ARABIC_FONT_URL})`, { style: "normal", weight: "100 900", display: "block" }).load().then((font) => {
+    const loadFont = new FontFace("HesabiArabicPdf", `url(${PDF_ARABIC_FONT_URL})`, { style: "normal", weight: "100 900", display: "block" }).load().then((font) => {
       document.fonts.add(font);
       return font;
-    });
+    }).catch(() => null);
+    canvasArabicFontPromise = waitWithTimeout(loadFont);
   }
   return canvasArabicFontPromise;
 }
@@ -28,7 +31,7 @@ function createPdfStage(html, page) {
 
 async function waitForPdfStage(stage) {
   if (!stage.textContent.trim()) throw new Error("لا يوجد محتوى صالح لإنشاء ملف PDF.");
-  await document.fonts?.ready;
+  if (document.fonts?.ready) await waitWithTimeout(document.fonts.ready);
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   if (stage.getBoundingClientRect().height < 1 || stage.scrollHeight < 1) throw new Error("تعذر تجهيز محتوى الفاتورة للطباعة.");
 }

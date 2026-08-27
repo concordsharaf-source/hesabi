@@ -483,3 +483,17 @@ test("يعرض خصم السطر والخصم العام بصيغة مبلغ أ�
   assert.match(style, /\[data-theme="dark"\] \.metric-card \{[^}]*background:#12634f;/);
   assert.match(style, /\.metric-card\.is-negative \{ background:#a73340; border-color:#ffc3ca;/);
 });
+
+test("يضغط خصم سطر البيع بجانب الكمية ويحافظ على صياغة الأرقام الإنجليزية", async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /new Intl\.NumberFormat\("en-US", \{ minimumFractionDigits: 0, maximumFractionDigits: 2 \}\)/);
+  assert.match(app, /new Intl\.NumberFormat\("en-US", \{ maximumFractionDigits: 2 \}\)/);
+  assert.match(app, /<label class="cart-line__discount" title="خصم السطر بالمبلغ أو النسبة"><span>خصم<\/span><input data-cart-line-discount=.*maxlength="4"/);
+  assert.match(app, /class="cart-line__discount-note"/);
+  assert.match(css, /\.cart-line__discount \{ display:flex; align-items:center; flex:0 0 auto;/);
+  assert.match(css, /\.cart-line__discount input \{ width:58px; min-width:58px;/);
+  assert.match(css, /\.invoice-list \.invoice-row:nth-child\(even\)/);
+});
