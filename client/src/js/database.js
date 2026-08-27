@@ -41,6 +41,14 @@ const transactionDone = (transaction) => new Promise((resolve, reject) => {
   transaction.onabort = () => reject(transaction.error || new Error("تم إلغاء العملية لحماية البيانات."));
 });
 const normalize = (value) => String(value || "").trim();
+const LOCAL_STORE_LOGO_PATTERN = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+={0,2}$/i;
+const LOCAL_STORE_LOGO_MAX_LENGTH = 620_000;
+const normalizeStoreLogoDataUrl = (value) => {
+  const dataUrl = normalize(value);
+  if (!dataUrl) return "";
+  if (!LOCAL_STORE_LOGO_PATTERN.test(dataUrl) || dataUrl.length > LOCAL_STORE_LOGO_MAX_LENGTH) throw new Error("ملف الشعار غير صالح أو أكبر من الحد المحلي الآمن.");
+  return dataUrl;
+};
 const normalizeUsername = (value) => normalize(value).toLocaleLowerCase("ar");
 const validatePin = (value) => /^\d{4,12}$/.test(String(value || ""));
 const secureCrypto = () => {
@@ -184,6 +192,7 @@ export const db = {
 
   async getSettings() { const database = await this.open(); return requestAsPromise(database.transaction("settings", "readonly").objectStore("settings").get("app")); },
   async saveSettings(values) { const database = await this.open(); const transaction = database.transaction("settings", "readwrite"); const store = transaction.objectStore("settings"); const current = await requestAsPromise(store.get("app")); store.put({ ...current, id: "app", ...values, setupCompleted: true, updatedAt: nowIso() }); await transactionDone(transaction); },
+  async saveStoreLogoDataUrl(dataUrl) { await this.saveSettings({ storeLogoDataUrl: normalizeStoreLogoDataUrl(dataUrl) }); },
 
   async listAccounts() { const database = await this.open(); const accounts = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").getAll()); return accounts.sort((a, b) => a.role === b.role ? a.name.localeCompare(b.name, "ar") : a.role === "admin" ? -1 : 1); },
   async getPersistentSession() {

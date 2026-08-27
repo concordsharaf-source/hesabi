@@ -63,11 +63,28 @@ async function fileOrDownload(file, title) {
   return "downloaded";
 }
 
-function drawThermalInvoiceCanvas({ invoice, customer, storeName, formatMoney, formatAmount, formatDateTime, paymentLabel }) {
+async function loadStoreLogoImage(logoDataUrl) {
+  if (!/^data:image\/(?:png|jpeg|webp);base64,/i.test(String(logoDataUrl || ""))) return null;
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => resolve(null);
+    image.src = logoDataUrl;
+  });
+}
+
+function drawStoreLogo(context, image, centerX, centerY, boxSize) {
+  if (!image?.naturalWidth || !image?.naturalHeight) return;
+  const scale = Math.min(boxSize / image.naturalWidth, boxSize / image.naturalHeight);
+  const width = image.naturalWidth * scale; const height = image.naturalHeight * scale;
+  context.drawImage(image, centerX - width / 2, centerY - height / 2, width, height);
+}
+
+function drawThermalInvoiceCanvas({ invoice, customer, storeName, logoImage, formatMoney, formatAmount, formatDateTime, paymentLabel }) {
   const mm = 12;
   const width = 80 * mm;
   const details = invoice.customerName ? 1 + Number(Boolean(customer?.phone)) + Number(Boolean(customer?.address)) : 0;
-  const height = Math.max(1420, (114 + details * 11 + Math.max(1, invoice.items?.length || 0) * 20 + (toNumber(invoice.deliveryFee) > 0 ? 9 : 0)) * mm);
+  const height = Math.max(1420, (114 + details * 11 + Math.max(1, invoice.items?.length || 0) * 20 + (logoImage ? 17 : 0) + (toNumber(invoice.deliveryFee) > 0 ? 9 : 0)) * mm);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -95,6 +112,7 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, formatMoney, f
     text(value, left, "left", options.valueSize || 27, options.bold ? 700 : 400, options.ltr ? "ltr" : "rtl");
     y += options.gap || 6.5 * mm;
   };
+  if (logoImage) { drawStoreLogo(context, logoImage, center, y + 7 * mm, 14 * mm); y += 17 * mm; }
   text(storeName || "حسابي", center, "center", 44, 700); y += 8 * mm;
   text("فاتورة بيع", right, "right", 30, 700); text(invoice.invoiceNumber, left, "left", 27, 700, "ltr"); y += 6 * mm;
   text(formatDateTime(invoice.date), center, "center", 20); y += 7 * mm;
@@ -126,7 +144,7 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, formatMoney, f
   return canvas;
 }
 
-function drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDateTime }) {
+function drawCustomerAccountCanvas({ account, storeName, logoImage, formatMoney, formatDateTime }) {
   const mm = 12;
   const width = 210 * mm;
   const rows = account.transactions || [];
@@ -151,6 +169,7 @@ function drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDate
   };
   const line = (fromX, fromY, toX, toY, color = "#d9e0d7", widthPx = 2) => { context.strokeStyle = color; context.lineWidth = widthPx; context.beginPath(); context.moveTo(fromX, fromY); context.lineTo(toX, toY); context.stroke(); };
   let y = 19 * mm;
+  if (logoImage) drawStoreLogo(context, logoImage, left + 13 * mm, y, 22 * mm);
   text(storeName || "حسابي", right, y, "right", 62, 700, "rtl", "#174c3f");
   y += 9 * mm;
   text("كشف حساب مديونية عميل", right, y, "right", 38, 600, "rtl", "#52645b");
@@ -211,7 +230,7 @@ function drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDate
   return canvas;
 }
 
-function drawReportCanvas({ rows, storeName, from, to }) {
+function drawReportCanvas({ rows, storeName, logoImage, from, to }) {
   const mm = 12;
   const width = 210 * mm;
   const dataRows = rows.slice(1);
@@ -234,6 +253,7 @@ function drawReportCanvas({ rows, storeName, from, to }) {
     context.fillText(String(value ?? ""), x, y);
   };
   let y = 20 * mm;
+  if (logoImage) drawStoreLogo(context, logoImage, left + 13 * mm, y, 22 * mm);
   text(storeName || "حسابي", right, y, "right", 62, 700, "#174c3f");
   y += 9 * mm;
   text("تقرير تشغيلي", right, y, "right", 40, 700, "#172e27");
@@ -302,9 +322,10 @@ export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
   }
 }
 
-export async function createThermalInvoicePdfFile({ invoice, customer, storeName, formatMoney, formatAmount, formatDateTime, paymentLabel, filename }) {
+export async function createThermalInvoicePdfFile({ invoice, customer, storeName, logoDataUrl, formatMoney, formatAmount, formatDateTime, paymentLabel, filename }) {
   await loadCanvasArabicFont();
-  const canvas = drawThermalInvoiceCanvas({ invoice, customer, storeName, formatMoney, formatAmount, formatDateTime, paymentLabel });
+  const logoImage = await loadStoreLogoImage(logoDataUrl);
+  const canvas = drawThermalInvoiceCanvas({ invoice, customer, storeName, logoImage, formatMoney, formatAmount, formatDateTime, paymentLabel });
   const thermalWidth = 80;
   const thermalHeight = (canvas.height * thermalWidth) / canvas.width;
   const pdf = new jsPDF({ unit: "mm", format: [thermalWidth, thermalHeight], orientation: "portrait", compress: true });
@@ -314,17 +335,19 @@ export async function createThermalInvoicePdfFile({ invoice, customer, storeName
   return new File([blob], filename, { type: "application/pdf" });
 }
 
-export async function createCustomerAccountPdfFile({ account, storeName, formatMoney, formatDateTime, filename }) {
+export async function createCustomerAccountPdfFile({ account, storeName, logoDataUrl, formatMoney, formatDateTime, filename }) {
   await loadCanvasArabicFont();
-  const pdf = createA4PdfFromCanvas(drawCustomerAccountCanvas({ account, storeName, formatMoney, formatDateTime }));
+  const logoImage = await loadStoreLogoImage(logoDataUrl);
+  const pdf = createA4PdfFromCanvas(drawCustomerAccountCanvas({ account, storeName, logoImage, formatMoney, formatDateTime }));
   const blob = pdf.output("blob");
   if (!blob || blob.size < 800) throw new Error("تعذر إنشاء ملف PDF واضح لكشف الحساب.");
   return new File([blob], filename, { type: "application/pdf" });
 }
 
-export async function createReportPdfFile({ rows, storeName, from, to, filename }) {
+export async function createReportPdfFile({ rows, storeName, logoDataUrl, from, to, filename }) {
   await loadCanvasArabicFont();
-  const pdf = createA4PdfFromCanvas(drawReportCanvas({ rows, storeName, from, to }));
+  const logoImage = await loadStoreLogoImage(logoDataUrl);
+  const pdf = createA4PdfFromCanvas(drawReportCanvas({ rows, storeName, logoImage, from, to }));
   const blob = pdf.output("blob");
   if (!blob || blob.size < 800) throw new Error("تعذر إنشاء تقرير PDF عربي واضح.");
   return new File([blob], filename, { type: "application/pdf" });

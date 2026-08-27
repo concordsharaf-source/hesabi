@@ -407,3 +407,19 @@ test("الجرد الدوري يحفظ لقطة محاسبية شهرية ونص
   await assert.rejects(() => db.createPeriodicInventory({ cycle: "quarterly", from: monthFrom, to: today }), /نوع دورة الجرد غير صالح/);
   await db.resetAllData();
 });
+
+test("يحفظ شعار المتجر محليًا ضمن النسخة الاحتياطية ويرفض البيانات غير الآمنة", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "متجر الشعار", businessType: "بقالة", currency: "YER" });
+  const logo = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLpbAAAAABJRU5ErkJggg==";
+  await db.saveStoreLogoDataUrl(logo);
+  assert.equal((await db.getSettings()).storeLogoDataUrl, logo);
+  const backup = await db.exportBackup();
+  assert.equal(backup.stores.settings[0].storeLogoDataUrl, logo);
+  await db.resetAllData();
+  await db.restoreBackup(backup);
+  assert.equal((await db.getSettings()).storeLogoDataUrl, logo);
+  await assert.rejects(() => db.saveStoreLogoDataUrl("data:image/svg+xml;base64,PHN2Zz48L3N2Zz4="), /غير صالح/);
+  await assert.rejects(() => db.saveStoreLogoDataUrl(`data:image/png;base64,${"A".repeat(620_001)}`), /غير صالح/);
+  await db.resetAllData();
+});

@@ -353,6 +353,17 @@ try {
   assert.deepEqual(inventoryAuditDialog, { hasPerformance: true, hasNotes: true, hasDamageDisclosure: true });
   await evaluate(`document.querySelector('[data-dialog-close]').click()`);
   await waitForGone('.periodic-inventory-detail');
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="settings"]').click()`);
+  await waitFor('#store-logo-file');
+  await evaluate(`(() => { const input = document.querySelector('#store-logo-file'); const bytes = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLpbAAAAABJRU5ErkJggg=='), (character) => character.charCodeAt(0)); const transfer = new DataTransfer(); transfer.items.add(new File([bytes], 'store-logo.png', { type: 'image/png' })); Object.defineProperty(input, 'files', { configurable: true, value: transfer.files }); input.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  for (let attempt = 0; attempt < 40 && !(await evaluate(`document.querySelector('.store-logo-preview strong')?.textContent.includes('شعار مخصص')`)); attempt += 1) await sleep(150);
+  const localLogo = await evaluate(`(() => ({ preview: document.querySelector('.store-logo-preview img')?.src.startsWith('data:image/webp'), reset: Boolean(document.querySelector('[data-action="clear-store-logo"]')), favicon: document.querySelector('link[rel="icon"]')?.href.startsWith('data:image/webp'), overflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth }))()`);
+  assert.deepEqual(localLogo, { preview: true, reset: true, favicon: true, overflow: true });
+  if (new URL(target).hostname === 'localhost') {
+    const customLogoPdf = await evaluate(`(async () => { const pdf = await import('/src/js/pdf-export.js'); const logoDataUrl = document.querySelector('.store-logo-preview img').src; const invoice = { invoiceNumber: 'INV-LOGO', date: '2026-08-27T10:00:00.000Z', paymentType: 'نقدي', paymentStatus: 'مدفوعة', paymentMethod: 'نقدي', items: [{ productName: 'منتج اختبار', unit: 'حبة', quantity: 1, unitPrice: 50, total: 50 }], subtotal: 50, discount: 0, deliveryFee: 0, total: 50, paidAmount: 50, remainingAmount: 0 }; const file = await pdf.createThermalInvoicePdfFile({ invoice, customer: null, storeName: 'متجر اختبار', logoDataUrl, formatMoney: (value) => String(value), formatAmount: (value) => String(value), formatDateTime: () => '27 أغسطس 2026', paymentLabel: 'كاش', filename: 'logo-invoice.pdf' }); return { type: file.type, size: file.size }; })()`);
+    assert.equal(customLogoPdf.type, 'application/pdf');
+    assert.ok(customLogoPdf.size > 800, 'تعذر إنشاء PDF الفاتورة مع شعار المتجر المحلي.');
+  }
   socket.close();
   console.log("اجتازت صفحات التطبيق وتبديل الكاشير وتسليم الصندوق اختبار التنقل التفاعلي.");
 } finally {

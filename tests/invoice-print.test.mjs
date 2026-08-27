@@ -39,6 +39,8 @@ test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الد
   assert.match(pdfExport, /drawThermalInvoiceCanvas/);
   assert.match(pdfExport, /drawCustomerAccountCanvas/);
   assert.match(pdfExport, /drawReportCanvas/);
+  assert.match(pdfExport, /loadStoreLogoImage/);
+  assert.match(pdfExport, /drawStoreLogo/);
   assert.match(pdfExport, /createReportPdfFile/);
   assert.match(pdfExport, /shareOrDownloadCustomerAccountPdf/);
   assert.match(pdfExport, /context\.direction = "rtl"/);
@@ -47,6 +49,27 @@ test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الد
   assert.match(app, /await db\.getCustomer\(invoice\.customerId\)/);
   assert.match(app, /shareOrDownloadCustomerAccountPdf\(/);
   assert.match(app, /createReportPdfFile\(/);
+  assert.match(app, /logoDataUrl: storeLogoDataUrl\(\)/);
+});
+
+test("يحصر شعار المتجر في ملف محلي آمن ويعرضه في إعدادات الأدمن والنسخة الاحتياطية", async () => {
+  const [app, database, permissions, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/permissions.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /id="store-logo-file"/);
+  assert.match(app, /accept="image\/png,image\/jpeg,image\/webp"/);
+  assert.match(app, /LOCAL_STORE_LOGO_MAX_SOURCE_BYTES/);
+  assert.match(app, /prepareStoreLogoDataUrl/);
+  assert.match(app, /updateStoreIcon/);
+  assert.match(database, /saveStoreLogoDataUrl/);
+  assert.match(database, /LOCAL_STORE_LOGO_PATTERN/);
+  assert.match(database, /LOCAL_STORE_LOGO_MAX_LENGTH/);
+  assert.match(permissions, /"clear-store-logo"/);
+  assert.match(css, /\.store-logo-settings__body/);
+  assert.match(css, /\[data-theme="dark"\] \.store-logo-preview/);
 });
 
 test("تنزيل PDF تلقائيًا عند غياب دعم مشاركة الملفات أو فشل طلب المشاركة", async () => {
