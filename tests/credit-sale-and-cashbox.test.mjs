@@ -334,3 +334,27 @@ test("بيع الكرتون يخصم حباته من المخزون ويسمح �
   assert.equal(adminSale.total, 80);
   await db.resetAllData();
 });
+
+test("توريد الحوالة الواردة للخزنة يدعم الجزء المتبقي ولا يكرر التحصيل أو يتجاوز مصدره", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "متجر توريد التحويل", businessType: "بقالة", currency: "YER", openingCash: 0 });
+  const product = await db.createProduct({ name: "منتج تحويل وارد", unit: "حبة", purchasePrice: 80, salePrice: 200, quantity: 2, minimumStock: 0 });
+  const sale = await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], discount: 0, paidAmount: 200, paymentMethod: "تحويل", sellerRole: "admin" });
+  const beforeDeposit = await db.getCashbox();
+  assert.deepEqual({ transferIncoming: beforeDeposit.transferIncoming, deposits: beforeDeposit.deposits, closing: beforeDeposit.closingBalance }, { transferIncoming: 200, deposits: 0, closing: 0 });
+
+  const firstDeposit = await db.depositIncomingTransferToVault({ sourceType: "SALE_TRANSFER", sourceId: sale.id, amount: 75, date: "2026-08-27", notes: "توريد جزئي" });
+  assert.deepEqual({ amount: firstDeposit.amount, depositedBefore: firstDeposit.depositedBefore, remainingAfter: firstDeposit.remainingAfter }, { amount: 75, depositedBefore: 0, remainingAfter: 125 });
+  const middleCashbox = await db.getCashbox();
+  assert.deepEqual({ transferIncoming: middleCashbox.transferIncoming, deposits: middleCashbox.deposits, closing: middleCashbox.closingBalance }, { transferIncoming: 200, deposits: 75, closing: 75 });
+
+  await assert.rejects(() => db.depositIncomingTransferToVault({ sourceType: "SALE_TRANSFER", sourceId: sale.id, amount: 126 }), /أكبر من المتبقي/);
+  const finalDeposit = await db.depositIncomingTransferToVault({ sourceType: "SALE_TRANSFER", sourceId: sale.id, amount: 125, date: "2026-08-28" });
+  assert.equal(finalDeposit.remainingAfter, 0);
+  const vault = await db.getVault(); const cashbox = await db.getCashbox(); const deposits = await db.listTransferVaultDeposits();
+  assert.equal(vault.vaultBalance, 200);
+  assert.deepEqual({ transferIncoming: cashbox.transferIncoming, deposits: cashbox.deposits, closing: cashbox.closingBalance }, { transferIncoming: 200, deposits: 200, closing: 200 });
+  assert.deepEqual(deposits.map((item) => item.amount), [125, 75]);
+  await assert.rejects(() => db.depositIncomingTransferToVault({ sourceType: "SALE_TRANSFER", sourceId: sale.id, amount: 1 }), /أكبر من المتبقي/);
+  await db.resetAllData();
+});

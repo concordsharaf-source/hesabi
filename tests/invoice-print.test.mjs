@@ -122,6 +122,26 @@ test("تفصل الخزنة عن صندوق الكاشير وتدعم ترحيل
   assert.match(css, /\.cashier-difference-row \{ display:grid;/);
 });
 
+test("تبقى الحوالات في صفحتها وتسمح بتوريد الوارد للخزنة كاملًا أو جزئيًا للأدمن فقط", async () => {
+  const [app, database, permissions, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/permissions.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(database, /async depositIncomingTransferToVault/);
+  assert.match(database, /async listTransferVaultDeposits/);
+  assert.match(database, /TRANSFER_TO_VAULT/);
+  assert.match(database, /مبلغ التوريد أكبر من المتبقي/);
+  assert.match(app, /function incomingTransferEntries/);
+  assert.match(app, /function openIncomingTransferDepositDialog/);
+  assert.match(app, /data-action="deposit-incoming-transfer"/);
+  assert.match(app, /توريد حوالة للخزنة/);
+  assert.match(app, /توريد التحويل لا يكرر التحصيل/);
+  assert.match(permissions, /"deposit-incoming-transfer"/);
+  assert.match(css, /\.transfer-vault-note/);
+});
+
 test("يدعم البحث المباشر برقم الفاتورة ويعرض عددي المنتجات والفواتير بأرقام إنجليزية في الرئيسية", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
   assert.match(app, /invoiceQuery: ""/);
