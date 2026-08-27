@@ -112,7 +112,11 @@ try {
   assert.ok(purchaseSearchEntered, 'تعذر الوصول إلى حقل بحث الشراء بعد إعادة تحميل واجهة PWA.');
   let purchaseProductSelected = false;
   for (let attempt = 0; attempt < 8 && !purchaseProductSelected; attempt += 1) {
-    purchaseProductSelected = await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); if (!search) return false; search.value = '628100000001'; search.dispatchEvent(new Event('input', { bubbles: true })); const result = document.querySelector('[data-add-purchase-product]'); if (!result) return false; result.click(); return true; })()`);
+    const searchReady = await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); if (!search) return false; search.value = '628100000001'; search.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
+    if (searchReady) {
+      await sleep(120);
+      purchaseProductSelected = await evaluate(`(() => { const result = document.querySelector('#purchase-product-results [data-add-purchase-product]'); if (!result) return false; result.click(); return true; })()`);
+    }
     if (!purchaseProductSelected) {
       if (!await evaluate(`Boolean(document.querySelector('#purchase-product-search'))`)) {
         await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]')?.click()`);
@@ -120,12 +124,12 @@ try {
         await evaluate(`document.querySelector('.topbar [data-action="new-purchase"]').click()`);
         await waitFor('#purchase-product-search');
       }
-      await sleep(150);
+      await sleep(180);
     }
   }
   assert.ok(purchaseProductSelected, 'تعذر اختيار نتيجة المنتج بعد إعادة عرض البحث.');
-  await waitFor('[data-purchase-sale-price="0"]');
-  const priorProductPurchaseLine = await evaluate(`(() => { const salePrice = document.querySelector('[data-purchase-sale-price="0"]'); const row = salePrice?.closest('.purchase-line'); const directPrice = row?.querySelector('[data-purchase-sale-price-visible="0"]'); const expiry = row?.querySelector('[data-purchase-expiry-date="0"]'); if (!salePrice || !row || !directPrice || !expiry) return null; const visibleStyle = getComputedStyle(directPrice); return { salePrice: salePrice.value, visiblePrice: directPrice.textContent.trim(), overlayVisibleBeforeFocus: visibleStyle.display === 'flex' && visibleStyle.opacity === '1' && visibleStyle.pointerEvents === 'none', rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length, expiryType: expiry.type, expiryValue: expiry.value, expiryDirection: getComputedStyle(expiry).direction }; })()`);
+  await waitFor('#purchase-lines .purchase-line [data-purchase-sale-price]');
+  const priorProductPurchaseLine = await evaluate(`(() => { const salePrice = document.querySelector('#purchase-lines .purchase-line [data-purchase-sale-price]'); const row = salePrice?.closest('.purchase-line'); const directPrice = row?.querySelector('[data-purchase-sale-price-visible="0"]'); const expiry = row?.querySelector('[data-purchase-expiry-date="0"]'); if (!salePrice || !row || !directPrice || !expiry) return null; const visibleStyle = getComputedStyle(directPrice); return { salePrice: salePrice.value, visiblePrice: directPrice.textContent.trim(), overlayVisibleBeforeFocus: visibleStyle.display === 'flex' && visibleStyle.opacity === '1' && visibleStyle.pointerEvents === 'none', rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length, expiryType: expiry.type, expiryValue: expiry.value, expiryDirection: getComputedStyle(expiry).direction }; })()`);
   assert.ok(priorProductPurchaseLine, 'لم يستقر سطر شراء المنتج السابق بعد إعادة العرض.');
   assert.deepEqual(priorProductPurchaseLine, { salePrice: '50', visiblePrice: '50', overlayVisibleBeforeFocus: true, rowDisplay: 'grid', fieldCount: 7, expiryType: 'date', expiryValue: '', expiryDirection: 'ltr' });
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
@@ -218,7 +222,7 @@ try {
   await evaluate(`document.querySelector('[data-action="checkout"]').click()`);
   await waitFor('#checkout-form');
   const checkoutDiscountLimit = await evaluate(`({ note: document.querySelector('#cashier-discount-limit')?.textContent, total: document.querySelector('#checkout-total')?.textContent, submitDisabled: document.querySelector('.checkout-submit')?.disabled })`);
-  assert.deepEqual(checkoutDiscountLimit, { note: 'خصم السطور والخصم العام: 60 ر.ي من سقف الكاشير 60 ر.ي.', total: '540 ر.ي', submitDisabled: false });
+  assert.deepEqual(checkoutDiscountLimit, { note: 'خصم السطور والخصم العام: 60 ر.ي من سقف الكاشير 10% (60 ر.ي).', total: '540 ر.ي', submitDisabled: false });
   await evaluate(`document.querySelector('#checkout-form').requestSubmit()`);
   await waitFor('[data-bottom-nav] [data-view="invoices"].is-active');
   await evaluate(`document.querySelector('[data-action="open-invoice"]').click()`);

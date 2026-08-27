@@ -29,6 +29,12 @@ export const calculateDiscountAmount = (value, base = 0) => {
   return roundMoney(Math.min(Math.max(amount, 0), subtotal));
 };
 
+export const normalizeCashierDiscountLimit = (value, fallback = 10) => {
+  const raw = String(value ?? "").trim().replace(/٪/g, "%").replace(/%$/, "");
+  if (!raw) return roundMoney(fallback);
+  return roundMoney(Math.min(100, Math.max(0, toNumber(raw))));
+};
+
 export const calculateSaleTotals = (items, discount = 0) => {
   const lines = items.map((item) => {
     const lineSubtotal = roundMoney(toNumber(item.unitPrice) * toNumber(item.quantity));

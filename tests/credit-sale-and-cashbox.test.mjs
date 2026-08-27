@@ -332,6 +332,13 @@ test("بيع الكرتون يخصم حباته من المخزون ويسمح �
   await assert.rejects(() => db.completeSale({ items: [{ productId: cappedProduct.id, quantity: 1, discount: "101" }], discount: "", paidAmount: 0, paymentMethod: "نقدي", cashierId: cashier.id, sellerRole: "cashier" }), /أقصى خصم للكاشير هو 10%/);
   const adminSale = await db.completeSale({ items: [{ productId: cappedProduct.id, quantity: 1, discount: "20%" }], discount: "", paidAmount: 80, paymentMethod: "نقدي", sellerRole: "admin" });
   assert.equal(adminSale.total, 80);
+
+  await db.saveSettings({ cashierDiscountLimitPercent: 15 });
+  assert.equal((await db.getSettings()).cashierDiscountLimitPercent, 15);
+  const raisedLimitSale = await db.completeSale({ items: [{ productId: cappedProduct.id, quantity: 1, discount: "15%" }], discount: "", paidAmount: 85, paymentMethod: "نقدي", cashierId: cashier.id, sellerRole: "cashier" });
+  assert.equal(raisedLimitSale.total, 85);
+  await db.saveSettings({ cashierDiscountLimitPercent: 150 });
+  assert.equal((await db.getSettings()).cashierDiscountLimitPercent, 100);
   await db.resetAllData();
 });
 
