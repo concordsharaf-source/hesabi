@@ -89,6 +89,8 @@ test("يوضح شاشة البداية ويستقبل قارئ الباركود 
   assert.match(scannerSession, /shouldAcceptDesktopBarcode/);
   assert.match(css, /شاشة البداية: الدفتر مرئي فوق خلفية محايدة/);
   assert.match(css, /#fbf7ec/);
+  assert.match(css, /\.setup-art \{ color:#153f34; background:repeating-linear-gradient\(0deg, transparent 0 36px, rgba\(91,111,103,\.16\)/);
+  assert.doesNotMatch(css, /\.setup-art \{ color:#153f34; background:repeating-linear-gradient\(0deg, transparent 0 36px, rgba\(31,107,89,\.23\)/);
   assert.match(css, /\[data-theme="dark"\] \.setup-page/);
 });
 

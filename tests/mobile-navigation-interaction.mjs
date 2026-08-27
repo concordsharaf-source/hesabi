@@ -124,6 +124,7 @@ try {
     }
   }
   assert.ok(purchaseProductSelected, 'تعذر اختيار نتيجة المنتج بعد إعادة عرض البحث.');
+  await waitFor('[data-purchase-sale-price="0"]');
   const priorProductPurchaseLine = await evaluate(`(() => { const salePrice = document.querySelector('[data-purchase-sale-price="0"]'); const row = salePrice?.closest('.purchase-line'); const directPrice = row?.querySelector('[data-purchase-sale-price-visible="0"]'); const expiry = row?.querySelector('[data-purchase-expiry-date="0"]'); if (!salePrice || !row || !directPrice || !expiry) return null; const visibleStyle = getComputedStyle(directPrice); return { salePrice: salePrice.value, visiblePrice: directPrice.textContent.trim(), overlayVisibleBeforeFocus: visibleStyle.display === 'flex' && visibleStyle.opacity === '1' && visibleStyle.pointerEvents === 'none', rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length, expiryType: expiry.type, expiryValue: expiry.value, expiryDirection: getComputedStyle(expiry).direction }; })()`);
   assert.ok(priorProductPurchaseLine, 'لم يستقر سطر شراء المنتج السابق بعد إعادة العرض.');
   assert.deepEqual(priorProductPurchaseLine, { salePrice: '50', visiblePrice: '50', overlayVisibleBeforeFocus: true, rowDisplay: 'grid', fieldCount: 7, expiryType: 'date', expiryValue: '', expiryDirection: 'ltr' });
