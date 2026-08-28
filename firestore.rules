@@ -7,7 +7,14 @@ service cloud.firestore {
       return signedIn() && exists(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)) && get(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)).data.status == 'active';
     }
     function admin(storeId) {
-      return member(storeId) && get(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)).data.role == 'admin';
+      return member(storeId)
+        && get(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function ownsStore(storeId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/stores/$(storeId))
+        && get(/databases/$(database)/documents/stores/$(storeId)).data.ownerUid == request.auth.uid;
     }
 
     match /backupOwners/{userId} {
@@ -23,10 +30,11 @@ service cloud.firestore {
       allow create, update: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
     }
 
-    match /stores/{storeId} {
+        match /stores/{storeId} {
       allow read: if member(storeId);
-      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
-      allow update: if admin(storeId);
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if admin(storeId) || ownsStore(storeId);
       match /members/{uid} {
         allow read: if (signedIn() && request.auth.uid == uid) || admin(storeId);
         allow create: if admin(storeId) || (signedIn() && request.auth.uid == uid && request.resource.data.role == 'admin' && request.resource.data.status == 'active');
