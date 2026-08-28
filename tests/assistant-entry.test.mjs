@@ -18,6 +18,8 @@ test("شاشة البداية تفصل دخول الجهاز المساعد عن
   assert.match(backup, /getAuth/);
   assert.match(sync, /from \"firebase\/app\"/);
   assert.match(sync, /signInAnonymously/);
+  assert.match(app, /applySyncChanges\(state\.cloud\.identity\.bootstrapChanges\)/);
+  assert.doesNotMatch(app, /restoreBackup\(mergeRemoteChanges\(current, state\.cloud\.identity\.bootstrapChanges\)\)/);
 });
 
 test("قواعد Firestore تحافظ على النسخ وتضيف حماية المتجر", () => {
