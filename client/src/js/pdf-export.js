@@ -23,7 +23,7 @@ function createPdfStage(html, page) {
   stage.dir = parsed.documentElement.dir || "rtl";
   stage.lang = parsed.documentElement.lang || "ar";
   stage.dataset.pdfStage = "true";
-  stage.style.cssText = `position:fixed;top:0;left:0;width:${page === "thermal" ? "80mm" : "210mm"};min-height:20mm;padding:0;background:#fff;color:#111;z-index:2147483647;pointer-events:none;overflow:visible;`;
+  stage.style.cssText = `position:fixed;top:0;left:0;width:${page === "thermal" ? "80mm" : "210mm"};min-height:20mm;padding:0;background:#fff;color:#111;z-index:2147483647;pointer-events:none;overflow:hidden`;
   stage.innerHTML = `${[...parsed.head.querySelectorAll("style")].map((style) => style.outerHTML).join("")}${parsed.body.innerHTML}`;
   document.body.appendChild(stage);
   return stage;
@@ -125,6 +125,13 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, logoImage, for
     if (customer?.address) pair("العنوان", customer.address, { gap: 6.5 * mm });
     y += 2 * mm;
   }
+
+  // عرض اسم الكاشير إن وُجد — نزيل أي وسم HTML بسيط لضمان عدم التأثير عند الرسم
+  const cashierNameForCanvas = invoice.cashierName ? String(invoice.cashierName).replace(/<[^>]*>/g, '') : null;
+  if (cashierNameForCanvas) {
+    pair("الكاشير", cashierNameForCanvas, { gap: 6.5 * mm });
+  }
+
   divider(); y += 6 * mm;
   for (const item of invoice.items || []) {
     text(item.productName, right, "right", 30, 700); text(formatMoney(item.total), left, "left", 28, 700, "ltr"); y += 6 * mm;
@@ -204,7 +211,7 @@ function drawCustomerAccountCanvas({ account, storeName, logoImage, formatMoney,
   const boxWidth = (right - left - boxGap * 2) / 3;
   summary.forEach(([label, value, background, color], index) => {
     const x = right - (index + 1) * boxWidth - index * boxGap;
-    context.fillStyle = background; context.strokeStyle = background === "#1f6b59" ? "#1f6b59" : "#d9e0d7"; context.lineWidth = 2; context.beginPath(); context.roundRect(x, y, boxWidth, 29 * mm, 10); context.fill(); context.stroke();
+    context.fillStyle = background; context.strokeStyle = background === "#1f6b59" ? "#1f6b59" : "#d9e0d7"; context.lineWidth = 2; context.beginPath(); context.roundRect(x, y, boxWidth, 29 * mm, 6); context.fill(); context.stroke();
     text(label, x + boxWidth - 4 * mm, y + 9 * mm, "right", 25, 600, "rtl", color);
     text(value, x + boxWidth - 4 * mm, y + 20 * mm, "right", 34, 700, "rtl", color);
   });
@@ -213,7 +220,7 @@ function drawCustomerAccountCanvas({ account, storeName, logoImage, formatMoney,
   y += 9 * mm;
   const columns = [right, 151 * mm, 105 * mm, 59 * mm, left];
   context.fillStyle = "#f4f6f1"; context.fillRect(left, y - 6 * mm, right - left, 12 * mm);
-  ["العملية", "التاريخ", "المرجع", "القيمة", "الرصيد بعد العملية"].forEach((label, index) => text(label, columns[index] - (index ? 3 * mm : 0), y, index === 4 ? "left" : "right", 23, 700, "rtl", "#52645b"));
+  ["العملية", "التاريخ", "المرجع", "القيمة", "الرصيد بعد العملية"].forEach((label, index) => text(label, columns[index] - (index ? 3 * mm : 0), y, index ? "left" : "right", 28, 700, "rtl", index ? "#145d4d" : "#145d4d"));
   y += 12 * mm;
   if (!rows.length) { text("لا توجد عمليات مسجلة.", right, y, "right", 30, 400, "rtl", "#52645b"); y += 14 * mm; }
   rows.forEach((transaction) => {
@@ -277,7 +284,7 @@ function drawReportCanvas({ rows, storeName, logoImage, from, to }) {
     y += 15 * mm;
   });
   y += 7 * mm;
-  text("تقرير صادر من حسابي للاستخدام التشغيلي.", width / 2, y, "center", 23, 400, "#52645b");
+  text("تقرير صادر من حسابي للاستخدام التشغيلي.", width / 2, y, "center", 23, 400, "rtl", "#52645b");
   return canvas;
 }
 
