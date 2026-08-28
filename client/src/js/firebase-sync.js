@@ -86,7 +86,7 @@ export async function redeemPairingInvite(code) {
     const pairing = snapshot.exists() ? snapshot.data() : null;
     if (!isPairingCodeUsable(pairing)) throw new Error("رمز الاقتران منتهي أو مستخدم.");
     const identity = createDeviceIdentity({ deviceId: `device_${user.uid}`, accountId: pairing.accountId, accountName: pairing.accountName, role: pairing.role, storeId: stores.storeId });
-    transaction.set(memberRef(firestore, stores.storeId, user.uid), { ...identity, uid: user.uid, status: "active", pairedAt: new Date().toISOString(), updatedAt: serverTimestamp() });
+    transaction.set(memberRef(firestore, stores.storeId, user.uid), { ...identity, uid: user.uid, pairingCode: stores.actualCode, status: "active", pairedAt: new Date().toISOString(), updatedAt: serverTimestamp() });
     transaction.update(target, { usedAt: new Date().toISOString(), usedBy: user.uid });
     result = identity;
   });

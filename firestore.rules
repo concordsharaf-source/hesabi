@@ -37,7 +37,7 @@ service cloud.firestore {
       allow update: if admin(storeId) || ownsStore(storeId);
       match /members/{uid} {
         allow read: if (signedIn() && request.auth.uid == uid) || admin(storeId);
-        allow create: if admin(storeId) || (signedIn() && request.auth.uid == uid && request.resource.data.role == 'admin' && request.resource.data.status == 'active');
+        allow create: if admin(storeId) || (signedIn() && request.auth.uid == uid && request.resource.data.role == 'admin' && request.resource.data.status == 'active') || (signedIn() && request.auth.uid == uid && request.resource.data.status == 'active' && request.resource.data.storeId == storeId && request.resource.data.pairingCode is string && exists(/databases/$(database)/documents/stores/$(storeId)/pairings/$(request.resource.data.pairingCode)) && get(/databases/$(database)/documents/stores/$(storeId)/pairings/$(request.resource.data.pairingCode)).data.usedAt == null && get(/databases/$(database)/documents/stores/$(storeId)/pairings/$(request.resource.data.pairingCode)).data.accountId == request.resource.data.accountId);
         allow update, delete: if admin(storeId) || (signedIn() && request.auth.uid == uid && request.resource.data.status == 'revoked');
       }
       match /pairRequests/{requestId} {

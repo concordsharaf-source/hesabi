@@ -26,5 +26,7 @@ test("قواعد Firestore تحافظ على النسخ وتضيف حماية ا
   assert.match(rules, /match \/stores\/{storeId}/);
   assert.match(rules, /match \/pairRequests\/{requestId}/);
   assert.match(rules, /match \/operations\/{operationId}/);
+  assert.match(rules, /request\.resource\.data\.pairingCode is string/);
+  assert.match(rules, /data\.usedAt == null/);
   assert.match(rules, /allow read, write: if false/);
 });
