@@ -1,6 +1,6 @@
 import { browserLocalPersistence, getAuth, setPersistence, signInAnonymously, signOut } from "firebase/auth";
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { collection, doc, getDoc, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc } from "firebase/firestore";
 import { createDeviceIdentity, createPairingCode, isPairingCodeUsable } from "./sync-domain.js";
 
 const fallbackConfig = {
@@ -127,7 +127,7 @@ export async function watchSyncOperations(onChange, onStatus = () => {}) {
 
 export async function requestAssistantDevice({ ownerEmail, accountName, role = "cashier" }) {
   const { firestore } = await services(); const user = await ensureAnonymousUser(); const directory = await getDoc(directoryRef(firestore, await emailKey(ownerEmail)));
-  if (!directory.exists()) throw new Error("لم نجد متجرًا مرتبطًا بهذا البريد.");
+  if (!directory.exists()) throw new Error("لم نجد متجرًا مرتبطًا بهذا البريد. يجب أن يربط الأدمن حساب النسخ السحابية مرة واحدة من جهازه أولًا.");
   const { storeId } = directory.data(); const requestId = `request_${user.uid}_${Date.now()}`;
   await setDoc(requestRef(firestore, storeId, requestId), { id: requestId, storeId, requesterUid: user.uid, accountName: String(accountName || "").trim().slice(0, 80), role: role === "admin" ? "admin" : "cashier", status: "pending", createdAt: serverTimestamp() });
   return { requestId, storeId, status: "pending" };
