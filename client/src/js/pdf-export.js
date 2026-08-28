@@ -80,8 +80,9 @@ function drawStoreLogo(context, image, centerX, centerY, boxSize) {
   context.drawImage(image, centerX - width / 2, centerY - height / 2, width, height);
 }
 
+// Increased base units and font sizes for better PDF readability on printers/viewers
 function drawThermalInvoiceCanvas({ invoice, customer, storeName, logoImage, formatMoney, formatAmount, formatDateTime, paymentLabel }) {
-  const mm = 12;
+  const mm = 14; // increased from 12 to enlarge layout and fonts
   const width = 80 * mm;
   const details = invoice.customerName ? 1 + Number(Boolean(customer?.phone)) + Number(Boolean(customer?.address)) : 0;
   const height = Math.max(1420, (114 + details * 11 + Math.max(1, invoice.items?.length || 0) * 20 + (logoImage ? 17 : 0) + (toNumber(invoice.deliveryFee) > 0 ? 9 : 0)) * mm);
@@ -98,7 +99,8 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, logoImage, for
   const left = 4 * mm;
   const center = 40 * mm;
   let y = 9 * mm;
-  const text = (value, x, align = "right", size = 28, weight = 400, direction = "rtl") => {
+  const text = (value, x, align = "right", size = 34, weight = 400, direction = "rtl") => {
+    // default size increased from 28 to 34
     context.direction = direction;
     context.textAlign = align;
     context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
@@ -108,46 +110,46 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, logoImage, for
     context.save(); context.strokeStyle = "#444"; context.setLineDash([6, 5]); context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke(); context.restore();
   };
   const pair = (label, value, options = {}) => {
-    text(label, right, "right", options.labelSize || 27, options.bold ? 700 : 400);
-    text(value, left, "left", options.valueSize || 27, options.bold ? 700 : 400, options.ltr ? "ltr" : "rtl");
-    y += options.gap || 6.5 * mm;
+    text(label, right, "right", options.labelSize || 34, options.bold ? 700 : 400);
+    text(value, left, "left", options.valueSize || 34, options.bold ? 700 : 400, options.ltr ? "ltr" : "rtl");
+    y += options.gap || 7.5 * mm;
   };
-  if (logoImage) { drawStoreLogo(context, logoImage, center, y + 7 * mm, 14 * mm); y += 17 * mm; }
-  text(storeName || "حسابي", center, "center", 44, 700); y += 8 * mm;
-  text("فاتورة بيع", right, "right", 30, 700); text(invoice.invoiceNumber, left, "left", 27, 700, "ltr"); y += 6 * mm;
-  text(formatDateTime(invoice.date), center, "center", 20); y += 7 * mm;
+  if (logoImage) { drawStoreLogo(context, logoImage, center, y + 8 * mm, 16 * mm); y += 18 * mm; }
+  text(storeName || "حسابي", center, "center", 55, 700); y += 9 * mm; // header larger (was 44)
+  text("فاتورة بيع", right, "right", 38, 700); text(invoice.invoiceNumber, left, "left", 34, 700, "ltr"); y += 7 * mm;
+  text(formatDateTime(invoice.date), center, "center", 25); y += 8 * mm;
   if (invoice.customerName) {
-    const cardHeight = (8 + details * 8) * mm;
+    const cardHeight = (10 + details * 9) * mm;
     context.fillStyle = "#f7f7f7"; context.strokeStyle = "#111"; context.lineWidth = 1.5; context.roundRect(left, y - 5 * mm, right - left, cardHeight, 6); context.fill(); context.stroke(); context.fillStyle = "#111";
-    text("بيانات العميل", right - 2 * mm, "right", 30, 700); y += 7 * mm;
-    pair("الاسم", invoice.customerName, { gap: 6.5 * mm });
-    if (customer?.phone) pair("الهاتف", customer.phone, { ltr: true, gap: 6.5 * mm });
-    if (customer?.address) pair("العنوان", customer.address, { gap: 6.5 * mm });
-    y += 2 * mm;
+    text("بيانات العميل", right - 2 * mm, "right", 36, 700); y += 8 * mm;
+    pair("الاسم", invoice.customerName, { gap: 7.5 * mm });
+    if (customer?.phone) pair("الهاتف", customer.phone, { ltr: true, gap: 7.5 * mm });
+    if (customer?.address) pair("العنوان", customer.address, { gap: 7.5 * mm });
+    y += 3 * mm;
   }
 
   // عرض اسم الكاشير إن وُجد — نزيل أي وسم HTML بسيط لضمان عدم التأثير عند الرسم
   const cashierNameForCanvas = invoice.cashierName ? String(invoice.cashierName).replace(/<[^>]*>/g, '') : null;
   if (cashierNameForCanvas) {
-    pair("الكاشير", cashierNameForCanvas, { gap: 6.5 * mm });
+    pair("الكاشير", cashierNameForCanvas, { gap: 7.5 * mm });
   }
 
-  divider(); y += 6 * mm;
-  for (const item of invoice.items || []) {
-    text(item.productName, right, "right", 30, 700); text(formatMoney(item.total), left, "left", 28, 700, "ltr"); y += 6 * mm;
-    text(`${formatAmount(item.quantity)} ${item.unit} × ${formatMoney(item.unitPrice)}`, right, "right", 22); y += 8 * mm;
-  }
   divider(); y += 7 * mm;
+  for (const item of invoice.items || []) {
+    text(item.productName, right, "right", 36, 700); text(formatMoney(item.total), left, "left", 34, 700, "ltr"); y += 7 * mm;
+    text(`${formatAmount(item.quantity)} ${item.unit} × ${formatMoney(item.unitPrice)}`, right, "right", 27); y += 9 * mm;
+  }
+  divider(); y += 8 * mm;
   pair("الإجمالي قبل الخصم", formatMoney(invoice.subtotal));
   pair("الخصم", formatMoney(invoice.discount));
   if (toNumber(invoice.deliveryFee) > 0) pair(`التوصيل · ${invoice.deliveryChargeType === "customer" ? "على العميل ضمن الفاتورة" : "حساب المحل"}`, formatMoney(invoice.deliveryFee));
   context.strokeStyle = "#111"; context.beginPath(); context.moveTo(left, y - 4 * mm); context.lineTo(right, y - 4 * mm); context.stroke();
-  pair("الإجمالي", formatMoney(invoice.total), { bold: true, labelSize: 32, valueSize: 32, gap: 7.5 * mm });
+  pair("الإجمالي", formatMoney(invoice.total), { bold: true, labelSize: 40, valueSize: 40, gap: 9 * mm });
   pair("طريقة السداد", paymentLabel);
   pair("المدفوع", formatMoney(invoice.paidAmount));
   if (invoice.paymentType === "آجل") pair("المتبقي", formatMoney(invoice.remainingAmount));
-  y += 3 * mm;
-  text("شكرًا لتعاملكم معنا", center, "center", 22);
+  y += 4 * mm;
+  text("شكرًا لتعاملكم معنا", center, "center", 28);
   return canvas;
 }
 
