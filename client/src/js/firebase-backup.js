@@ -1,5 +1,5 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
-import { browserLocalPersistence, createUserWithEmailAndPassword, getAuth, setPersistence, signInWithEmailAndPassword, signOut } from "firebase/auth";
+import { browserLocalPersistence, createUserWithEmailAndPassword, getAuth, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { collection, deleteDoc, doc, getDoc, getDocs, getFirestore, setDoc } from "firebase/firestore";
 import { CLOUD_BACKUP_MAX_ENCODED_BYTES, createCloudBackupPackage, decodeCloudBackupPackage } from "./cloud-backup-codec.js";
 import { shortRandomId } from "./ids.js";
@@ -41,6 +41,10 @@ function readableAuthError(error) {
     "auth/invalid-email": "أدخل بريدًا إلكترونيًا صحيحًا.",
     "auth/weak-password": "كلمة المرور ضعيفة؛ استخدم 6 أحرف على الأقل.",
     "auth/network-request-failed": "تعذر الاتصال بالإنترنت. تبقى بيانات جهازك المحلية متاحة.",
+    "auth/operation-not-allowed": "فعّل Email/Password من Firebase Authentication ثم أعد المحاولة.",
+    "auth/user-not-found": "لا يوجد حساب نسخ سحابية بهذا البريد. استخدم إنشاء وربط مرة واحدة.",
+    "auth/wrong-password": "كلمة مرور النسخ السحابية غير صحيحة. استخدم استعادة كلمة المرور.",
+    "auth/too-many-requests": "تكررت المحاولات؛ انتظر قليلًا ثم أعد المحاولة.",
   };
   return messages[error?.code] || error?.message || "تعذر إكمال تسجيل الدخول السحابي.";
 }
@@ -66,6 +70,13 @@ export async function registerCloudBackupUser(email, password) {
     const { auth } = await getServices();
     const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
     return { uid: result.user.uid, email: result.user.email || "" };
+  } catch (error) { throw new Error(readableAuthError(error)); }
+}
+
+export async function resetCloudBackupPassword(email) {
+  try {
+    const { auth } = await getServices();
+    await sendPasswordResetEmail(auth, email.trim());
   } catch (error) { throw new Error(readableAuthError(error)); }
 }
 
