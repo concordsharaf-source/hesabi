@@ -10,6 +10,8 @@ test("شاشة البداية تفصل دخول الجهاز المساعد عن
   assert.match(app, /function openAssistantEntryDialog/);
   assert.match(app, /requestAssistantDevice/);
   assert.doesNotMatch(app, /crypto\.randomUUID/);
+  assert.match(app, /normalizeAccountName/);
+  assert.match(app, /const matches = state\.accounts\.filter/);
 });
 
 test("قواعد Firestore تحافظ على النسخ وتضيف حماية المتجر", () => {

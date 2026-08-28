@@ -1354,7 +1354,16 @@ async function disconnectCloudBackup() {
 
 async function approvePairingRequestFromUi(requestId) {
   const request = state.cloud.pairRequests?.find((item) => item.id === requestId); if (!request || !state.settings?.cloudStoreId) return;
-  try { const account = state.accounts.find((item) => item.name === request.accountName && item.isActive && item.id !== state.currentUser.id); if (!account) { showToast("أنشئ حساب المستخدم بهذا الاسم أولًا من إدارة المستخدمين ثم أعد اعتماد الطلب.", "error"); return; } const pairing = await approveAssistantRequest({ storeId: state.settings.cloudStoreId, requestId, accountId: account.id, accountName: account.name, role: account.role }); window.prompt("أرسل رمز الدخول هذا للمستخدم مرة واحدة فقط:", pairing.token); showToast("تم اعتماد الطلب وإنشاء رمز الدخول."); } catch (error) { showToast(error.message || "تعذر اعتماد طلب الجهاز.", "error"); }
+  const normalizeAccountName = (value) => String(value || "").normalize("NFKC").replace(/[\u064B-\u065F\u0670\u0640]/g, "").replace(/\s+/g, " ").trim().toLocaleLowerCase("ar");
+  try {
+    const requestedName = normalizeAccountName(request.accountName);
+    const matches = state.accounts.filter((item) => item.isActive && item.id !== state.currentUser.id && normalizeAccountName(item.name) === requestedName);
+    if (matches.length > 1) { showToast("يوجد أكثر من حساب بهذا الاسم؛ غيّر اسم الحسابات ثم أعد الطلب.", "error"); return; }
+    const account = matches[0];
+    if (!account) { showToast(`لم نجد حسابًا نشطًا باسم «${request.accountName || "غير محدد"}». اكتب اسم الكاشير كما يظهر في إدارة المستخدمين.`, "error"); return; }
+    const pairing = await approveAssistantRequest({ storeId: state.settings.cloudStoreId, requestId, accountId: account.id, accountName: account.name, role: account.role });
+    window.prompt("أرسل رمز الدخول هذا للمستخدم مرة واحدة فقط:", pairing.token); showToast("تم اعتماد الطلب وإنشاء رمز الدخول.");
+  } catch (error) { showToast(error.message || "تعذر اعتماد طلب الجهاز.", "error"); }
 }
 
 function openPairingInviteDialog() {
