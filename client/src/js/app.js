@@ -5,7 +5,7 @@ import { mergeRemoteChanges } from "./sync-domain.js";
 import { db } from "./database.js";
 import { calculateDiscountAmount, calculatePackagePurchase, calculateSaleTotals, calculateTransferCollections, dateKey, normalizeCashierDiscountLimit, roundMoney, stockStatus, toNumber } from "./domain.js";
 import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, resetCloudBackupPassword, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
-import { approveAssistantRequest, createPairingInvite, getCloudDeviceIdentity, redeemPairingInvite, requestAssistantDevice, revokeCloudDevice, seedWorkspaceBackup, watchAssistantRequests } from "./firebase-sync.js";
+import { approveAssistantRequest, createPairingInvite, createStoreWorkspace, getCloudDeviceIdentity, redeemPairingInvite, requestAssistantDevice, revokeCloudDevice, seedWorkspaceBackup, watchAssistantRequests } from "./firebase-sync.js";
 import { installSyncCoordinator } from "./sync-coordinator.js";
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { renderCustomerAccountHtml } from "./customer-account-print.js";
