@@ -38,8 +38,8 @@ const requestAsPromise = (request) => new Promise((resolve, reject) => {
 });
 const transactionDone = (transaction) => new Promise((resolve, reject) => {
   transaction.oncomplete = () => resolve();
-  transaction.onerror = () => reject(transaction.error || new Error("تعذر حفظ التغييرات."));
-  transaction.onabort = () => reject(transaction.error || new Error("تم إلغاء العملية لحماية البيانات."));
+  transaction.onerror = () => reject(transaction.error || new Error("تعذر حفظ التغييرات المحلية."));
+  transaction.onabort = () => reject(transaction.error || new Error("تم إلغاء العملية المحلية: تعارض أو بيانات غير صالحة."));
 });
 const normalize = (value) => String(value || "").trim();
 const LOCAL_STORE_LOGO_PATTERN = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+={0,2}$/i;
@@ -520,7 +520,26 @@ export const db = {
   async exportBackup() { const database = await this.open(); const storeNames = Array.from(database.objectStoreNames); const transaction = database.transaction(storeNames, "readonly"); const values = await Promise.all(storeNames.map((name) => requestAsPromise(transaction.objectStore(name).getAll()))); await transactionDone(transaction); return { schema: "hesabi-backup", version: 1, databaseVersion: DB_VERSION, exportedAt: nowIso(), stores: Object.fromEntries(storeNames.map((name, index) => [name, name === "meta" ? values[index].filter((item) => item.id !== ACTIVE_SESSION_META_ID) : values[index]])) }; },
   validateBackup(payload) { if (!payload || payload.schema !== "hesabi-backup" || !payload.stores || typeof payload.stores !== "object") throw new Error("ملف النسخة الاحتياطية غير صالح."); if (!Array.isArray(payload.stores.settings) || !Array.isArray(payload.stores.products)) throw new Error("ملف النسخة الاحتياطية لا يحتوي على البيانات الأساسية."); return true; },
   async restoreBackup(payload) { this.validateBackup(payload); const database = await this.open(); const storeNames = Array.from(database.objectStoreNames); const transaction = database.transaction(storeNames, "readwrite"); storeNames.forEach((name) => transaction.objectStore(name).clear()); storeNames.forEach((name) => (payload.stores[name] || []).filter((item) => name !== "meta" || item.id !== ACTIVE_SESSION_META_ID).forEach((item) => transaction.objectStore(name).put(item))); await transactionDone(transaction); return { restoredStores: storeNames.filter((name) => Array.isArray(payload.stores[name])).length }; },
-  async applySyncChanges(changes = []) { const database = await this.open(); const valid = (changes || []).filter((change) => change?.store && change.recordId && database.objectStoreNames.contains(change.store)); if (!valid.length) return 0; const transaction = database.transaction([...new Set(valid.map((change) => change.store))], "readwrite"); valid.forEach((change) => { const store = transaction.objectStore(change.store); if (change.type === "delete") store.delete(change.recordId); else if (change.record && typeof change.record === "object") store.put(change.record); }); await transactionDone(transaction); return valid.length; },
+  async applySyncChanges(changes = []) {
+    const database = await this.open();
+    const valid = (changes || []).filter((change) => change?.store && change.recordId && database.objectStoreNames.contains(change.store));
+    if (!valid.length) return 0;
+    const uniqueIndexes = { accounts: ["username"], sales: ["invoiceNumber"], purchases: ["invoiceNumber"], cashierSalaryDeductions: ["shiftId"] };
+    const conflicts = new Map();
+    for (const storeName of [...new Set(valid.map((change) => change.store))]) {
+      const indexes = uniqueIndexes[storeName] || [];
+      if (!indexes.length) continue;
+      const existing = await requestAsPromise(database.transaction(storeName, "readonly").objectStore(storeName).getAll());
+      const byKey = new Map();
+      existing.forEach((record) => indexes.forEach((index) => { const value = record?.[index]; if (value !== undefined && value !== null && value !== "") byKey.set(`${storeName}:${index}:${value}`, record.id); }));
+      valid.filter((change) => change.store === storeName && change.type !== "delete" && change.record).forEach((change) => indexes.forEach((index) => { const value = change.record?.[index]; const oldId = value !== undefined && value !== null && value !== "" ? byKey.get(`${storeName}:${index}:${value}`) : undefined; if (oldId && oldId !== change.recordId) conflicts.set(`${storeName}:${oldId}`, { storeName, id: oldId }); }));
+    }
+    const transaction = database.transaction([...new Set(valid.map((change) => change.store))], "readwrite");
+    conflicts.forEach(({ storeName, id }) => transaction.objectStore(storeName).delete(id));
+    valid.forEach((change) => { const store = transaction.objectStore(change.store); if (change.type === "delete") store.delete(change.recordId); else if (change.record && typeof change.record === "object") store.put(change.record); });
+    await transactionDone(transaction);
+    return valid.length;
+  },
   async resetAllData() { const database = await this.open(); const storeNames = Array.from(database.objectStoreNames); const transaction = database.transaction(storeNames, "readwrite"); storeNames.forEach((name) => transaction.objectStore(name).clear()); await transactionDone(transaction); },
 
   async listExpenses() { const database = await this.open(); const items = await requestAsPromise(database.transaction("expenses", "readonly").objectStore("expenses").getAll()); return items.sort((a, b) => new Date(b.date) - new Date(a.date)); },
