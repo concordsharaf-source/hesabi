@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 
 const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
 const rules = await readFile(new URL("../firestore.rules", import.meta.url), "utf8");
+const backup = await readFile(new URL("../client/src/js/firebase-backup.js", import.meta.url), "utf8");
+const sync = await readFile(new URL("../client/src/js/firebase-sync.js", import.meta.url), "utf8");
 
 test("شاشة البداية تفصل دخول الجهاز المساعد عن فتح متجر جديد", () => {
   assert.match(app, /data-action="assistant-login"/);
@@ -12,6 +14,10 @@ test("شاشة البداية تفصل دخول الجهاز المساعد عن
   assert.doesNotMatch(app, /crypto\.randomUUID/);
   assert.match(app, /normalizeAccountName/);
   assert.match(app, /const matches = state\.accounts\.filter/);
+  assert.match(backup, /from \"firebase\/app\"/);
+  assert.match(backup, /getAuth/);
+  assert.match(sync, /from \"firebase\/app\"/);
+  assert.match(sync, /signInAnonymously/);
 });
 
 test("قواعد Firestore تحافظ على النسخ وتضيف حماية المتجر", () => {

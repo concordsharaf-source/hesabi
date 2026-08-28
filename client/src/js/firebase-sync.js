@@ -1,5 +1,5 @@
-import { browserLocalPersistence, getAuth, setPersistence, signInAnonymously, signOut } from "firebase/auth";
 import { getApp, getApps, initializeApp } from "firebase/app";
+import { browserLocalPersistence, getAuth, setPersistence, signInAnonymously, signOut } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc } from "firebase/firestore";
 import { createDeviceIdentity, createPairingCode, isPairingCodeUsable } from "./sync-domain.js";
 
