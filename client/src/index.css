@@ -174,4 +174,21 @@
       max-width: 1280px; /* Standard content width */
     }
   }
+
+  /* Ensure checkbox labels and menu checkbox items are readable in dark theme.
+     This targets Radix/peer-based checkboxes and menu checkbox items used across the app.
+     It is intentionally specific to the .dark theme so it doesn't affect light mode. */
+  .dark .peer[data-state="checked"] + *,
+  .dark .peer[data-state="checked"] ~ *,
+  .dark [data-slot="dropdown-menu-checkbox-item"],
+  .dark [data-slot="menubar-checkbox-item"],
+  .dark [data-slot="context-menu-checkbox-item"] {
+    color: var(--accent-foreground) !important;
+  }
+
+  /* Fallback: make sure checkbox-adjacent text in dark mode at least uses foreground color */
+  .dark .peer + *,
+  .dark .peer ~ * {
+    color: var(--foreground);
+  }
 }
