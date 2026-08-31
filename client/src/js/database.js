@@ -8,6 +8,7 @@ import {
   calculatePackagePurchase,
   calculateDiscountAmount,
   calculatePurchaseTotals,
+  expiryProgress,
   calculateSaleTotals,
   normalizeCashierDiscountLimit,
   canReturn,
@@ -293,10 +294,12 @@ export const db = {
     const products = transaction.objectStore("products"); const createdAt = nowIso(); const quantity = Math.max(0, toNumber(values.quantity)); const barcode = normalize(values.barcode);
     const duplicate = barcode ? (await requestAsPromise(products.index("barcode").getAll(barcode))).find((item) => !item.isDeleted) : null;
     if (duplicate) throw new Error(`هذا الباركود مستخدم بالفعل للمنتج: ${duplicate.name}`);
-    const unitsPerPackage = Math.max(1, toNumber(values.unitsPerPackage) || 1); const nearestExpiryDate = normalize(values.nearestExpiryDate);
+    const unitsPerPackage = Math.max(1, toNumber(values.unitsPerPackage) || 1); const nearestProductionDate = normalize(values.nearestProductionDate); const nearestExpiryDate = normalize(values.nearestExpiryDate);
+    if (nearestProductionDate && !/^\d{4}-\d{2}-\d{2}$/.test(nearestProductionDate)) throw new Error("أدخل تاريخ إنتاج صالحًا أو اترك الحقل فارغًا.");
     if (nearestExpiryDate && (!/^\d{4}-\d{2}-\d{2}$/.test(nearestExpiryDate) || nearestExpiryDate <= dateKey())) throw new Error("أدخل تاريخ انتهاء مستقبليًا صالحًا أو اترك الحقل فارغًا.");
+    if (nearestProductionDate && nearestExpiryDate && nearestProductionDate > nearestExpiryDate) throw new Error("تاريخ الإنتاج يجب أن يسبق تاريخ الانتهاء.");
     const purchasePackageUnit = normalize(values.purchasePackageUnit || values.packageUnit || "حبة") || "حبة";
-    const product = { id: uid("product"), name: normalize(values.name), nameLower: normalize(values.name).toLocaleLowerCase("ar"), barcode, internalCode: normalize(values.internalCode), category: normalize(values.category || values.unit || "عام"), purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)), quantity, minimumStock: Math.max(0, toNumber(values.minimumStock)), unit: values.unit || "حبة", purchasePackageUnit, unitsPerPackage, lastPackageCost: Math.max(0, toNumber(values.lastPackageCost ?? values.packageCost)), nearestExpiryDate, createdAt, updatedAt: createdAt, isDeleted: false };
+    const product = { id: uid("product"), name: normalize(values.name), nameLower: normalize(values.name).toLocaleLowerCase("ar"), barcode, internalCode: normalize(values.internalCode), category: normalize(values.category || values.unit || "عام"), purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)), quantity, minimumStock: Math.max(0, toNumber(values.minimumStock)), nearestProductionDate, unit: values.unit || "حبة", purchasePackageUnit, unitsPerPackage, lastPackageCost: Math.max(0, toNumber(values.lastPackageCost ?? values.packageCost)), nearestExpiryDate, createdAt, updatedAt: createdAt, isDeleted: false };
     if (!product.name) throw new Error("اسم المنتج مطلوب.");
     products.add(product);
     if (quantity > 0) createStockMovement(transaction.objectStore("stockMovements"), { productId: product.id, type: "INITIAL", quantity, previousQuantity: 0, newQuantity: quantity, date: createdAt, note: "كمية افتتاحية", referenceType: "PRODUCT", referenceId: product.id });
@@ -307,9 +310,11 @@ export const db = {
     if (!current || current.isDeleted) throw new Error("المنتج غير متاح للتعديل.");
     const barcode = normalize(values.barcode); const duplicate = barcode ? (await requestAsPromise(store.index("barcode").getAll(barcode))).find((item) => !item.isDeleted && item.id !== productId) : null;
     if (duplicate) throw new Error(`هذا الباركود مستخدم بالفعل للمنتج: ${duplicate.name}`);
-    const nearestExpiryDate = normalize(values.nearestExpiryDate ?? current.nearestExpiryDate);
+    const nearestProductionDate = normalize(values.nearestProductionDate ?? current.nearestProductionDate); const nearestExpiryDate = normalize(values.nearestExpiryDate ?? current.nearestExpiryDate);
+    if (nearestProductionDate && !/^\d{4}-\d{2}-\d{2}$/.test(nearestProductionDate)) throw new Error("أدخل تاريخ إنتاج صالحًا أو اترك الحقل فارغًا.");
     if (nearestExpiryDate && (!/^\d{4}-\d{2}-\d{2}$/.test(nearestExpiryDate) || nearestExpiryDate <= dateKey())) throw new Error("أدخل تاريخ انتهاء مستقبليًا صالحًا أو اترك الحقل فارغًا.");
-    const updated = { ...current, name: normalize(values.name), nameLower: normalize(values.name).toLocaleLowerCase("ar"), barcode, internalCode: normalize(values.internalCode), category: normalize(values.category || current.category || values.unit), purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)), minimumStock: Math.max(0, toNumber(values.minimumStock)), unit: values.unit, purchasePackageUnit: normalize(values.purchasePackageUnit || current.purchasePackageUnit || "حبة") || "حبة", unitsPerPackage: Math.max(1, toNumber(values.unitsPerPackage ?? current.unitsPerPackage) || 1), lastPackageCost: Math.max(0, toNumber(values.lastPackageCost ?? current.lastPackageCost)), nearestExpiryDate, updatedAt: nowIso() };
+    if (nearestProductionDate && nearestExpiryDate && nearestProductionDate > nearestExpiryDate) throw new Error("تاريخ الإنتاج يجب أن يسبق تاريخ الانتهاء.");
+    const updated = { ...current, name: normalize(values.name), nameLower: normalize(values.name).toLocaleLowerCase("ar"), barcode, internalCode: normalize(values.internalCode), category: normalize(values.category || current.category || values.unit), purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)), minimumStock: Math.max(0, toNumber(values.minimumStock)), nearestProductionDate, unit: values.unit, purchasePackageUnit: normalize(values.purchasePackageUnit || current.purchasePackageUnit || "حبة") || "حبة", unitsPerPackage: Math.max(1, toNumber(values.unitsPerPackage ?? current.unitsPerPackage) || 1), lastPackageCost: Math.max(0, toNumber(values.lastPackageCost ?? current.lastPackageCost)), nearestExpiryDate, updatedAt: nowIso() };
     if (!updated.name) throw new Error("اسم المنتج مطلوب."); store.put(updated); await transactionDone(transaction); return updated;
   },
   async softDeleteProduct(productId) {
@@ -363,23 +368,25 @@ export const db = {
       const packageCost = line.packageCost === undefined ? toNumber(line.unitCost) : toNumber(line.packageCost);
       const packaging = calculatePackagePurchase({ packageQuantity, unitsPerPackage, packageCost });
       if (packaging.packageQuantity <= 0 || packaging.unitsPerPackage <= 0 || packaging.packageCost < 0) throw new Error("أدخل عدد العبوات والحبات وسعر العبوة بصورة صحيحة.");
-      const batchNumber = normalize(line.batchNumber); const expiryDate = normalize(line.expiryDate);
+      const batchNumber = normalize(line.batchNumber); const productionDate = normalize(line.productionDate); const expiryDate = normalize(line.expiryDate);
       if (pharmacyMode && !batchNumber) throw new Error(`أدخل رقم التشغيلة للمنتج: ${product.name}`);
       if (pharmacyMode && !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) throw new Error(`أدخل تاريخ انتهاء صالحًا للمنتج: ${product.name}`);
       if (expiryDate && !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) throw new Error(`أدخل تاريخ انتهاء صالحًا للمنتج: ${product.name}`);
+      if (productionDate && !/^\d{4}-\d{2}-\d{2}$/.test(productionDate)) throw new Error(`أدخل تاريخ إنتاج صالحًا للمنتج: ${product.name}`);
+      if (productionDate && expiryDate && productionDate > expiryDate) throw new Error(`تاريخ الإنتاج يجب أن يسبق تاريخ الانتهاء للمنتج: ${product.name}`);
       if (expiryDate && expiryDate <= dateKey()) throw new Error(`لا يمكن حفظ منتج منتهٍ أو ينتهي اليوم: ${product.name}`);
       const salePrice = line.salePrice === undefined || line.salePrice === "" ? toNumber(product.salePrice) : Math.max(0, toNumber(line.salePrice));
-      resolved.push({ product, ...packaging, packageUnit: normalize(line.packageUnit || product.purchasePackageUnit || "حبة") || "حبة", salePrice, batchNumber, expiryDate });
+      resolved.push({ product, ...packaging, packageUnit: normalize(line.packageUnit || product.purchasePackageUnit || "حبة") || "حبة", salePrice, batchNumber, productionDate, expiryDate });
     }
     const total = calculatePurchaseTotals(resolved); const isCredit = paymentType === "آجل"; if (isCredit && !supplier) throw new Error("اختر موردًا نشطًا للشراء الآجل."); const paid = roundMoney(paidAmount === "" ? (isCredit ? 0 : total) : toNumber(paidAmount)); if (paid < 0 || paid > total) throw new Error("المبلغ المدفوع لا يمكن أن يتجاوز إجمالي فاتورة الشراء."); if (!isCredit && paid < total) throw new Error("سدد إجمالي الفاتورة أو اختر الشراء الآجل."); const remaining = remainingAmount(total, paid); const status = paymentStatus(total, paid); const meta = transaction.objectStore("meta"); const sequence = ((await requestAsPromise(meta.get("purchaseSequence")))?.value || 0) + 1; const date = nowIso(); const purchase = { id: uid("purchase"), invoiceNumber: purchaseNumber(sequence), supplierId: supplier?.id || "", supplierName: supplier?.name || "بدون مورد", date, notes: normalize(notes), total, paymentType: isCredit ? "آجل" : "نقدي", paymentMethod, paidAmount: paid, initialPaidAmount: paid, remainingAmount: remaining, paymentStatus: status, returnedTotal: 0 };
     transaction.objectStore("purchases").add(purchase);
-    for (const { product, quantity, unitCost, total: itemTotal, packageQuantity, unitsPerPackage, packageCost, packageUnit, salePrice, batchNumber, expiryDate } of resolved) {
+    for (const { product, quantity, unitCost, total: itemTotal, packageQuantity, unitsPerPackage, packageCost, packageUnit, salePrice, batchNumber, productionDate, expiryDate } of resolved) {
       const previousQuantity = toNumber(product.quantity); const newQuantity = previousQuantity + quantity;
       const nearestExpiryDate = expiryDate && (!product.nearestExpiryDate || expiryDate < product.nearestExpiryDate) ? expiryDate : product.nearestExpiryDate || "";
-      products.put({ ...product, quantity: newQuantity, purchasePrice: unitCost, salePrice, purchasePackageUnit: packageUnit, unitsPerPackage, lastPackageCost: packageCost, lastSupplierId: supplier?.id || product.lastSupplierId || "", lastSupplierPurchaseId: supplier ? purchase.id : product.lastSupplierPurchaseId || "", lastSupplierAt: supplier ? date : product.lastSupplierAt || "", latestBatchNumber: batchNumber || product.latestBatchNumber || "", nearestExpiryDate, updatedAt: date });
+      products.put({ ...product, quantity: newQuantity, purchasePrice: unitCost, salePrice, purchasePackageUnit: packageUnit, unitsPerPackage, lastPackageCost: packageCost, lastSupplierId: supplier?.id || product.lastSupplierId || "", lastSupplierPurchaseId: supplier ? purchase.id : product.lastSupplierPurchaseId || "", nearestProductionDate: productionDate || product.nearestProductionDate || "", lastSupplierAt: supplier ? date : product.lastSupplierAt || "", latestBatchNumber: batchNumber || product.latestBatchNumber || "", nearestExpiryDate, updatedAt: date });
       const batchId = expiryDate ? uid("batch") : "";
-      transaction.objectStore("purchaseItems").add({ id: uid("purchase-item"), purchaseId: purchase.id, productId: product.id, productName: product.name, unit: product.unit, quantity, unitCost, total: itemTotal, packageUnit, packageQuantity, unitsPerPackage, packageCost, salePrice, batchNumber, expiryDate, batchId, returnedQuantity: 0 });
-      if (expiryDate) batches.add({ id: batchId, productId: product.id, productName: product.name, purchaseId: purchase.id, batchNumber, expiryDate, quantity, remainingQuantity: quantity, unitCost, createdAt: date, updatedAt: date });
+      transaction.objectStore("purchaseItems").add({ id: uid("purchase-item"), purchaseId: purchase.id, productId: product.id, productName: product.name, unit: product.unit, quantity, unitCost, total: itemTotal, packageUnit, packageQuantity, unitsPerPackage, packageCost, salePrice, batchNumber, productionDate, expiryDate, batchId, returnedQuantity: 0 });
+      if (expiryDate) batches.add({ id: batchId, productId: product.id, productName: product.name, purchaseId: purchase.id, batchNumber, productionDate, expiryDate, quantity, remainingQuantity: quantity, unitCost, createdAt: date, updatedAt: date });
       createStockMovement(transaction.objectStore("stockMovements"), { productId: product.id, type: "PURCHASE", quantity, previousQuantity, newQuantity, date, note: `شراء ${packageQuantity} ${packageUnit} ضمن الفاتورة ${purchase.invoiceNumber}`, referenceType: "PURCHASE", referenceId: purchase.id });
     }
     if (supplier) { const balanceAfter = roundMoney(toNumber(supplier.balance) + remaining); transaction.objectStore("suppliers").put({ ...supplier, balance: balanceAfter, updatedAt: date }); transaction.objectStore("supplierTransactions").add({ id: uid("supplier-transaction"), supplierId: supplier.id, type: "PURCHASE", date, amount: total, paidAmount: paid, remainingAmount: balanceAfter, referenceType: "PURCHASE", referenceId: purchase.id, invoiceNumber: purchase.invoiceNumber, note: isCredit ? "شراء آجل" : "شراء نقدي", createdAt: date }); }

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { adjustmentDelta, calculateCashBalance, calculateDiscountAmount, calculatePackagePurchase, calculateProfit, calculatePurchaseTotals, calculateSaleTotals, calculateTransferCollections, canRegisterPayment, canReturn, canSell, invoiceNumber, paymentStatus, purchaseNumber, remainingAmount, stockStatus } from "../client/src/js/domain.js";
+import { adjustmentDelta, calculateCashBalance, calculateDiscountAmount, calculatePackagePurchase, calculateProfit, calculatePurchaseTotals, calculateSaleTotals, calculateTransferCollections, canRegisterPayment, canReturn, canSell, expiryProgress, invoiceNumber, paymentStatus, purchaseNumber, remainingAmount, stockStatus } from "../client/src/js/domain.js";
 import { CURRENCIES, DEFAULT_CURRENCY_CODE } from "../client/src/js/constants.js";
 
 test("ينشئ تسلسل أرقام فواتير ثابتًا وغير مكرر", () => {
@@ -84,4 +84,12 @@ test("يحوّل الكرتون إلى حبات ويحسب سعر الحبة و�
   const carton = calculatePackagePurchase({ packageQuantity: 3, unitsPerPackage: 24, packageCost: 1200 });
   assert.deepEqual(carton, { packageQuantity: 3, unitsPerPackage: 24, packageCost: 1200, quantity: 72, unitCost: 50, total: 3600 });
   assert.equal(calculatePurchaseTotals([carton]), 3600);
+});
+
+test("يحسب نسبة استهلاك الصلاحية للمنتجات قصيرة الأمد", () => {
+  const progress = expiryProgress({ productionDate: "2026-09-01", expiryDate: "2026-10-01", today: "2026-09-27" });
+  assert.equal(progress.totalDays, 30);
+  assert.equal(progress.elapsedDays, 26);
+  assert.equal(progress.ratio, 26 / 30);
+  assert.ok(progress.ratio >= 0.85);
 });

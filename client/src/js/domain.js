@@ -113,6 +113,16 @@ export const isWithinDateRange = (value, from, to) => {
   return (!from || key >= from) && (!to || key <= to);
 };
 
+export const expiryProgress = ({ productionDate = "", expiryDate = "", today = dateKey() } = {}) => {
+  const production = String(productionDate || "");
+  const expiry = String(expiryDate || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(production) || !/^\d{4}-\d{2}-\d{2}$/.test(expiry) || expiry <= production) return null;
+  const asDay = (value) => Date.UTC(Number(value.slice(0, 4)), Number(value.slice(5, 7)) - 1, Number(value.slice(8, 10)));
+  const totalDays = Math.max(1, Math.round((asDay(expiry) - asDay(production)) / 86400000));
+  const elapsedDays = Math.round((asDay(String(today)) - asDay(production)) / 86400000);
+  return { totalDays, elapsedDays, ratio: elapsedDays / totalDays, remainingDays: totalDays - elapsedDays };
+};
+
 /** يحسب الحصة المعترف بها من مصروف شهري في فترة محددة، دون إدخال الشهر نفسه مرتين. */
 export const calculateMonthlyExpenseAllocation = ({ amount = 0, date = dateKey(), from = "", to = "" } = {}) => {
   const month = String(date || dateKey()).slice(0, 7);
