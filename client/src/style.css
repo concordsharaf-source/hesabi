@@ -577,3 +577,19 @@ label { font-size:15px; }
 .category-chip:hover, .category-chip.is-active { color:#fff; background:var(--green); border-color:var(--green); }
 .inventory-summary { grid-template-columns:repeat(3,1fr); }
 @media (max-width:620px) { .category-toolbar { display:block; } .category-toolbar > strong { display:block; margin-bottom:9px; } .category-chips { overflow-x:auto; flex-wrap:nowrap; padding-bottom:2px; scrollbar-width:none; } .category-chips::-webkit-scrollbar { display:none; } .category-chip { flex:0 0 auto; } .inventory-summary { grid-template-columns:1fr 1fr; } .inventory-summary div:first-child { grid-column:1 / -1; } }
+
+/* تحسين تباين أدوات الاستيراد والأصناف في الوضع الداكن والجوال */
+.import-choice-button { display:grid; gap:2px; width:100%; padding:11px 12px; color:var(--ink); text-align:right; background:var(--paper); border:1px solid var(--line); border-radius:10px; }
+.import-choice-button:hover { border-color:var(--green); background:var(--green-pale); }
+.import-choice-button strong { color:var(--green-deep); font-size:12px; }
+.import-choice-button span { color:var(--muted); font-size:11px; line-height:1.6; }
+[data-theme="dark"] .task-progress__card { color:#f2faf5; background:#1a2d26; border-color:#6d9585; }
+[data-theme="dark"] .task-progress__card p { color:#c4d4cb; }
+[data-theme="dark"] .category-toolbar { color:#f2faf5; background:#1a2d26; border-color:#557267; }
+[data-theme="dark"] .category-toolbar > strong { color:#d6ffea; }
+[data-theme="dark"] .category-chip { color:#d6ffea; background:#244b3d; border-color:#5e927b; }
+[data-theme="dark"] .category-chip:hover, [data-theme="dark"] .category-chip.is-active { color:#10271d; background:#7bd8aa; border-color:#b7f1ce; }
+[data-theme="dark"] .import-choice-button { color:#f2faf5; background:#1a2b25; border-color:#58756a; }
+[data-theme="dark"] .import-choice-button strong { color:#baf2d0; }
+[data-theme="dark"] .import-choice-button span { color:#c4d4cb; }
+@media (max-width:620px) { .category-chips { overflow:visible; flex-wrap:wrap; } .category-chip { flex:0 0 auto; } .import-confirm-choice { grid-template-columns:1fr; } }
