@@ -29,8 +29,10 @@ async function services() {
 }
 
 const localKey = "hesabi-cloud-device";
+const deviceKey = "hesabi-cloud-device-id";
 const readIdentity = () => { try { return JSON.parse(localStorage.getItem(localKey) || "null"); } catch { return null; } };
 const saveIdentity = (identity) => localStorage.setItem(localKey, JSON.stringify(identity));
+const readDeviceId = () => { let value = localStorage.getItem(deviceKey); if (!value) { value = `device_${crypto.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`}`; localStorage.setItem(deviceKey, value); } return value; };
 const storeRef = (firestore, storeId) => doc(firestore, "stores", storeId);
 const memberRef = (firestore, storeId, uid) => doc(firestore, "stores", storeId, "members", uid);
 const pairingRef = (firestore, storeId, code) => doc(firestore, "stores", storeId, "pairings", code);
@@ -54,8 +56,12 @@ async function ensureOwnerUser() {
 export async function createStoreWorkspace({ storeId, storeName, ownerAccount }) {
   const { firestore } = await services();
   const user = await ensureOwnerUser();
-  const identity = createDeviceIdentity({ deviceId: `device_${user.uid}`, accountId: ownerAccount.id, accountName: ownerAccount.name, role: "admin", storeId });
-  await setDoc(storeRef(firestore, storeId), { id: storeId, ownerUid: user.uid, ownerEmail: user.email || "", name: String(storeName || "حسابي").slice(0, 80), updatedAt: serverTimestamp() }, { merge: true });
+  const deviceId = readDeviceId();
+  const existingStore = await getDoc(storeRef(firestore, storeId));
+  const existingOwnerDeviceId = existingStore.exists() ? existingStore.data().ownerDeviceId : "";
+  const isOwnerDevice = !existingOwnerDeviceId || existingOwnerDeviceId === deviceId;
+  const identity = { ...createDeviceIdentity({ deviceId, accountId: ownerAccount.id, accountName: ownerAccount.name, role: "admin", storeId }), isOwnerDevice };
+  await setDoc(storeRef(firestore, storeId), { id: storeId, ownerUid: user.uid, ownerEmail: user.email || "", name: String(storeName || "حسابي").slice(0, 80), ownerDeviceId: existingOwnerDeviceId || deviceId, updatedAt: serverTimestamp() }, { merge: true });
   if (user.email) await setDoc(directoryRef(firestore, await emailKey(user.email)), { storeId, ownerUid: user.uid, ownerEmail: user.email, updatedAt: serverTimestamp() }, { merge: true });
   await setDoc(memberRef(firestore, storeId, user.uid), { ...identity, uid: user.uid, status: "active", updatedAt: serverTimestamp() }, { merge: true });
   saveIdentity(identity);
@@ -85,7 +91,7 @@ export async function redeemPairingInvite(code) {
     const snapshot = await transaction.get(target);
     const pairing = snapshot.exists() ? snapshot.data() : null;
     if (!isPairingCodeUsable(pairing)) throw new Error("رمز الاقتران منتهي أو مستخدم.");
-    const identity = createDeviceIdentity({ deviceId: `device_${user.uid}`, accountId: pairing.accountId, accountName: pairing.accountName, role: pairing.role, storeId: stores.storeId });
+    const identity = { ...createDeviceIdentity({ deviceId: readDeviceId(), accountId: pairing.accountId, accountName: pairing.accountName, role: pairing.role, storeId: stores.storeId }), isOwnerDevice: false };
     transaction.set(memberRef(firestore, stores.storeId, user.uid), { ...identity, uid: user.uid, pairingCode: stores.actualCode, status: "active", pairedAt: new Date().toISOString(), updatedAt: serverTimestamp() });
     transaction.update(target, { usedAt: new Date().toISOString(), usedBy: user.uid });
     result = identity;

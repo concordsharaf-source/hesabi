@@ -1367,7 +1367,7 @@ async function runAutomaticBackups({ force = false } = {}) {
       localStorage.setItem(AUTOMATIC_LOCAL_BACKUP_MARKER, dateKey());
     }
     const cloudMarker = Number(localStorage.getItem(AUTOMATIC_CLOUD_BACKUP_MARKER) || 0);
-    if (state.cloud.user && navigator.onLine !== false && (force || !cloudMarker || now - cloudMarker >= AUTOMATIC_CLOUD_BACKUP_INTERVAL_MS)) {
+    if (state.cloud.user && state.cloud.identity?.isOwnerDevice !== false && navigator.onLine !== false && (force || !cloudMarker || now - cloudMarker >= AUTOMATIC_CLOUD_BACKUP_INTERVAL_MS)) {
       await uploadCloudBackup(await db.exportBackup(), { storeName: storeDisplayName() });
       localStorage.setItem(AUTOMATIC_CLOUD_BACKUP_MARKER, String(now));
       if (state.view === "settings") await refreshCloudBackups({ quiet: true });
@@ -1379,7 +1379,7 @@ async function runAutomaticBackups({ force = false } = {}) {
 
 function installAutomaticBackups() {
   if (automaticBackupTimer) return;
-  void runAutomaticBackups();
+  window.setTimeout(() => { void runAutomaticBackups(); }, 5000);
   automaticBackupTimer = window.setInterval(() => { void runAutomaticBackups(); }, AUTOMATIC_BACKUP_CHECK_MS);
   window.addEventListener("online", () => { void runAutomaticBackups(); }, { passive: true });
 }
