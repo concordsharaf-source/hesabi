@@ -9,13 +9,13 @@ test("يتضمن ملف PWA هوية ونطاقًا وأيقونات صالحة 
   assert.equal(manifest.scope, "./");
   assert.equal(manifest.icons.length, 2);
   assert.deepEqual(manifest.icons.map((icon) => icon.sizes), ["192x192", "512x512"]);
-  assert.ok(manifest.icons.every((icon) => icon.src.startsWith("https://")));
+  assert.ok(manifest.icons.every((icon) => icon.src.startsWith("./")));
 });
 
 test("لا يربط عامل الخدمة تخزينه الابتدائي بمسار خاص بنطاق Manus", async () => {
   const worker = await readFile(new URL("../client/public/service-worker.js", import.meta.url), "utf8");
   const main = await readFile(new URL("../client/src/main.js", import.meta.url), "utf8");
-  assert.match(worker, /hesabi-pwa-v24/);
+  assert.match(worker, /hesabi-pwa-v25/);
   assert.doesNotMatch(worker, /https:\/\/hesabipwa-2r9mmdzn\.manus\.space/);
   assert.match(worker, /event\.request\.mode === "navigate"/);
   assert.match(worker, /fetch\(event\.request\)/);
