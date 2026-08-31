@@ -1,4 +1,5 @@
 export const ACTIVE_SESSION_META_ID = "active-account-session";
+export const ACTIVE_SESSION_STORAGE_KEY = "hesabi-active-account-session";
 
 export function toPersistentSessionUser(account) {
   if (!account?.id || !account.isActive) return null;

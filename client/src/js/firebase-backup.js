@@ -25,12 +25,14 @@ function firebaseConfig() {
 
 let servicesPromise;
 async function getServices() {
-  servicesPromise ||= (async () => {
-    const app = getApps().length ? getApp() : initializeApp(firebaseConfig());
-    const auth = getAuth(app);
-    await setPersistence(auth, browserLocalPersistence);
-    return { auth, firestore: getFirestore(app) };
-  })();
+  if (!servicesPromise) {
+    servicesPromise = (async () => {
+      const app = getApps().length ? getApp() : initializeApp(firebaseConfig());
+      const auth = getAuth(app);
+      await setPersistence(auth, browserLocalPersistence);
+      return { auth, firestore: getFirestore(app) };
+    })().catch((error) => { servicesPromise = null; throw error; });
+  }
   return servicesPromise;
 }
 

@@ -10,7 +10,7 @@ const escapeHtml = (value = "") => String(value).replace(/[&<>"']/g, (character)
 test("ينشئ قالب الطباعة الحرارية 80 مم وفيه الفاتورة والبنود والإجمالي وطريقة السداد", () => {
   const html = renderThermalInvoiceHtml({
     storeName: "بقالة الاختبار",
-    invoice: { invoiceNumber: "INV-000123", date: "2026-08-23T00:00:00.000Z", subtotal: 120, discount: 20, total: 100, paidAmount: 30, remainingAmount: 70, paymentType: "آجل", customerName: "أحمد العميل", items: [{ productName: "ماء <معدني>", quantity: 2, unit: "حبة", unitPrice: 60, total: 120 }] },
+    invoice: { invoiceNumber: "INV-000123", date: "2026-08-23T00:00:00.000Z", subtotal: 120, discount: 20, total: 100, paidAmount: 30, remainingAmount: 70, paymentType: "آجل", cashierName: "محمد الكاشير", customerName: "أحمد العميل", items: [{ productName: "ماء <معدني>", quantity: 2, unit: "حبة", unitPrice: 60, total: 120 }] },
     customer: { phone: "777123456", address: "صنعاء" },
     formatMoney: (value) => `${value} ر.ي`, formatAmount: (value) => String(value), formatDateTime: () => "23 أغسطس 2026", escapeHtml, paymentLabel: "دين",
   });
@@ -27,6 +27,8 @@ test("ينشئ قالب الطباعة الحرارية 80 مم وفيه الف�
   assert.match(html, /أحمد العميل/);
   assert.match(html, /777123456/);
   assert.match(html, /صنعاء/);
+  assert.match(html, /الكاشير المنفذ/);
+  assert.match(html, /محمد الكاشير/);
 });
 
 test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الدقة بدل صورة نص قد تتداخل حروفها", async () => {
@@ -50,6 +52,9 @@ test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الد
   assert.match(app, /shareOrDownloadCustomerAccountPdf\(/);
   assert.match(app, /createReportPdfFile\(/);
   assert.match(app, /logoDataUrl: storeLogoDataUrl\(\)/);
+  assert.match(app, /cashierName: state\.currentUser\?\.name \|\| "الأدمن"/);
+  assert.match(app, /invoice\.cashierName \|\| "الأدمن"/);
+  assert.match(pdfExport, /invoice\.cashierName \|\| "الأدمن"/);
 });
 
 test("يحصر شعار المتجر في ملف محلي آمن ويعرضه في إعدادات الأدمن والنسخة الاحتياطية", async () => {
@@ -593,4 +598,78 @@ test("يضغط خصم سطر البيع بجانب الكمية ويحافظ ع�
   assert.match(css, /\.cart-line__discount \{ display:flex; align-items:center; flex:0 0 auto;/);
   assert.match(css, /\.cart-line__discount input \{ width:58px; min-width:58px;/);
   assert.match(css, /\.invoice-list \.invoice-row:nth-child\(even\)/);
+});
+
+test("يحافظ على جلسة الحساب بعد تحديث الصفحة ولا يمسحها إلا عند تسجيل الخروج", async () => {
+  const [database, session, app] = await Promise.all([
+    readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/session.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(session, /ACTIVE_SESSION_STORAGE_KEY/);
+  assert.match(database, /localStorage\.setItem\(ACTIVE_SESSION_STORAGE_KEY/);
+  assert.match(database, /localStorage\.getItem\(ACTIVE_SESSION_STORAGE_KEY/);
+  assert.match(database, /localStorage\.removeItem\(ACTIVE_SESSION_STORAGE_KEY/);
+  assert.match(app, /getPersistentSession\(\)/);
+  assert.match(app, /clearPersistentSession\(\)/);
+});
+
+test("يحذف الكاشير تعطيلًا ويحافظ على السجل ويمنع تجاوز السلفة وخصم العجز المكرر", async () => {
+  const [database, app, permissions] = await Promise.all([
+    readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/permissions.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(database, /async deleteCashierAccount\(accountId\)/);
+  assert.match(database, /current\.role !== "cashier"/);
+  assert.match(database, /isActive: false, deletedAt/);
+  assert.match(database, /السلفة تتجاوز المتبقي/);
+  assert.match(database, /!shift\.salaryDeductionId/);
+  assert.match(database, /salaryDeductionId: deduction\.id/);
+  assert.match(app, /data-action="delete-cashier-account"/);
+  assert.match(app, /سيُوقف الحساب عن الدخول مع الاحتفاظ بكل الفواتير والسلف والورديات/);
+  assert.match(permissions, /"delete-cashier-account"/);
+});
+
+test("لا تمسح الاستعادة السحابية جلسة حسابي وتضمن تباين خيار تفعيل الكاشير", async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /const sessionBeforeRestore = state\.currentUser/);
+  assert.match(app, /const restoredAccount = sessionBeforeRestore/);
+  assert.doesNotMatch(app.slice(app.indexOf("async function restoreCloudBackup"), app.indexOf("async function removeCloudBackup")), /clearPersistentSession\(\)/);
+  assert.match(css, /\[data-theme="dark"\] \.checkbox-field/);
+  assert.match(css, /\[data-theme="dark"\] \.checkbox-field span \{ color:#f2faf5; \}/);
+});
+
+test("يعزل تهيئة Firebase عن جلسة حسابي ويعيد المحاولة بعد فشل الخدمة", async () => {
+  const [firebase, app] = await Promise.all([
+    readFile(new URL("../client/src/js/firebase-backup.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+  ]);
+  assert.match(firebase, /import \{ getApp, getApps, initializeApp \} from "firebase\/app"/);
+  assert.match(firebase, /servicesPromise = null; throw error/);
+  const restoreBlock = app.slice(app.indexOf("async function restoreCloudBackup"), app.indexOf("async function removeCloudBackup"));
+  assert.doesNotMatch(restoreBlock, /clearPersistentSession\(\)/);
+  assert.match(restoreBlock, /sessionBeforeRestore/);
+});
+
+test("توحد بيانات الفاتورة في التفاصيل والطباعة وPDF", async () => {
+  const [app, thermal, pdf, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/invoice-print.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /invoice-customer-card/);
+  assert.match(app, /invoiceCashierName\(invoice\)/);
+  assert.match(app, /طريقة السداد/);
+  assert.match(thermal, /الكاشير المنفذ/);
+  assert.match(thermal, /حالة السداد/);
+  assert.match(thermal, /بيانات العميل/);
+  assert.match(pdf, /الكاشير المنفذ/);
+  assert.match(pdf, /حالة السداد/);
+  assert.match(pdf, /بيانات العميل/);
+  assert.match(css, /\.invoice-customer-card/);
 });

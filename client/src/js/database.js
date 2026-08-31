@@ -24,7 +24,7 @@ import {
   saleReturnNumber,
   toNumber,
 } from "./domain.js";
-import { ACTIVE_SESSION_META_ID, toPersistentSessionUser } from "./session.js";
+import { ACTIVE_SESSION_META_ID, ACTIVE_SESSION_STORAGE_KEY, toPersistentSessionUser } from "./session.js";
 import { randomId } from "./ids.js";
 
 const DB_NAME = "hesabi-pwa";
@@ -146,7 +146,7 @@ export const db = {
     if (databasePromise) return databasePromise;
     databasePromise = new Promise((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION);
-      request.onerror = () => reject(request.error || new Error("تعذر فتح قاعدة البيانات المحلية."));
+      request.onerror = () => { databasePromise = null; reject(request.error || new Error("تعذر فتح قاعدة البيانات المحلية.")); };
       request.onupgradeneeded = () => {
         const database = request.result;
         makeIndexedStore(database, "settings");
@@ -199,10 +199,13 @@ export const db = {
   async getPersistentSession() {
     const database = await this.open();
     const marker = await requestAsPromise(database.transaction("meta", "readonly").objectStore("meta").get(ACTIVE_SESSION_META_ID));
-    if (!marker?.accountId) return null;
-    const account = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").get(marker.accountId));
+    let accountId = marker?.accountId || "";
+    if (!accountId) { try { accountId = JSON.parse(localStorage.getItem(ACTIVE_SESSION_STORAGE_KEY) || "{}").accountId || ""; } catch { accountId = ""; } }
+    if (!accountId) return null;
+    const account = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").get(accountId));
     const user = toPersistentSessionUser(account);
-    if (!user) await this.clearPersistentSession();
+    if (!user) { await this.clearPersistentSession(); return null; }
+    try { localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, JSON.stringify({ accountId: user.id, updatedAt: nowIso() })); } catch { /* localStorage may be unavailable in private mode */ }
     return user;
   },
   async savePersistentSession(accountId) {
@@ -210,8 +213,9 @@ export const db = {
     const account = await requestAsPromise(transaction.objectStore("accounts").get(accountId));
     if (!toPersistentSessionUser(account)) throw new Error("الحساب غير متاح لحفظ الجلسة.");
     transaction.objectStore("meta").put({ id: ACTIVE_SESSION_META_ID, accountId, updatedAt: nowIso() }); await transactionDone(transaction);
+    try { localStorage.setItem(ACTIVE_SESSION_STORAGE_KEY, JSON.stringify({ accountId, updatedAt: nowIso() })); } catch { /* localStorage may be unavailable in private mode */ }
   },
-  async clearPersistentSession() { const database = await this.open(); const transaction = database.transaction("meta", "readwrite"); transaction.objectStore("meta").delete(ACTIVE_SESSION_META_ID); await transactionDone(transaction); },
+  async clearPersistentSession() { const database = await this.open(); const transaction = database.transaction("meta", "readwrite"); transaction.objectStore("meta").delete(ACTIVE_SESSION_META_ID); await transactionDone(transaction); try { localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY); } catch { /* localStorage may be unavailable in private mode */ } },
   async authenticateAccount({ username, pin }) {
     const normalized = normalizeUsername(username); const database = await this.open(); const account = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").index("username").get(normalized));
     if (!account || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("بيانات الدخول غير صحيحة.");
@@ -233,6 +237,13 @@ export const db = {
     const name = normalize(values.name ?? current.name); if (!name) throw new Error("اسم الحساب مطلوب.");
     const monthlySalary = nextRole === "cashier" ? Math.max(0, toNumber(values.monthlySalary ?? current.monthlySalary)) : 0;
     const updated = { ...current, name, role: nextRole, isActive: nextActive, monthlySalary, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
+  },
+  async deleteCashierAccount(accountId) {
+    const database = await this.open(); const transaction = database.transaction("accounts", "readwrite"); const accounts = transaction.objectStore("accounts"); const current = await requestAsPromise(accounts.get(accountId));
+    if (!current) throw new Error("الحساب غير موجود.");
+    if (current.role !== "cashier") throw new Error("لا يمكن حذف حساب الأدمن من هنا.");
+    accounts.put({ ...current, isActive: false, deletedAt: nowIso(), updatedAt: nowIso() });
+    await transactionDone(transaction); return { ...current, isActive: false };
   },
   async changeAccountPin(accountId, pin) {
     if (!validatePin(pin)) throw new Error("رمز الدخول يجب أن يتكون من 4 إلى 12 رقمًا.");
@@ -571,7 +582,19 @@ export const db = {
     }
     const expense = { id: uid("expense"), amount, periodType, category: isCashierSalaryAdvance ? "سلفة راتب كاشير" : normalize(values.category || (periodType === "monthly" ? "مصروفات شهرية أخرى" : "مصروفات يومية أخرى")), description: isCashierSalaryAdvance ? normalize(values.description || `سلفة من راتب ${cashier.name}`) : normalize(values.description), date, notes: normalize(values.notes), cashierSalaryAdvance: isCashierSalaryAdvance, cashierId: isCashierSalaryAdvance ? cashier.id : "", cashierName: isCashierSalaryAdvance ? cashier.name : "", createdAt: nowIso(), updatedAt: nowIso() }; transaction.objectStore("expenses").add(expense); await transactionDone(transaction); return expense;
   },
-  async updateExpense(expenseId, values) { const database = await this.open(); const transaction = database.transaction("expenses", "readwrite"); const store = transaction.objectStore("expenses"); const current = await requestAsPromise(store.get(expenseId)); if (!current) throw new Error("المصروف غير موجود."); const amount = Math.max(0, toNumber(values.amount)); if (amount <= 0) throw new Error("أدخل مبلغ مصروف أكبر من صفر."); const periodType = values.periodType === "monthly" ? "monthly" : "daily"; const updated = { ...current, amount, periodType, category: normalize(values.category || current.category), description: normalize(values.description), date: values.date || current.date, notes: normalize(values.notes), updatedAt: nowIso() }; store.put(updated); await transactionDone(transaction); return updated; },
+  async updateExpense(expenseId, values) {
+    const amount = Math.max(0, toNumber(values.amount)); if (amount <= 0) throw new Error("أدخل مبلغ مصروف أكبر من صفر.");
+    const database = await this.open(); const current = await requestAsPromise(database.transaction("expenses", "readonly").objectStore("expenses").get(expenseId)); if (!current) throw new Error("المصروف غير موجود.");
+    const transaction = database.transaction(current.cashierSalaryAdvance ? ["accounts", "expenses", "cashierSalaryDeductions"] : ["expenses"], "readwrite"); const store = transaction.objectStore("expenses");
+    if (current.cashierSalaryAdvance) {
+      const account = await requestAsPromise(transaction.objectStore("accounts").get(current.cashierId)); if (!account || account.role !== "cashier") throw new Error("حساب الكاشير المرتبط بالسلفة غير متاح.");
+      const date = values.date || current.date; const month = String(date).slice(0, 7); const expenses = await requestAsPromise(store.getAll()); const deductions = await requestAsPromise(transaction.objectStore("cashierSalaryDeductions").index("accountId").getAll(current.cashierId));
+      const otherAdvances = roundMoney(expenses.filter((expense) => expense.id !== expenseId && expense.cashierSalaryAdvance && expense.cashierId === current.cashierId && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+      const priorDeductions = roundMoney(deductions.filter((deduction) => deduction.month === month).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0)); const remaining = roundMoney(Math.max(0, toNumber(account.monthlySalary) - otherAdvances - priorDeductions));
+      if (amount > remaining) throw new Error(`السلفة تتجاوز المتبقي من راتب ${account.name} لهذا الشهر (${remaining}).`);
+    }
+    const periodType = current.cashierSalaryAdvance ? "daily" : (values.periodType === "monthly" ? "monthly" : "daily"); const updated = { ...current, amount, periodType, category: current.cashierSalaryAdvance ? "سلفة راتب كاشير" : normalize(values.category || current.category), description: current.cashierSalaryAdvance ? normalize(values.description || current.description) : normalize(values.description), date: values.date || current.date, notes: normalize(values.notes), updatedAt: nowIso() }; store.put(updated); await transactionDone(transaction); return updated;
+  },
   async deleteExpense(expenseId) { const database = await this.open(); const transaction = database.transaction("expenses", "readwrite"); transaction.objectStore("expenses").delete(expenseId); await transactionDone(transaction); },
 
   async listStockMovements() { const database = await this.open(); const movements = await requestAsPromise(database.transaction("stockMovements", "readonly").objectStore("stockMovements").getAll()); return movements.sort((a, b) => new Date(b.date) - new Date(a.date)); },
