@@ -11,7 +11,7 @@
   "dir": "rtl",
   "lang": "ar",
   "icons": [
-    { "src": "https://hesabipwa-2r9mmdzn.manus.space/manus-storage/hesabi-icon-192_51850a45.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "https://hesabipwa-2r9mmdzn.manus.space/manus-storage/hesabi-icon-512_c19a422a.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+    { "src": "./hesabi-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "./hesabi-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ]
 }
