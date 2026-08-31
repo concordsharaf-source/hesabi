@@ -1369,7 +1369,8 @@ async function importBarcodeFile(event) {
       if (seenBarcodes.has(record.barcode)) { skipped += 1; continue; }
       seenBarcodes.add(record.barcode);
       const normalizedName = record.name.trim().toLocaleLowerCase("ar");
-      const existing = products.find((product) => product.barcode === record.barcode || (record.internalCode && product.internalCode === record.internalCode) || (normalizedName && product.name.toLocaleLowerCase("ar") === normalizedName));
+      const normalizedExistingBarcode = (value) => String(value || "").trim().replace(/\.0+$/, "");
+      const existing = products.find((product) => normalizedExistingBarcode(product.barcode) === record.barcode || (!product.barcode && normalizedName && product.name.toLocaleLowerCase("ar") === normalizedName));
       if (existing) { await db.updateProduct(existing.id, { ...existing, barcode: record.barcode, internalCode: record.internalCode || existing.internalCode }); updated += 1; }
       else { await db.createProduct({ name: record.name || `صنف ${record.barcode}`, barcode: record.barcode, internalCode: record.internalCode, purchasePrice: record.purchasePrice, salePrice: record.salePrice, quantity: record.quantity, unit: record.unit, minimumStock: 0 }); created += 1; }
     }

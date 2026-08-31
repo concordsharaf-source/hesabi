@@ -19,6 +19,7 @@ const numberValue = (value) => {
   const result = Number(normalized);
   return Number.isFinite(result) ? result : 0;
 };
+const barcodeValue = (value) => { const text = String(value ?? "").trim(); return /^\d+\.0+$/.test(text) ? text.slice(0, text.indexOf(".")) : text; };
 
 export async function parseBarcodeFile(file) {
   const data = await file.arrayBuffer();
@@ -32,7 +33,7 @@ export async function parseBarcodeFile(file) {
   const records = rows.slice(1).map((row, index) => ({
     rowNumber: index + 2,
     name: String(row[columns.name] ?? "").trim(),
-    barcode: String(row[columns.barcode] ?? "").trim(),
+    barcode: barcodeValue(row[columns.barcode]),
     internalCode: columns.internalCode >= 0 ? String(row[columns.internalCode] ?? "").trim() : "",
     purchasePrice: columns.purchasePrice >= 0 ? numberValue(row[columns.purchasePrice]) : 0,
     salePrice: columns.salePrice >= 0 ? numberValue(row[columns.salePrice]) : 0,
