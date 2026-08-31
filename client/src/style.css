@@ -568,3 +568,12 @@ label { font-size:15px; }
 .import-confirm-choice span { color:var(--muted); font-size:11px; line-height:1.6; }
 @keyframes task-progress-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 @media (min-width:720px) { .task-progress { right:32px; bottom:32px; left:auto; width:430px; } .import-confirm-choice { grid-template-columns:1fr 1fr; } }
+
+/* كتالوج الأصناف والعدادات */
+.category-toolbar { display:flex; align-items:center; gap:12px; padding:12px 14px; margin-bottom:14px; background:rgba(255,255,250,.76); border:1px solid rgba(31,107,89,.12); border-radius:13px; }
+.category-toolbar > strong { flex:0 0 auto; color:var(--green-deep); font-size:12px; }
+.category-chips { display:flex; flex-wrap:wrap; gap:7px; min-width:0; }
+.category-chip { min-height:32px; padding:0 11px; color:var(--green-deep); background:var(--green-pale); border:1px solid transparent; border-radius:999px; font-size:11px; font-weight:800; }
+.category-chip:hover, .category-chip.is-active { color:#fff; background:var(--green); border-color:var(--green); }
+.inventory-summary { grid-template-columns:repeat(3,1fr); }
+@media (max-width:620px) { .category-toolbar { display:block; } .category-toolbar > strong { display:block; margin-bottom:9px; } .category-chips { overflow-x:auto; flex-wrap:nowrap; padding-bottom:2px; scrollbar-width:none; } .category-chips::-webkit-scrollbar { display:none; } .category-chip { flex:0 0 auto; } .inventory-summary { grid-template-columns:1fr 1fr; } .inventory-summary div:first-child { grid-column:1 / -1; } }
