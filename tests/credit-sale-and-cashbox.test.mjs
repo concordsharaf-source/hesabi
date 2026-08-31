@@ -406,7 +406,7 @@ test("الجرد الدوري يحفظ لقطة محاسبية شهرية ونص
   assert.equal(revisedMonthly.comparison.netProfitDelta, 0);
   assert.equal((await db.listPeriodicInventories()).length, 4);
   const backup = await db.exportBackup();
-  assert.equal(backup.databaseVersion, 12);
+  assert.equal(backup.databaseVersion, 13);
   assert.equal(backup.stores.periodicInventories.length, 4);
   await db.resetAllData();
   await db.restoreBackup(backup);
@@ -452,5 +452,17 @@ test("يفرض سقف المديونية العام مع إمكانية تخصي
   await db.updateCustomer(customer.id, { name: customer.name, creditLimit: 200 });
   const allowed = await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], paymentType: "آجل", customerId: customer.id });
   assert.equal(allowed.total, 80);
+  await db.resetAllData();
+});
+
+test("يحتفظ مخزن النسخ المحلية بآخر ثلاث نسخ فقط ولا يدخلها في النسخة المصدرة", async () => {
+  await db.resetAllData();
+  await db.createLocalBackup();
+  await db.createLocalBackup();
+  await db.createLocalBackup();
+  await db.createLocalBackup();
+  assert.equal((await db.listLocalBackups()).length, 3);
+  const exported = await db.exportBackup();
+  assert.equal(exported.stores.localBackups, undefined);
   await db.resetAllData();
 });

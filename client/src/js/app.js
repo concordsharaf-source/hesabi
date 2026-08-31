@@ -63,6 +63,12 @@ let exitGuardInstalled = false;
 let exitAllowed = false;
 let runtimeGuardsInstalled = false;
 let desktopBarcodeReaderInstalled = false;
+let automaticBackupTimer = null;
+let automaticBackupBusy = false;
+const AUTOMATIC_BACKUP_CHECK_MS = 5 * 60 * 1000;
+const AUTOMATIC_CLOUD_BACKUP_INTERVAL_MS = 60 * 60 * 1000;
+const AUTOMATIC_LOCAL_BACKUP_MARKER = "hesabi-last-local-daily-backup";
+const AUTOMATIC_CLOUD_BACKUP_MARKER = "hesabi-last-cloud-hourly-backup";
 const desktopBarcodeReader = { code: "", startedAt: 0, lastKeyAt: 0, resetTimer: null, lastCode: "", lastAcceptedAt: 0 };
 const roleLabel = (role) => ACCOUNT_ROLES.find((item) => item.id === role)?.label || "كاشير";
 const adminOnlyMessage = () => showToast("هذه العملية متاحة لحساب الأدمن فقط.", "error");
@@ -789,6 +795,7 @@ function openCloudRestoreOnSetupDialog() {
           state.accounts = await db.listAccounts();
           state.currentUser = await db.authenticateAccount(values);
           await db.savePersistentSession(state.currentUser.id);
+          installAutomaticBackups();
           state.cart = [];
           state.view = "dashboard";
           await refresh();
@@ -965,6 +972,7 @@ async function handleLogin(event) {
   try {
     state.currentUser = await db.authenticateAccount(values);
     await db.savePersistentSession(state.currentUser.id);
+    installAutomaticBackups();
     await refresh();
     state.view = state.currentUser.role === "admin" ? "dashboard" : "sales";
     render();
@@ -1347,6 +1355,34 @@ async function handleStoreLogoFile(event) { const file = event.currentTarget.fil
 async function clearStoreLogo() { try { await db.saveStoreLogoDataUrl(""); state.settings = await db.getSettings(); await refresh(); render(); showToast("تمت استعادة شعار حسابي الافتراضي."); } catch (error) { showToast(error.message || "تعذر استعادة الشعار الافتراضي.", "error"); } }
 
 function downloadBackupPayload(backup, suffix = dateKey()) { const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `hesabi-backup-${suffix}.json`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); }
+
+async function runAutomaticBackups({ force = false } = {}) {
+  if (automaticBackupBusy || !state.settings?.setupCompleted || !state.currentUser) return;
+  automaticBackupBusy = true;
+  try {
+    const now = Date.now();
+    const localMarker = localStorage.getItem(AUTOMATIC_LOCAL_BACKUP_MARKER) || "";
+    if (force || localMarker !== dateKey()) {
+      await db.createLocalBackup();
+      localStorage.setItem(AUTOMATIC_LOCAL_BACKUP_MARKER, dateKey());
+    }
+    const cloudMarker = Number(localStorage.getItem(AUTOMATIC_CLOUD_BACKUP_MARKER) || 0);
+    if (state.cloud.user && navigator.onLine !== false && (force || !cloudMarker || now - cloudMarker >= AUTOMATIC_CLOUD_BACKUP_INTERVAL_MS)) {
+      await uploadCloudBackup(await db.exportBackup(), { storeName: storeDisplayName() });
+      localStorage.setItem(AUTOMATIC_CLOUD_BACKUP_MARKER, String(now));
+      if (state.view === "settings") await refreshCloudBackups({ quiet: true });
+    }
+  } catch (error) {
+    console.warn("[Hesabi automatic backup unavailable]", error);
+  } finally { automaticBackupBusy = false; }
+}
+
+function installAutomaticBackups() {
+  if (automaticBackupTimer) return;
+  void runAutomaticBackups();
+  automaticBackupTimer = window.setInterval(() => { void runAutomaticBackups(); }, AUTOMATIC_BACKUP_CHECK_MS);
+  window.addEventListener("online", () => { void runAutomaticBackups(); }, { passive: true });
+}
 
 async function downloadBackup() { try { downloadBackupPayload(await db.exportBackup()); showToast("تم تصدير النسخة الاحتياطية"); } catch (error) { showToast(error.message || "تعذر تصدير النسخة الاحتياطية.", "error"); } }
 
@@ -1986,5 +2022,5 @@ export async function bootApp(target) {
   root = target;
   installRuntimeGuards();
   installDesktopBarcodeReader();
-  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
+  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }
