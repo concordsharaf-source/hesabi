@@ -9,7 +9,7 @@ test("يقرأ ملف باركود Excel بأسماء أعمدة عربية وي
   XLSX.utils.book_append_sheet(workbook, sheet, "الباركودات");
   const bytes = XLSX.write(workbook, { bookType: "xlsx", type: "array" });
   const parsed = await parseBarcodeFile(new Blob([bytes]));
-  assert.deepEqual(parsed.records[0], { rowNumber: 2, name: "قهوة", barcode: "628123", internalCode: "", purchasePrice: 0, salePrice: 150, quantity: 0, unit: "حبة" });
+  assert.deepEqual(parsed.records[0], { rowNumber: 2, name: "قهوة", barcode: "628123", internalCode: "", purchasePrice: 0, salePrice: 150, quantity: 0, unit: "حبة", providedFields: ["name", "barcode", "salePrice"] });
   const exported = await parseBarcodeFile(new Blob([createBarcodeWorkbook([{ name: "قهوة", barcode: "628123", internalCode: "", purchasePrice: 100, salePrice: 150, quantity: 2, unit: "حبة" }])]));
   assert.equal(exported.records[0].barcode, "628123");
 });

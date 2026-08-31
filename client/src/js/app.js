@@ -1364,20 +1364,22 @@ function exportBarcodesFile() { try { downloadBinaryFile(createBarcodeWorkbook(s
 async function importBarcodeFile(event) {
   const input = event.currentTarget; const file = input.files?.[0]; if (!file) return;
   try {
-    const { records } = await parseBarcodeFile(file); const products = await db.listProducts(); const seenBarcodes = new Set(); let updated = 0; let created = 0; let skipped = 0;
+    const { records } = await parseBarcodeFile(file); const products = await db.listProducts(); const seenBarcodes = new Set(); let updated = 0; let created = 0; let skipped = 0; let unchanged = 0;
+    const normalizedExistingBarcode = (value) => String(value || "").trim().replace(/\.0+$/, "");
+    const matches = records.map((record) => { const normalizedName = record.name.trim().toLocaleLowerCase("ar"); const existing = products.find((product) => normalizedExistingBarcode(product.barcode) === record.barcode || (!product.barcode && normalizedName && product.name.toLocaleLowerCase("ar") === normalizedName)); const changed = existing && ((record.providedFields.includes("name") && record.name && record.name !== existing.name) || normalizedExistingBarcode(existing.barcode) !== record.barcode || (record.providedFields.includes("internalCode") && record.internalCode && record.internalCode !== existing.internalCode) || (record.providedFields.includes("purchasePrice") && Number(record.purchasePrice) !== Number(existing.purchasePrice)) || (record.providedFields.includes("salePrice") && Number(record.salePrice) !== Number(existing.salePrice)) || (record.providedFields.includes("unit") && record.unit && record.unit !== existing.unit)); return { record, existing, changed }; });
+    const changedMatches = matches.filter((match) => match.changed);
+    const replaceExisting = !changedMatches.length || window.confirm(`وجدت ${changedMatches.length} منتجات موجودة ببيانات مختلفة. اضغط «موافق» لاستبدال بياناتها، أو «إلغاء» لتخطيها وإضافة المنتجات الجديدة فقط.`);
     const failedRows = [];
-    for (const record of records) {
+    for (const { record, existing, changed } of matches) {
       if (seenBarcodes.has(record.barcode)) { skipped += 1; continue; }
       seenBarcodes.add(record.barcode);
-      const normalizedName = record.name.trim().toLocaleLowerCase("ar");
-      const normalizedExistingBarcode = (value) => String(value || "").trim().replace(/\.0+$/, "");
-      const existing = products.find((product) => normalizedExistingBarcode(product.barcode) === record.barcode || (!product.barcode && normalizedName && product.name.toLocaleLowerCase("ar") === normalizedName));
+      if (existing && changed && !replaceExisting) { skipped += 1; continue; }
       try {
-        if (existing) { await db.updateProduct(existing.id, { ...existing, name: record.name || existing.name, barcode: record.barcode, internalCode: record.internalCode || existing.internalCode }); updated += 1; }
+        if (existing) { await db.updateProduct(existing.id, { ...existing, name: record.name || existing.name, barcode: record.barcode, internalCode: record.internalCode || existing.internalCode, purchasePrice: record.providedFields.includes("purchasePrice") ? record.purchasePrice : existing.purchasePrice, salePrice: record.providedFields.includes("salePrice") ? record.salePrice : existing.salePrice, unit: record.providedFields.includes("unit") ? record.unit : existing.unit }); changed ? updated += 1 : unchanged += 1; }
         else { await db.createProduct({ name: record.name || `صنف ${record.barcode}`, barcode: record.barcode, internalCode: record.internalCode, purchasePrice: record.purchasePrice, salePrice: record.salePrice, quantity: record.quantity, unit: record.unit, minimumStock: 0 }); created += 1; }
       } catch (error) { failedRows.push(`${record.rowNumber}: ${error.message || "خطأ غير معروف"}`); }
     }
-    await refresh(); render(); showToast(`تم الاستيراد: ${created} منتجات جديدة و${updated} محدثة${skipped ? `، وتجاوز ${skipped} مكرر` : ""}${failedRows.length ? `، تعذر ${failedRows.length} صف` : ""}.`, failedRows.length ? "error" : "success");
+    await refresh(); render(); showToast(`تم الاستيراد: ${created} جديدة و${updated} مستبدلة${unchanged ? ` و${unchanged} بدون تغيير` : ""}${skipped ? `، تم تخطي ${skipped}` : ""}${failedRows.length ? `، تعذر ${failedRows.length} صف` : ""}.`, failedRows.length ? "error" : "success");
   } catch (error) { showToast(error.message || "تعذر استيراد ملف الباركودات.", "error"); }
   finally { input.value = ""; }
 }

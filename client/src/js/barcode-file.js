@@ -30,6 +30,7 @@ export async function parseBarcodeFile(file) {
   const headers = rows[0].map((value) => String(value ?? "").trim());
   const columns = Object.fromEntries(Object.keys(aliases).map((field) => [field, findColumn(headers, field)]));
   if (columns.barcode < 0) throw new Error("لم أجد عمود الباركود. استخدم اسم العمود «الباركود» أو «Barcode».");
+  const providedFields = Object.keys(aliases).filter((field) => columns[field] >= 0);
   const records = rows.slice(1).map((row, index) => ({
     rowNumber: index + 2,
     name: String(row[columns.name] ?? "").trim(),
@@ -39,6 +40,7 @@ export async function parseBarcodeFile(file) {
     salePrice: columns.salePrice >= 0 ? numberValue(row[columns.salePrice]) : 0,
     quantity: columns.quantity >= 0 ? numberValue(row[columns.quantity]) : 0,
     unit: columns.unit >= 0 ? String(row[columns.unit] ?? "حبة").trim() || "حبة" : "حبة",
+    providedFields,
   })).filter((record) => record.barcode);
   if (!records.length) throw new Error("لم أجد أي صف يحتوي على باركود صالح.");
   return { records, headers };
