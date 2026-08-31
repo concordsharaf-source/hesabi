@@ -113,6 +113,11 @@ export const isWithinDateRange = (value, from, to) => {
   return (!from || key >= from) && (!to || key <= to);
 };
 
+export const normalizeCreditLimit = (value, fallback = 0) => {
+  if (value === "" || value === null || value === undefined) return Math.max(0, toNumber(fallback));
+  return Math.max(0, toNumber(value));
+};
+
 export const expiryProgress = ({ productionDate = "", expiryDate = "", today = dateKey() } = {}) => {
   const production = String(productionDate || "");
   const expiry = String(expiryDate || "");

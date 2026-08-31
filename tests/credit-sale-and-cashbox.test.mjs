@@ -430,3 +430,27 @@ test("يحفظ شعار المتجر محليًا ضمن النسخة الاحت
   await assert.rejects(() => db.saveStoreLogoDataUrl(`data:image/png;base64,${"A".repeat(620_001)}`), /غير صالح/);
   await db.resetAllData();
 });
+
+test("يفصل تكلفة الكمية القديمة عن الدفعة الجديدة عند البيع والجرد", async () => {
+  await db.resetAllData();
+  const product = await db.createProduct({ name: "منتج دفعات مختلفة", unit: "حبة", purchasePrice: 10, salePrice: 30, quantity: 10, minimumStock: 0 });
+  await db.createPurchase({ items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 10, packageCost: 200, packageUnit: "كرتون", salePrice: 35 }] });
+  const sale = await db.completeSale({ items: [{ productId: product.id, quantity: 12 }], discount: 0, paidAmount: 420, paymentMethod: "نقدي" });
+  const invoice = await db.getInvoice(sale.id);
+  assert.equal(invoice.items[0].costTotal, 140);
+  assert.equal((await db.getDashboard()).inventoryValue, 160);
+  await db.resetAllData();
+});
+
+test("يفرض سقف المديونية العام مع إمكانية تخصيص سقف أعلى للعميل", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ customerCreditLimit: 100 });
+  const product = await db.createProduct({ name: "منتج سقف الدين", unit: "حبة", purchasePrice: 10, salePrice: 80, quantity: 5, minimumStock: 0 });
+  const customer = await db.createCustomer({ name: "عميل بسقف عام" });
+  await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], paymentType: "آجل", customerId: customer.id });
+  await assert.rejects(() => db.completeSale({ items: [{ productId: product.id, quantity: 1 }], paymentType: "آجل", customerId: customer.id }), /سقف مديونية/);
+  await db.updateCustomer(customer.id, { name: customer.name, creditLimit: 200 });
+  const allowed = await db.completeSale({ items: [{ productId: product.id, quantity: 1 }], paymentType: "آجل", customerId: customer.id });
+  assert.equal(allowed.total, 80);
+  await db.resetAllData();
+});
