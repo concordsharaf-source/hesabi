@@ -221,6 +221,12 @@ export const db = {
     if (!account || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("بيانات الدخول غير صحيحة.");
     return toPersistentSessionUser(account);
   },
+  async authenticateBackupAccount(payload, { username, pin }) {
+    const normalized = normalizeUsername(username);
+    const account = (payload?.stores?.accounts || []).find((item) => item.username === normalized);
+    if (!account || account.role !== "admin" || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("بيانات الأدمن في النسخة السحابية غير صحيحة.");
+    return toPersistentSessionUser(account);
+  },
   async createAccount(values) {
     const account = await createAccountRecord({ ...values, role: values.role || "cashier" }); const database = await this.open(); const transaction = database.transaction("accounts", "readwrite"); const accounts = transaction.objectStore("accounts");
     if (await requestAsPromise(accounts.index("username").get(account.username))) throw new Error("اسم المستخدم مستخدم بالفعل.");

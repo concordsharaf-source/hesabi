@@ -751,6 +751,56 @@ function injectSetupRestoreControl() {
   setupForm.insertAdjacentElement("afterend", control);
 }
 
+function openCloudRestoreOnSetupDialog() {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">استعادة من نسخة سحابية</span><h2>افتح متجرك من السحابة</h2><p class="dialog__subtext">أدخل بريد وكلمة مرور النسخ السحابية أولًا. بعدها سيُطلب منك اسم مستخدم الأدمن ورمز دخوله الموجودان داخل النسخة.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="setup-cloud-auth-form" class="form-grid"><label class="form-full">بريد النسخ السحابية<input name="email" type="email" dir="ltr" autocomplete="email" required autofocus /></label><label class="form-full">كلمة مرور النسخ السحابية<input name="password" type="password" dir="ltr" autocomplete="current-password" minlength="6" required /></label><small class="offline-note form-full">هذا الحساب مخصص للوصول إلى النسخ فقط، ولا يغيّر حساب الأدمن المحلي.</small><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">متابعة إلى النسخة</button></div></form>`);
+  const form = overlay.querySelector("#setup-cloud-auth-form");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector("button[type=submit]");
+    submit.disabled = true;
+    try {
+      state.cloud.user = await signInCloudBackupUser(new FormData(form).get("email"), new FormData(form).get("password"));
+      const backups = await listCloudBackups();
+      const latest = backups[0];
+      if (!latest) throw new Error("لا توجد نسخة سحابية مكتملة لهذا البريد.");
+      const createdAt = latest.createdAtClient ? dateTime(latest.createdAtClient) : "غير معروف";
+      form.outerHTML = `<form id="setup-cloud-admin-form" class="form-grid"><div class="cloud-backup-card__note form-full"><strong>تم العثور على أحدث نسخة</strong><span>${escapeHtml(latest.storeName || "حسابي")} · ${escapeHtml(createdAt)} · ${amount(latest.chunkCount || 0)} جزء</span></div><label class="form-full">اسم مستخدم الأدمن داخل النسخة<input name="username" dir="ltr" autocomplete="username" required minlength="3" maxlength="30" autofocus placeholder="مثال: admin" /></label><label class="form-full">رمز دخول الأدمن<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" required minlength="4" maxlength="12" placeholder="••••" /></label><small class="offline-note form-full">سيتم التحقق من الحساب قبل استبدال أي بيانات على هذا الجهاز.</small><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">استعادة وفتح التطبيق ${icon("restore", 17)}</button></div></form>`;
+      const adminForm = overlay.querySelector("#setup-cloud-admin-form");
+      adminForm.addEventListener("submit", async (adminEvent) => {
+        adminEvent.preventDefault();
+        const restoreButton = adminForm.querySelector("button[type=submit]");
+        restoreButton.disabled = true;
+        try {
+          const values = Object.fromEntries(new FormData(adminForm));
+          const { payload } = await readCloudBackup(latest.id);
+          db.validateBackup(payload);
+          const restoredUser = await db.authenticateBackupAccount(payload, values);
+          const safetyBackup = await db.exportBackup();
+          downloadBackupPayload(safetyBackup, `before-cloud-restore-${dateKey()}`);
+          await db.restoreBackup(payload);
+          state.settings = await db.getSettings();
+          state.accounts = await db.listAccounts();
+          state.currentUser = await db.authenticateAccount(values);
+          await db.savePersistentSession(state.currentUser.id);
+          state.cart = [];
+          state.view = "dashboard";
+          await refresh();
+          closeDialog();
+          render();
+          showToast(`تمت استعادة متجر ${state.settings?.storeName || "حسابي"} وفتح حساب ${restoredUser.name}.`);
+        } catch (error) {
+          restoreButton.disabled = false;
+          showToast(error.message || "تعذرت استعادة النسخة السحابية.", "error");
+        }
+      });
+      overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+    } catch (error) {
+      submit.disabled = false;
+      showToast(error.message || "تعذر الوصول إلى النسخة السحابية.", "error");
+    }
+  });
+}
+
 async function repairCloudWorkspace() {
   if (!isAdmin(state.currentUser) || !state.cloud.user) { showToast("اربط حساب النسخ السحابية للأدمن أولًا.", "error"); return; }
   try { state.cloud.busy = "repair"; render(); await ensureAdminCloudWorkspace(); await seedWorkspaceBackup(await db.exportBackup()); state.cloud.error = ""; showToast("تم إصلاح ربط المتجر بالبريد السحابي. جرّب إنشاء رمز الاقتران الآن."); } catch (error) { state.cloud.error = error.message || "تعذر إصلاح ربط المتجر."; showToast(state.cloud.error, "error"); } finally { state.cloud.busy = false; render(); }
@@ -777,7 +827,7 @@ function openAssistantEntryDialog() {
 }
 
 function setupMarkup() {
-  return `<main class="setup-page"><section class="setup-art"><div class="setup-art__brand"><img src="${storeLogoUrl()}" alt="شعار المتجر" /><span class="brand-wordmark">حسابي</span><small>سجلّ المتجر اليومي</small></div><div class="setup-art__status"><span class="presence-dot"></span><span>نظامك المحلي جاهز للعمل دون اتصال</span></div><div class="setup-art__copy"><p class="eyebrow">سجل تشغيلي · المرحلة الأولى</p><h1>بيانات واضحة<br />لبداية يوم بيع منظّم.</h1><p>ستسجل هنا البيانات التي تظهر على الفواتير وتضبط عرض المخزون والمبيعات اليومية.</p><div class="setup-art__stamps"><span>المنتجات</span><span>المخزون</span><span>الفواتير</span></div></div><div class="setup-art__ledger-card"><span>خط سير اليوم</span><strong>منتج ← مخزون ← فاتورة</strong><i></i><i></i><i></i></div><img class="setup-art__image" src="${assetBaseUrl}/hesabi-setup-ledger_a7b0fae4.png" alt="رسم تعبيري لأدوات تنظيم المتجر" /></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-sheet__brand"><img src="${storeLogoUrl()}" alt="شعار المتجر" /><div><strong>حسابي</strong><span>دفتر التاجر الهادئ</span></div><span class="setup-stamp">خطوة 1 من 1</span></div><div class="setup-form"><span class="eyebrow">سجل بداية العمل</span><h2>بيانات تُستخدم كل يوم</h2><p>أدخل اسم المتجر والنشاط والعملة. ستظهر هذه البيانات في الفواتير، وتُنظّم طريقة قراءة المخزون والمبيعات اليومية.</p><form id="setup-form"><label>اسم المتجر<input name="storeName" dir="rtl" required maxlength="60" placeholder="مثال: بقالة الواحة" autofocus /></label><label>نوع النشاط<select name="businessType" required>${BUSINESS_TYPES.map((type) => `<option value="${type}">${type}</option>`).join("")}</select></label><label>العملة<select name="currency" required>${CURRENCIES.map((currency) => `<option value="${currency.code}" ${currency.code === DEFAULT_CURRENCY_CODE ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><button class="button button--primary button--wide" type="submit">فتح سجل المتجر ${icon("arrow", 18)}</button></form><button class="button button--secondary button--wide" type="button" data-action="assistant-login">دخول جهاز مساعد ${icon("arrow", 18)}</button><small class="offline-note"><span class="presence-dot"></span>يحفظ محليًا ويظل متاحًا بعد أول تحميل</small></div></div></section></main>`;
+  return `<main class="setup-page"><section class="setup-art"><div class="setup-art__brand"><img src="${storeLogoUrl()}" alt="شعار المتجر" /><span class="brand-wordmark">حسابي</span><small>سجلّ المتجر اليومي</small></div><div class="setup-art__status"><span class="presence-dot"></span><span>نظامك المحلي جاهز للعمل دون اتصال</span></div><div class="setup-art__copy"><p class="eyebrow">سجل تشغيلي · المرحلة الأولى</p><h1>بيانات واضحة<br />لبداية يوم بيع منظّم.</h1><p>ستسجل هنا البيانات التي تظهر على الفواتير وتضبط عرض المخزون والمبيعات اليومية.</p><div class="setup-art__stamps"><span>المنتجات</span><span>المخزون</span><span>الفواتير</span></div></div><div class="setup-art__ledger-card"><span>خط سير اليوم</span><strong>منتج ← مخزون ← فاتورة</strong><i></i><i></i><i></i></div><img class="setup-art__image" src="${assetBaseUrl}/hesabi-setup-ledger_a7b0fae4.png" alt="رسم تعبيري لأدوات تنظيم المتجر" /></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-sheet__brand"><img src="${storeLogoUrl()}" alt="شعار المتجر" /><div><strong>حسابي</strong><span>دفتر التاجر الهادئ</span></div><span class="setup-stamp">خطوة 1 من 1</span></div><div class="setup-form"><span class="eyebrow">سجل بداية العمل</span><h2>بيانات تُستخدم كل يوم</h2><p>أدخل اسم المتجر والنشاط والعملة. ستظهر هذه البيانات في الفواتير، وتُنظّم طريقة قراءة المخزون والمبيعات اليومية.</p><form id="setup-form"><label>اسم المتجر<input name="storeName" dir="rtl" required maxlength="60" placeholder="مثال: بقالة الواحة" autofocus /></label><label>نوع النشاط<select name="businessType" required>${BUSINESS_TYPES.map((type) => `<option value="${type}">${type}</option>`).join("")}</select></label><label>العملة<select name="currency" required>${CURRENCIES.map((currency) => `<option value="${currency.code}" ${currency.code === DEFAULT_CURRENCY_CODE ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><button class="button button--primary button--wide" type="submit">فتح سجل المتجر ${icon("arrow", 18)}</button></form><button class="button button--secondary button--wide" type="button" data-action="cloud-restore-start">استعادة من نسخة سحابية ${icon("restore", 18)}</button><button class="button button--secondary button--wide" type="button" data-action="assistant-login">دخول جهاز مساعد ${icon("arrow", 18)}</button><small class="offline-note"><span class="presence-dot"></span>يحفظ محليًا ويظل متاحًا بعد أول تحميل</small></div></div></section></main>`;
 }
 
 function bindSearchInput(selector, stateKey) {
@@ -939,6 +989,7 @@ async function handleActionUnsafe(event) {
   const id = event.currentTarget.dataset.id;
   if (action === "fill-login") { const input = root.querySelector("#login-form [name=username]"); if (input) { input.value = event.currentTarget.dataset.username; root.querySelector("#login-form [name=pin]")?.focus(); } return; }
   if (action === "open-phone-recovery") { openPhoneRecoveryDialog(); return; }
+  if (action === "cloud-restore-start") { openCloudRestoreOnSetupDialog(); return; }
   if (action === "logout") { openLogoutConfirmDialog(); return; }
   if (action === "account-session") { openAccountSessionDialog(); return; }
   if (action === "navigate") { const view = event.currentTarget.dataset.view; if (!canAccessView(state.currentUser, view)) { adminOnlyMessage(); return; } state.view = view; render(); if (["settings", "data-management"].includes(view) && isAdmin(state.currentUser)) void refreshCloudBackups({ quiet: true }); return; }
