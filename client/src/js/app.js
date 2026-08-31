@@ -13,6 +13,7 @@ import { randomId } from "./ids.js";
 import { createReportPdfFile, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf } from "./pdf-export.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 import { shortRandomId } from "./ids.js";
+import { createBarcodeWorkbook, parseBarcodeFile } from "./barcode-file.js";
 import { CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isDesktopBarcodeWedge, isNewContinuousBarcode, shouldAcceptDesktopBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 
 const icon = (name, size = 20) => {
@@ -683,7 +684,7 @@ function settingsMarkup() {
 }
 function generalSettingsMarkup() {
   return `${topbarMarkup("إعدادات عامة", "حدّث بيانات المتجر التي تظهر في رأس التطبيق والفواتير، ثم احفظ التغيير.", settingsBackAction())}
-  <div class="settings-page settings-subpage"><form id="settings-form" class="panel form-grid"><div class="panel__head form-full"><div><span class="eyebrow">بيانات المتجر</span><h2>الإعدادات الأساسية</h2></div></div><label class="form-full">اسم المتجر<input name="storeName" required maxlength="60" dir="rtl" value="${escapeHtml(state.settings?.storeName || "")}" /></label><label>نوع النشاط<select name="businessType">${BUSINESS_TYPES.map((type) => `<option value="${type}" ${state.settings?.businessType === type ? "selected" : ""}>${type}</option>`).join("")}</select></label><label>العملة<select name="currency">${CURRENCIES.map((currency) => `<option value="${currency.code}" ${state.settings?.currency === currency.code ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><label class="form-full">رصيد افتتاحي للصندوق<input name="openingCash" type="number" min="0" step="0.01" value="${escapeHtml(state.settings?.openingCash ?? "")}" /></label><label class="form-full settings-discount-limit-field">الحد الأقصى لخصم الكاشير (%)<input name="cashierDiscountLimitPercent" type="number" min="0" max="100" step="0.01" value="${escapeHtml(state.settings?.cashierDiscountLimitPercent ?? 10)}" /><small class="field-hint">الافتراضي 10%. يطبّق على مجموع خصم السطور والخصم العام، ولا يستطيع الكاشير تجاوزه. يمكن للأدمن رفعه حتى 100% عند الحاجة.</small></label><label class="form-full">السقف العام لمديونية العملاء<input name="customerCreditLimit" type="number" min="0" step="0.01" value="${escapeHtml(state.settings?.customerCreditLimit ?? "")}" /><small class="field-hint">اتركه فارغًا أو ضع 0 للسماح دون سقف عام. يمكن تحديد سقف مختلف لكل عميل من خيارات العملاء.</small></label><div class="dialog__actions form-full"><button class="button button--primary" type="submit">حفظ الإعدادات ${icon("check", 17)}</button></div></form></div>`;
+  <div class="settings-page settings-subpage"><form id="settings-form" class="panel form-grid"><div class="panel__head form-full"><div><span class="eyebrow">بيانات المتجر</span><h2>الإعدادات الأساسية</h2></div></div><label class="form-full">اسم المتجر<input name="storeName" required maxlength="60" dir="rtl" value="${escapeHtml(state.settings?.storeName || "")}" /></label><label>نوع النشاط<select name="businessType">${BUSINESS_TYPES.map((type) => `<option value="${type}" ${state.settings?.businessType === type ? "selected" : ""}>${type}</option>`).join("")}</select></label><label>العملة<select name="currency">${CURRENCIES.map((currency) => `<option value="${currency.code}" ${state.settings?.currency === currency.code ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><label class="form-full">رصيد افتتاحي للصندوق<input name="openingCash" type="number" min="0" step="0.01" value="${escapeHtml(state.settings?.openingCash ?? "")}" /></label><label class="form-full settings-discount-limit-field">الحد الأقصى لخصم الكاشير (%)<input name="cashierDiscountLimitPercent" type="number" min="0" max="100" step="0.01" value="${escapeHtml(state.settings?.cashierDiscountLimitPercent ?? 10)}" /><small class="field-hint">الافتراضي 10%. يطبّق على مجموع خصم السطور والخصم العام، ولا يستطيع الكاشير تجاوزه. يمكن للأدمن رفعه حتى 100% عند الحاجة.</small></label><label class="form-full">السقف العام لمديونية العملاء<input name="customerCreditLimit" type="number" min="0" step="0.01" value="${escapeHtml(state.settings?.customerCreditLimit ?? "")}" /><small class="field-hint">اتركه فارغًا أو ضع 0 للسماح دون سقف عام. يمكن تحديد سقف مختلف لكل عميل من خيارات العملاء.</small></label><div class="dialog__actions form-full"><button class="button button--primary" type="submit">حفظ الإعدادات ${icon("check", 17)}</button></div></form><section class="panel barcode-tools"><div class="panel__head"><div><span class="eyebrow">كتالوج الباركود</span><h2>استيراد أو تصدير الباركودات</h2></div></div><p>صدّر منتجاتك إلى Excel، أو استورد ملف Excel/CSV/TSV. تُطابق الأعمدة العربية أو الإنجليزية تلقائيًا وتظهر المنتجات والباركودات فورًا في القوائم.</p><div class="dialog__actions"><button class="button button--secondary" type="button" data-action="export-barcodes">تصدير Excel</button><label class="button button--primary" for="barcode-import-file">استيراد ملف الباركود<input id="barcode-import-file" type="file" accept=".xlsx,.xls,.csv,.tsv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden /></label></div><small class="field-hint">يفضل أن يحتوي الملف على عمود «الباركود» و«اسم المنتج». إذا كان المنتج موجودًا سيتم تحديث باركوده، وإذا لم يكن موجودًا سيُضاف إلى المنتجات.</small></section></div>`;
 }
 function brandSettingsMarkup() { return `${topbarMarkup("شعار المتجر", "اختر شعارًا محليًا يظهر في التطبيق وملفات PDF ويدخل في النسخة الاحتياطية.", settingsBackAction())}<div class="settings-page settings-subpage">${storeLogoSettingsMarkup()}</div>`; }
 function navigationSettingsMarkup() { return `${topbarMarkup("ترتيب أيقونات الهاتف", "قدّم أو أخّر الأقسام حسب أولويات متجرك. يبقى ترتيب الكاشير مقتصرًا على الأقسام المسموح بها.", settingsBackAction())}<div class="settings-page settings-subpage">${mobileNavigationSettingsMarkup()}</div>`; }
@@ -938,6 +939,7 @@ function bindEvents() {
   root.querySelector("#settings-form")?.addEventListener("submit", saveSettings);
   root.querySelector("#store-logo-file")?.addEventListener("change", handleStoreLogoFile);
   root.querySelector("#restore-file")?.addEventListener("change", restoreBackupFromFile);
+  root.querySelector("#barcode-import-file")?.addEventListener("change", importBarcodeFile);
   root.querySelector("#setup-restore-file")?.addEventListener("change", restoreBackupFromFile);
   root.querySelectorAll("[data-cart-quantity]").forEach((input) => input.addEventListener("change", (event) => {
     setCartQuantity(event.currentTarget.dataset.cartQuantity, event.currentTarget.value, { renderNow: false });
@@ -1057,6 +1059,7 @@ async function handleActionUnsafe(event) {
   if (action === "open-periodic-inventory") { openPeriodicInventoryDialog(id); return; }
   if (action === "clear-store-logo") { await clearStoreLogo(); return; }
   if (action === "export-backup") { downloadBackup(); return; }
+  if (action === "export-barcodes") { exportBarcodesFile(); return; }
   if (action === "open-cloud-auth") { openCloudAuthDialog(); return; }
   if (action === "pairing-invite") { openPairingInviteDialog(); return; }
   if (action === "pairing-redeem") { openPairingRedeemDialog(); return; }
@@ -1355,6 +1358,25 @@ async function handleStoreLogoFile(event) { const file = event.currentTarget.fil
 async function clearStoreLogo() { try { await db.saveStoreLogoDataUrl(""); state.settings = await db.getSettings(); await refresh(); render(); showToast("تمت استعادة شعار حسابي الافتراضي."); } catch (error) { showToast(error.message || "تعذر استعادة الشعار الافتراضي.", "error"); } }
 
 function downloadBackupPayload(backup, suffix = dateKey()) { const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `hesabi-backup-${suffix}.json`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); }
+
+function downloadBinaryFile(content, filename, type = "application/octet-stream") { const blob = new Blob([content], { type }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); }
+function exportBarcodesFile() { try { downloadBinaryFile(createBarcodeWorkbook(state.products), `hesabi-barcodes-${dateKey()}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); showToast("تم تصدير ملف الباركودات بصيغة Excel."); } catch (error) { showToast(error.message || "تعذر تصدير ملف الباركودات.", "error"); } }
+async function importBarcodeFile(event) {
+  const input = event.currentTarget; const file = input.files?.[0]; if (!file) return;
+  try {
+    const { records } = await parseBarcodeFile(file); const products = await db.listProducts(); const seenBarcodes = new Set(); let updated = 0; let created = 0; let skipped = 0;
+    for (const record of records) {
+      if (seenBarcodes.has(record.barcode)) { skipped += 1; continue; }
+      seenBarcodes.add(record.barcode);
+      const normalizedName = record.name.trim().toLocaleLowerCase("ar");
+      const existing = products.find((product) => product.barcode === record.barcode || (record.internalCode && product.internalCode === record.internalCode) || (normalizedName && product.name.toLocaleLowerCase("ar") === normalizedName));
+      if (existing) { await db.updateProduct(existing.id, { ...existing, barcode: record.barcode, internalCode: record.internalCode || existing.internalCode }); updated += 1; }
+      else { await db.createProduct({ name: record.name || `صنف ${record.barcode}`, barcode: record.barcode, internalCode: record.internalCode, purchasePrice: record.purchasePrice, salePrice: record.salePrice, quantity: record.quantity, unit: record.unit, minimumStock: 0 }); created += 1; }
+    }
+    await refresh(); render(); showToast(`تم استيراد ${records.length - skipped} باركود: ${created} منتجات جديدة و${updated} منتجات محدثة${skipped ? `، وتجاوز ${skipped} صفوف مكررة` : ""}.`);
+  } catch (error) { showToast(error.message || "تعذر استيراد ملف الباركودات.", "error"); }
+  finally { input.value = ""; }
+}
 
 async function runAutomaticBackups({ force = false } = {}) {
   if (automaticBackupBusy || !state.settings?.setupCompleted || !state.currentUser) return;
