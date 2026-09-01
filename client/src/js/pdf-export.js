@@ -154,10 +154,11 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, f
   const left = 14 * mm;
   const right = 196 * mm;
   const center = width / 2;
+  const fontScale = 3;
   const lineHeight = 8 * mm;
-  const itemHeight = 39 * mm;
+  const itemHeight = 48 * mm;
   const items = purchase.items || [];
-  const height = Math.max(297 * mm, (72 + Math.max(1, items.length) * 39 + 92) * mm);
+  const height = Math.max(297 * mm, (72 + Math.max(1, items.length) * 48 + 105) * mm);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -169,7 +170,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, f
   const text = (value, x, y, align = "right", size = 26, weight = 400, direction = "rtl", color = "#172e27") => {
     context.direction = direction;
     context.textAlign = align;
-    context.font = `${weight} ${size}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
+    context.font = `${weight} ${Math.round(size * fontScale)}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
     context.fillStyle = color;
     context.fillText(String(value ?? ""), x, y);
   };
@@ -221,7 +222,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, f
   items.forEach((item, index) => {
     if (index % 2 === 0) { context.fillStyle = "#f5faf7"; context.fillRect(left, y, right - left, itemHeight); }
     context.save();
-    context.font = `700 23px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
+    context.font = `700 ${23 * fontScale}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
     const itemNameRows = wrapped(item.productName || "", right - 5 * mm, y + 7 * mm, 62 * mm, { size: 23, weight: 700, maxRows: 2 });
     context.restore();
     text(`${formatAmount(item.quantity)} ${item.unit || ""}`, 126 * mm, y + 8 * mm, "right", 22, 600, "rtl");
@@ -238,7 +239,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, f
       item.expiryDate ? `الانتهاء: ${item.expiryDate}` : "",
       toNumber(item.returnedQuantity) ? `المرتجع: ${formatAmount(item.returnedQuantity)}` : "",
     ].filter(Boolean).join(" · ");
-    if (purchaseDetails) { context.font = `400 19px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; wrapped(purchaseDetails, right - 5 * mm, detailY, right - left - 10 * mm, { size: 19, maxRows: 2, lineHeight: 5.5 * mm, color: "#52645b" }); }
+    if (purchaseDetails) { context.font = `400 ${19 * fontScale}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; wrapped(purchaseDetails, right - 5 * mm, detailY, right - left - 10 * mm, { size: 19, maxRows: 2, lineHeight: 7 * mm, color: "#52645b" }); }
     y += itemHeight;
     rule(y);
   });
@@ -261,7 +262,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, f
   y += 10 * mm;
   summaryRows.forEach(([label, value, strong]) => { pair(label, value, y, { bold: strong, labelSize: strong ? 28 : 22, valueSize: strong ? 30 : 23, ltr: !/[ء-ي]/.test(value) }); y += lineHeight; if (strong) rule(y - 4 * mm, "#174c3f"); });
   y += 5 * mm;
-  if (purchase.notes) { text("ملاحظات", right, y, "right", 24, 700, "rtl", "#174c3f"); y += 7 * mm; context.font = `400 21px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; wrapped(purchase.notes, right, y, right - left, { size: 21, maxRows: 3, lineHeight: 6 * mm, color: "#52645b" }); y += 18 * mm; }
+  if (purchase.notes) { text("ملاحظات", right, y, "right", 24, 700, "rtl", "#174c3f"); y += 7 * mm; context.font = `400 ${21 * fontScale}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; wrapped(purchase.notes, right, y, right - left, { size: 21, maxRows: 3, lineHeight: 7 * mm, color: "#52645b" }); y += 22 * mm; }
   text("تم إصدار هذه الفاتورة من حسابي", center, Math.min(y + 8 * mm, height - 8 * mm), "center", 21, 400, "rtl", "#52645b");
   return canvas;
 }
