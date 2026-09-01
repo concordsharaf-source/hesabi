@@ -527,3 +527,18 @@ test("يحتفظ مخزن النسخ المحلية بآخر ثلاث نسخ ف�
   assert.equal(exported.stores.localBackups, undefined);
   await db.resetAllData();
 });
+
+test("فاتورة الشراء تسمح بدفع جزء من المبلغ وتضيف المتبقي إلى رصيد المورد", async () => {
+  await db.resetAllData();
+  const product = await db.createProduct({ name: "منتج شراء جزئي", unit: "حبة", purchasePrice: 0, salePrice: 150, quantity: 0, minimumStock: 0 });
+  const supplier = await db.createSupplier({ name: "مورد شراء جزئي" });
+  const purchase = await db.createPurchase({ supplierId: supplier.id, paymentType: "نقدي", paymentMethod: "نقدي", paidAmount: 40, items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 1, packageCost: 100, packageUnit: "حبة", salePrice: 150 }] });
+  const saved = await db.getPurchase(purchase.id);
+  const account = await db.getSupplierAccount(supplier.id);
+  assert.equal(saved.total, 100);
+  assert.equal(saved.paidAmount, 40);
+  assert.equal(saved.remainingAmount, 60);
+  assert.equal(saved.paymentType, "آجل");
+  assert.equal(account.balance, 60);
+  await db.resetAllData();
+});

@@ -447,6 +447,8 @@ export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
   }
 }
 
+const escapePdfValue = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '\"': "&quot;", "'": "&#39;" }[character]));
+
 export async function createThermalInvoicePdfFile({ invoice, customer, storeName, logoDataUrl, formatMoney, formatAmount, formatDateTime, paymentLabel, filename }) {
   await loadCanvasArabicFont();
   const logoImage = await loadStoreLogoImage(logoDataUrl);
