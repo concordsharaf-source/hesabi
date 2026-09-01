@@ -695,6 +695,9 @@ function storeLogoSettingsMarkup() {
 
 function settingsBackAction() { return `<button class="button button--secondary" data-action="navigate" data-view="settings">${icon("arrow", 17)}<span>مركز الإعدادات</span></button>`; }
 function settingsHubCard({ view, iconName, eyebrow, title, description }) { return `<button class="settings-hub__card" data-action="navigate" data-view="${view}"><span class="settings-hub__icon">${icon(iconName, 22)}</span><span><small>${escapeHtml(eyebrow)}</small><strong>${escapeHtml(title)}</strong><em>${escapeHtml(description)}</em></span>${icon("arrow", 18)}</button>`; }
+function settingsContactMarkup() {
+  return `<section class="panel settings-contact-card"><span class="eyebrow">تواصل مع المصمم</span><h2>نسعد باستقبال ملاحظاتكم واقتراحاتكم</h2><p>يسعدنا تواصلكم لتحسين تجربة استخدام حسابي.</p><a class="settings-contact-card__phone" href="https://wa.me/967770388100" target="_blank" rel="noopener noreferrer">نسعد باستقبال ملاحظاتكم واقتراحاتكم · +967770388100</a><a class="settings-contact-card__email" href="mailto:concordsharaf@gmail.com">concordsharaf@gmail.com</a><small>تصميم شرف غالب قحطان · الجمهورية اليمنية</small></section>`;
+}
 function settingsMarkup() {
   const cards = [
     { view: "general-settings", iconName: "box", eyebrow: "المتجر", title: "إعدادات عامة", description: "الاسم والنشاط والعملة ورصيد البداية" },
@@ -705,7 +708,7 @@ function settingsMarkup() {
     { view: "data-management", iconName: "restore", eyebrow: "الحفظ", title: "إدارة البيانات", description: "نسخ محلية وسحابية واستعادة آمنة" },
   ];
   return `${topbarMarkup("مركز الإعدادات", "اختر منطقة الضبط المطلوبة. تبقى بيانات متجرك محلية، ولا تظهر هذه الأدوات للكاشير.")}
-  <div class="settings-page settings-hub"><section class="settings-hub__intro panel"><span class="eyebrow">لوحة إدارة</span><h2>ضبط المتجر من مكان واحد</h2><p>فُصلت الإعدادات إلى صفحات واضحة لتبقى الشاشة مرتبة على الهاتف وسطح المكتب.</p></section><section class="settings-hub__grid">${cards.map(settingsHubCard).join("")}</section></div>`;
+  <div class="settings-page settings-hub"><section class="settings-hub__intro panel"><span class="eyebrow">لوحة إدارة</span><h2>ضبط المتجر من مكان واحد</h2><p>فُصلت الإعدادات إلى صفحات واضحة لتبقى الشاشة مرتبة على الهاتف وسطح المكتب.</p></section><section class="settings-hub__grid">${cards.map(settingsHubCard).join("")}</section>${settingsContactMarkup()}</div>`;
 }
 function generalSettingsMarkup() {
   return `${topbarMarkup("إعدادات عامة", "حدّث بيانات المتجر التي تظهر في رأس التطبيق والفواتير، ثم احفظ التغيير.", settingsBackAction())}
@@ -1656,7 +1659,7 @@ async function shareInvoice(invoice) {
 async function thermalInvoiceHtml(invoice) {
   const customer = invoice.customerId ? state.customers.find((item) => item.id === invoice.customerId) || await db.getCustomer(invoice.customerId) : null;
   const invoiceWithCustomer = customer && !invoice.customerName ? { ...invoice, customerName: customer.name } : invoice;
-  return renderThermalInvoiceHtml({ invoice: invoiceWithCustomer, customer, storeName: storeDisplayName(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml, paymentLabel: paymentChannelLabel(invoice) });
+  return renderThermalInvoiceHtml({ invoice: invoiceWithCustomer, customer, storeName: storeDisplayName(), logoDataUrl: storeLogoDataUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml, paymentLabel: paymentChannelLabel(invoice) });
 }
 
 async function printInvoiceThermal(invoice) {

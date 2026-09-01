@@ -80,11 +80,34 @@ function drawStoreLogo(context, image, centerX, centerY, boxSize) {
   context.drawImage(image, centerX - width / 2, centerY - height / 2, width, height);
 }
 
+const PDF_FOOTER_TITLE = "تم إصدار هذه الفاتورة من حسابي";
+const PDF_FOOTER_DESIGN = "تصميم شرف غالب قحطان · الجمهورية اليمنية · +967770388100";
+const PDF_FOOTER_EMAIL = "concordsharaf@gmail.com";
+function drawPdfFooter(context, { center, width, height, y = height - 22 * 12 }) {
+  const left = 14 * 12;
+  const right = width - left;
+  const footerY = Math.min(y, height - 25 * 12);
+  context.save();
+  context.strokeStyle = "#b9cbc1";
+  context.lineWidth = 2;
+  context.beginPath(); context.moveTo(left, footerY - 12 * 12); context.lineTo(right, footerY - 12 * 12); context.stroke();
+  context.direction = "rtl"; context.textAlign = "center"; context.textBaseline = "middle";
+  context.fillStyle = "#52645b";
+  context.font = '400 21px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
+  context.fillText(PDF_FOOTER_TITLE, center, footerY - 7 * 12);
+  context.font = '400 16px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
+  context.fillText(PDF_FOOTER_DESIGN, center, footerY);
+  context.direction = "ltr";
+  context.font = '400 15px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
+  context.fillText(PDF_FOOTER_EMAIL, center, footerY + 6 * 12);
+  context.restore();
+}
+
 function drawThermalInvoiceCanvas({ invoice, customer, storeName, logoImage, formatMoney, formatAmount, formatDateTime, paymentLabel }) {
   const mm = 12;
   const width = 80 * mm;
   const details = invoice.customerName ? 1 + Number(Boolean(customer?.phone)) + Number(Boolean(customer?.address)) : 0;
-  const height = Math.max(1420, (126 + details * 11 + Math.max(1, invoice.items?.length || 0) * 20 + (logoImage ? 17 : 0) + (toNumber(invoice.deliveryFee) > 0 ? 9 : 0)) * mm);
+  const height = Math.max(1420, (160 + details * 11 + Math.max(1, invoice.items?.length || 0) * 20 + (logoImage ? 17 : 0) + (toNumber(invoice.deliveryFee) > 0 ? 9 : 0)) * mm);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -145,6 +168,7 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, logoImage, for
   if (invoice.paymentType === "آجل") pair("المتبقي", formatMoney(invoice.remainingAmount));
   y += 3 * mm;
   text("شكرًا لتعاملكم معنا", center, "center", 22);
+  drawPdfFooter(context, { center, width, height, y: height - 17 * mm });
   return canvas;
 }
 
@@ -191,12 +215,12 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, f
   const pair = (label, value, y, options = {}) => { text(label, right - 5 * mm, y, "right", options.labelSize || 24, options.labelWeight || 600); text(value, left + 5 * mm, y, "left", options.valueSize || 25, options.valueWeight || 700, options.ltr ? "ltr" : "rtl", options.color || "#172e27"); };
 
   let y = 17 * mm;
-  if (logoImage) { drawStoreLogo(context, logoImage, left + 14 * mm, y + 10 * mm, 22 * mm); }
-  text(storeName || "حسابي", right, y + 7 * mm, "right", 52, 700, "rtl", "#174c3f");
-  text("فاتورة شراء", right, y + 17 * mm, "right", 34, 700, "rtl", "#52645b");
+  if (logoImage) drawStoreLogo(context, logoImage, center, y + 8 * mm, 22 * mm);
+  text(storeName || "حسابي", center, y + 24 * mm, "center", 48, 700, "rtl", "#174c3f");
+  text("فاتورة شراء", center, y + 34 * mm, "center", 32, 700, "rtl", "#52645b");
   text(`رقم الفاتورة: ${purchase.invoiceNumber || "—"}`, left, y + 7 * mm, "left", 25, 700, "ltr", "#172e27");
   text(formatDateTime(purchase.date), left, y + 17 * mm, "left", 22, 400, "ltr", "#52645b");
-  y += 29 * mm;
+  y += 43 * mm;
 
   const supplierLines = [
     ["اسم المورد", purchase.supplierName || "بدون مورد", false],
@@ -265,7 +289,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, f
   summaryRows.forEach(([label, value, strong]) => { pair(label, value, y, { bold: strong, labelSize: strong ? 28 : 22, valueSize: strong ? 30 : 23, ltr: !/[ء-ي]/.test(value) }); y += lineHeight; if (strong) rule(y - 4 * mm, "#174c3f"); });
   y += 5 * mm;
   if (purchase.notes) { text("ملاحظات", right, y, "right", 24, 700, "rtl", "#174c3f"); y += 7 * mm; context.font = `400 ${21 * fontScale}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; wrapped(purchase.notes, right, y, right - left, { size: 21, maxRows: 3, lineHeight: 7 * mm, color: "#52645b" }); y += 22 * mm; }
-  text("تم إصدار هذه الفاتورة من حسابي", center, Math.min(y + 8 * mm, height - 8 * mm), "center", 21, 400, "rtl", "#52645b");
+  drawPdfFooter(context, { center, width, height, y: height - 17 * mm });
   return canvas;
 }
 
@@ -294,10 +318,10 @@ function drawCustomerAccountCanvas({ account, storeName, logoImage, formatMoney,
   };
   const line = (fromX, fromY, toX, toY, color = "#d9e0d7", widthPx = 2) => { context.strokeStyle = color; context.lineWidth = widthPx; context.beginPath(); context.moveTo(fromX, fromY); context.lineTo(toX, toY); context.stroke(); };
   let y = 19 * mm;
-  if (logoImage) drawStoreLogo(context, logoImage, left + 13 * mm, y, 22 * mm);
-  text(storeName || "حسابي", right, y, "right", 62, 700, "rtl", "#174c3f");
-  y += 9 * mm;
-  text("كشف حساب مديونية عميل", right, y, "right", 38, 600, "rtl", "#52645b");
+  if (logoImage) drawStoreLogo(context, logoImage, center, y + 8 * mm, 22 * mm);
+  text(storeName || "حسابي", center, y + 24 * mm, "center", 56, 700, "rtl", "#174c3f");
+  y += 33 * mm;
+  text("كشف حساب مديونية عميل", center, y, "center", 38, 600, "rtl", "#52645b");
   y += 10 * mm;
   text(`تاريخ الإنشاء: ${formatDateTime(new Date().toISOString())}`, right, y, "right", 26, 400, "rtl", "#52645b");
   y += 11 * mm;
@@ -351,7 +375,7 @@ function drawCustomerAccountCanvas({ account, storeName, logoImage, formatMoney,
     line(left, y - 5 * mm, right, y - 5 * mm);
   });
   y += 7 * mm;
-  text("هذا الكشف صادر من حسابي للاستخدام التشغيلي.", width / 2, y, "center", 23, 400, "rtl", "#52645b");
+  drawPdfFooter(context, { center: width / 2, width, height, y: height - 17 * mm });
   return canvas;
 }
 
@@ -402,7 +426,7 @@ function drawReportCanvas({ rows, storeName, logoImage, from, to }) {
     y += 15 * mm;
   });
   y += 7 * mm;
-  text("تقرير صادر من حسابي للاستخدام التشغيلي.", width / 2, y, "center", 23, 400, "#52645b");
+  drawPdfFooter(context, { center: width / 2, width, height, y: height - 17 * mm });
   return canvas;
 }
 
