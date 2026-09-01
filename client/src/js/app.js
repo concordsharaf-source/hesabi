@@ -696,7 +696,7 @@ function storeLogoSettingsMarkup() {
 function settingsBackAction() { return `<button class="button button--secondary" data-action="navigate" data-view="settings">${icon("arrow", 17)}<span>مركز الإعدادات</span></button>`; }
 function settingsHubCard({ view, iconName, eyebrow, title, description }) { return `<button class="settings-hub__card" data-action="navigate" data-view="${view}"><span class="settings-hub__icon">${icon(iconName, 22)}</span><span><small>${escapeHtml(eyebrow)}</small><strong>${escapeHtml(title)}</strong><em>${escapeHtml(description)}</em></span>${icon("arrow", 18)}</button>`; }
 function settingsContactMarkup() {
-  return `<section class="panel settings-contact-card"><span class="eyebrow">تواصل مع المصمم</span><h2>نسعد باستقبال ملاحظاتكم واقتراحاتكم</h2><p>يسعدنا تواصلكم لتحسين تجربة استخدام حسابي.</p><a class="settings-contact-card__phone" href="https://wa.me/967770388100" target="_blank" rel="noopener noreferrer">نسعد باستقبال ملاحظاتكم واقتراحاتكم · +967770388100</a><a class="settings-contact-card__email" href="mailto:concordsharaf@gmail.com">concordsharaf@gmail.com</a><small>تصميم شرف غالب قحطان · الجمهورية اليمنية</small></section>`;
+  return `<section class="panel settings-contact-card"><span class="eyebrow">تواصل مع المصمم</span><h2>نسعد باستقبال ملاحظاتكم واقتراحاتكم</h2><p>لتحسين تجربة استخدام حسابي وتطويرها باستمرار.</p><a class="settings-contact-card__phone" href="https://wa.me/967770388100" target="_blank" rel="noopener noreferrer">واتساب: +967770388100</a><a class="settings-contact-card__email" href="mailto:concordsharaf@gmail.com">concordsharaf@gmail.com</a><small>تصميم شرف غالب قحطان · الجمهورية اليمنية</small></section>`;
 }
 function settingsMarkup() {
   const cards = [
