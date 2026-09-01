@@ -215,8 +215,9 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, f
   context.fillStyle = "#174c3f";
   context.fillRect(left, tableTop, right - left, 12 * mm);
   text("الصنف", right - 5 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
-  text("الكمية", 126 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
-  text("سعر الوحدة", 91 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
+  text("الكمية", 132 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
+  text("سعر الشراء", 101 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
+  text("سعر البيع", 69 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
   text("الإجمالي", left + 5 * mm, tableTop + 6 * mm, "left", 24, 700, "rtl", "#ffffff");
   y += 12 * mm;
   items.forEach((item, index) => {
@@ -225,15 +226,16 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, f
     context.font = `700 ${23 * fontScale}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
     const itemNameRows = wrapped(item.productName || "", right - 5 * mm, y + 7 * mm, 62 * mm, { size: 23, weight: 700, maxRows: 2 });
     context.restore();
-    text(`${formatAmount(item.quantity)} ${item.unit || ""}`, 126 * mm, y + 8 * mm, "right", 22, 600, "rtl");
-    text(formatMoney(item.unitCost), 91 * mm, y + 8 * mm, "right", 22, 600, "ltr");
+    text(`${formatAmount(item.quantity)} ${item.unit || ""}`, 132 * mm, y + 8 * mm, "right", 22, 600, "rtl");
+    text(formatMoney(item.unitCost), 101 * mm, y + 8 * mm, "right", 22, 600, "ltr");
+    text(formatMoney(item.salePrice ?? 0), 69 * mm, y + 8 * mm, "right", 22, 700, "ltr", "#174c3f");
     text(formatMoney(item.total), left + 5 * mm, y + 8 * mm, "left", 22, 700, "ltr");
     let detailY = y + (itemNameRows > 1 ? 18 : 15) * mm;
     const purchaseDetails = [
       item.packageQuantity ? `العبوات: ${formatAmount(item.packageQuantity)} ${item.packageUnit || "عبوة"}` : "",
       item.unitsPerPackage ? `الوحدات/العبوة: ${formatAmount(item.unitsPerPackage)}` : "",
       item.packageCost !== undefined ? `سعر العبوة: ${formatMoney(item.packageCost)}` : "",
-      item.salePrice !== undefined ? `سعر البيع: ${formatMoney(item.salePrice)}` : "",
+
       item.batchNumber ? `التشغيلة: ${item.batchNumber}` : "",
       item.productionDate ? `الإنتاج: ${item.productionDate}` : "",
       item.expiryDate ? `الانتهاء: ${item.expiryDate}` : "",
