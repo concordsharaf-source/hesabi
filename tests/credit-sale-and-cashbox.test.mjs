@@ -113,16 +113,29 @@ test("تخصص الأنشطة وحداتها ولا تعرض عبوات البق
   assert.equal(BUSINESS_PROFILES["صيدلية"].packageUnits.includes("شريط"), true);
 });
 
-test("شراء الصيدلية يفرض التشغيلة والصلاحية ويحفظهما لتنبيه المنتج", async () => {
+test("شراء الصيدلية يجعل رقم التشغيلة اختياريًا ويفرض الصلاحية ويحفظ البيانات", async () => {
   await db.resetAllData();
   await db.saveSettings({ storeName: "صيدلية الاختبار", businessType: "صيدلية", currency: "YER" });
   const product = await db.createProduct({ name: "دواء تجريبي", unit: "حبة", purchasePrice: 0, salePrice: 0, quantity: 0, minimumStock: 1 });
-  await assert.rejects(() => db.createPurchase({ items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 10, packageCost: 1000, packageUnit: "علبة", salePrice: 150 }] }), /رقم التشغيلة/);
+  const purchaseWithoutBatch = await db.createPurchase({ items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 10, packageCost: 1000, packageUnit: "علبة", salePrice: 150, expiryDate: "2026-12-31" }] });
+  assert.equal((await db.getPurchase(purchaseWithoutBatch.id)).items[0].batchNumber, "");
   const purchase = await db.createPurchase({ items: [{ productId: product.id, packageQuantity: 1, unitsPerPackage: 10, packageCost: 1000, packageUnit: "علبة", salePrice: 150, batchNumber: "B-2026", expiryDate: "2026-12-31" }] });
   const storedProduct = await db.getProduct(product.id); const storedPurchase = await db.getPurchase(purchase.id);
   assert.equal(storedProduct.latestBatchNumber, "B-2026");
   assert.equal(storedProduct.nearestExpiryDate, "2026-12-31");
   assert.equal(storedPurchase.items[0].expiryDate, "2026-12-31");
+  await db.resetAllData();
+});
+
+test("السماح بالبيع بالسالب يخصم الكمية ثم تعوضها فاتورة شراء لاحقة", async () => {
+  await db.resetAllData();
+  await db.saveSettings({ storeName: "متجر السالب", businessType: "بقالة", currency: "YER", allowNegativeSales: true });
+  const product = await db.createProduct({ name: "منتج مخزون سالب", unit: "حبة", purchasePrice: 10, salePrice: 25, quantity: 0, minimumStock: 1 });
+  const sale = await db.completeSale({ items: [{ productId: product.id, quantity: 3, unitPrice: 30 }], paidAmount: 90, paymentType: "نقدي", paymentMethod: "نقدي" });
+  assert.equal(sale.total, 90);
+  assert.equal((await db.getProduct(product.id)).quantity, -3);
+  await db.createPurchase({ items: [{ productId: product.id, packageQuantity: 5, unitsPerPackage: 1, packageCost: 10, packageUnit: "حبة", salePrice: 30 }] });
+  assert.equal((await db.getProduct(product.id)).quantity, 2);
   await db.resetAllData();
 });
 
