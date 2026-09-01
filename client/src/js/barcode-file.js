@@ -71,6 +71,8 @@ export function createPurchaseWorkbook(purchase) {
     "رقم الفاتورة": purchase.invoiceNumber || "",
     "تاريخ الفاتورة": purchase.date || "",
     "المورد": purchase.supplierName || "بدون مورد",
+    "هاتف المورد": purchase.supplierPhone || "",
+    "عنوان المورد": purchase.supplierAddress || "",
     "اسم المنتج": item.productName || "",
     "الكمية": item.quantity ?? 0,
     "الوحدة": item.unit || "حبة",
@@ -89,7 +91,7 @@ export function createPurchaseWorkbook(purchase) {
   }));
   const sheet = XLSX.utils.json_to_sheet(rows.length ? rows : [{ "رقم الفاتورة": purchase.invoiceNumber || "", "المورد": purchase.supplierName || "بدون مورد", "الإجمالي": purchase.total ?? 0 }]);
   sheet["!cols"] = [
-    { wch: 16 }, { wch: 22 }, { wch: 24 }, { wch: 28 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 },
+    { wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 24 }, { wch: 28 }, { wch: 12 }, { wch: 12 }, { wch: 14 }, { wch: 14 },
     { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
   ];
   const workbook = XLSX.utils.book_new();

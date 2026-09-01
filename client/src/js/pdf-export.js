@@ -148,6 +148,124 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, logoImage, for
   return canvas;
 }
 
+function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, formatMoney, formatAmount, formatDateTime }) {
+  const mm = 12;
+  const width = 210 * mm;
+  const left = 14 * mm;
+  const right = 196 * mm;
+  const center = width / 2;
+  const lineHeight = 8 * mm;
+  const itemHeight = 39 * mm;
+  const items = purchase.items || [];
+  const height = Math.max(297 * mm, (72 + Math.max(1, items.length) * 39 + 92) * mm);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.textBaseline = "middle";
+  context.direction = "rtl";
+  const text = (value, x, y, align = "right", size = 26, weight = 400, direction = "rtl", color = "#172e27") => {
+    context.direction = direction;
+    context.textAlign = align;
+    context.font = `${weight} ${size}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
+    context.fillStyle = color;
+    context.fillText(String(value ?? ""), x, y);
+  };
+  const wrapped = (value, x, y, maxWidth, options = {}) => {
+    const words = String(value ?? "").split(/\s+/).filter(Boolean);
+    const rows = [];
+    let current = "";
+    words.forEach((word) => {
+      const next = current ? `${current} ${word}` : word;
+      if (current && context.measureText(next).width > maxWidth) { rows.push(current); current = word; } else current = next;
+    });
+    if (current || !rows.length) rows.push(current);
+    rows.slice(0, options.maxRows || 3).forEach((row, index) => text(row, x, y + index * (options.lineHeight || 6.5 * mm), options.align || "right", options.size || 22, options.weight || 400, options.direction || "rtl", options.color || "#172e27"));
+    return Math.min(rows.length, options.maxRows || 3);
+  };
+  const rule = (y, color = "#b9cbc1") => { context.strokeStyle = color; context.lineWidth = 2; context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke(); };
+  const box = (top, boxHeight, fill = "#f1f7f3") => { context.fillStyle = fill; context.strokeStyle = "#c4d5cc"; context.lineWidth = 2; context.beginPath(); context.roundRect(left, top, right - left, boxHeight, 10); context.fill(); context.stroke(); };
+  const pair = (label, value, y, options = {}) => { text(label, right - 5 * mm, y, "right", options.labelSize || 24, options.labelWeight || 600); text(value, left + 5 * mm, y, "left", options.valueSize || 25, options.valueWeight || 700, options.ltr ? "ltr" : "rtl", options.color || "#172e27"); };
+
+  let y = 17 * mm;
+  if (logoImage) { drawStoreLogo(context, logoImage, left + 14 * mm, y + 10 * mm, 22 * mm); }
+  text(storeName || "حسابي", right, y + 7 * mm, "right", 52, 700, "rtl", "#174c3f");
+  text("فاتورة شراء", right, y + 17 * mm, "right", 34, 700, "rtl", "#52645b");
+  text(`رقم الفاتورة: ${purchase.invoiceNumber || "—"}`, left, y + 7 * mm, "left", 25, 700, "ltr", "#172e27");
+  text(formatDateTime(purchase.date), left, y + 17 * mm, "left", 22, 400, "ltr", "#52645b");
+  y += 29 * mm;
+
+  const supplierLines = [
+    ["اسم المورد", purchase.supplierName || "بدون مورد", false],
+    ["الهاتف", supplier?.phone || purchase.supplierPhone || "غير متوفر", true],
+    ["العنوان", supplier?.address || purchase.supplierAddress || "غير متوفر", false],
+  ];
+  const supplierRows = supplierLines.filter(([, value], index) => index === 0 || value !== "غير متوفر");
+  const supplierBoxHeight = (supplierRows.length * 8 + 10) * mm;
+  box(y, supplierBoxHeight);
+  text("بيانات المورد", right - 5 * mm, y + 8 * mm, "right", 29, 700, "rtl", "#174c3f");
+  y += 16 * mm;
+  supplierRows.forEach(([label, value, ltr]) => { pair(label, value, y, { ltr, valueSize: 23 }); y += lineHeight; });
+  y += 7 * mm;
+
+  const tableTop = y;
+  context.fillStyle = "#174c3f";
+  context.fillRect(left, tableTop, right - left, 12 * mm);
+  text("الصنف", right - 5 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
+  text("الكمية", 126 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
+  text("سعر الوحدة", 91 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
+  text("الإجمالي", left + 5 * mm, tableTop + 6 * mm, "left", 24, 700, "rtl", "#ffffff");
+  y += 12 * mm;
+  items.forEach((item, index) => {
+    if (index % 2 === 0) { context.fillStyle = "#f5faf7"; context.fillRect(left, y, right - left, itemHeight); }
+    context.save();
+    context.font = `700 23px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
+    const itemNameRows = wrapped(item.productName || "", right - 5 * mm, y + 7 * mm, 62 * mm, { size: 23, weight: 700, maxRows: 2 });
+    context.restore();
+    text(`${formatAmount(item.quantity)} ${item.unit || ""}`, 126 * mm, y + 8 * mm, "right", 22, 600, "rtl");
+    text(formatMoney(item.unitCost), 91 * mm, y + 8 * mm, "right", 22, 600, "ltr");
+    text(formatMoney(item.total), left + 5 * mm, y + 8 * mm, "left", 22, 700, "ltr");
+    let detailY = y + (itemNameRows > 1 ? 18 : 15) * mm;
+    const purchaseDetails = [
+      item.packageQuantity ? `العبوات: ${formatAmount(item.packageQuantity)} ${item.packageUnit || "عبوة"}` : "",
+      item.unitsPerPackage ? `الوحدات/العبوة: ${formatAmount(item.unitsPerPackage)}` : "",
+      item.packageCost !== undefined ? `سعر العبوة: ${formatMoney(item.packageCost)}` : "",
+      item.salePrice !== undefined ? `سعر البيع: ${formatMoney(item.salePrice)}` : "",
+      item.batchNumber ? `التشغيلة: ${item.batchNumber}` : "",
+      item.productionDate ? `الإنتاج: ${item.productionDate}` : "",
+      item.expiryDate ? `الانتهاء: ${item.expiryDate}` : "",
+      toNumber(item.returnedQuantity) ? `المرتجع: ${formatAmount(item.returnedQuantity)}` : "",
+    ].filter(Boolean).join(" · ");
+    if (purchaseDetails) { context.font = `400 19px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; wrapped(purchaseDetails, right - 5 * mm, detailY, right - left - 10 * mm, { size: 19, maxRows: 2, lineHeight: 5.5 * mm, color: "#52645b" }); }
+    y += itemHeight;
+    rule(y);
+  });
+  y += 9 * mm;
+
+  const summaryTop = y;
+  const summaryRows = [
+    ["الإجمالي قبل الخصم", formatMoney(purchase.subtotal ?? purchase.total), false],
+    ["الخصم", formatMoney(purchase.discount || 0), false],
+    ["إجمالي الفاتورة", formatMoney(purchase.total), true],
+    ["إجمالي المرتجعات", formatMoney(purchase.returnedTotal || 0), false],
+    ["طريقة الدفع", purchase.paymentType || "نقدي", false],
+    ["وسيلة الدفع", purchase.paymentMethod || "نقدي", false],
+    ["حالة السداد", purchase.paymentStatus || "مدفوعة", false],
+    ["المبلغ المدفوع", formatMoney(purchase.paidAmount), false],
+    ["المتبقي", formatMoney(purchase.remainingAmount), false],
+  ];
+  const summaryHeight = (summaryRows.length * 8 + 10) * mm;
+  box(summaryTop, summaryHeight, "#f8fbf9");
+  y += 10 * mm;
+  summaryRows.forEach(([label, value, strong]) => { pair(label, value, y, { bold: strong, labelSize: strong ? 28 : 22, valueSize: strong ? 30 : 23, ltr: !/[ء-ي]/.test(value) }); y += lineHeight; if (strong) rule(y - 4 * mm, "#174c3f"); });
+  y += 5 * mm;
+  if (purchase.notes) { text("ملاحظات", right, y, "right", 24, 700, "rtl", "#174c3f"); y += 7 * mm; context.font = `400 21px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; wrapped(purchase.notes, right, y, right - left, { size: 21, maxRows: 3, lineHeight: 6 * mm, color: "#52645b" }); y += 18 * mm; }
+  text("تم إصدار هذه الفاتورة من حسابي", center, Math.min(y + 8 * mm, height - 8 * mm), "center", 21, 400, "rtl", "#52645b");
+  return canvas;
+}
+
 function drawCustomerAccountCanvas({ account, storeName, logoImage, formatMoney, formatDateTime }) {
   const mm = 12;
   const width = 210 * mm;
@@ -339,6 +457,15 @@ export async function createThermalInvoicePdfFile({ invoice, customer, storeName
   return new File([blob], filename, { type: "application/pdf" });
 }
 
+export async function createPurchaseInvoicePdfFile({ purchase, supplier, storeName, logoDataUrl, formatMoney, formatAmount, formatDateTime, filename }) {
+  await loadCanvasArabicFont();
+  const logoImage = await loadStoreLogoImage(logoDataUrl);
+  const pdf = createA4PdfFromCanvas(drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, logoImage, formatMoney, formatAmount, formatDateTime }));
+  const blob = pdf.output("blob");
+  if (!blob || blob.size < 800) throw new Error("تعذر إنشاء ملف PDF واضح لفاتورة الشراء.");
+  return new File([blob], filename, { type: "application/pdf" });
+}
+
 export async function createCustomerAccountPdfFile({ account, storeName, logoDataUrl, formatMoney, formatDateTime, filename }) {
   await loadCanvasArabicFont();
   const logoImage = await loadStoreLogoImage(logoDataUrl);
@@ -359,6 +486,7 @@ export async function createReportPdfFile({ rows, storeName, logoDataUrl, from, 
 
 export async function shareOrDownloadPdf({ html, filename, title, page = "a4" }) { return fileOrDownload(await createPdfFileFromHtml({ html, filename, page }), title); }
 export async function shareOrDownloadInvoicePdf(options) { return fileOrDownload(await createThermalInvoicePdfFile(options), options.title); }
+export async function shareOrDownloadPurchaseInvoicePdf(options) { return fileOrDownload(await createPurchaseInvoicePdfFile(options), options.title); }
 export async function shareOrDownloadCustomerAccountPdf(options) { return fileOrDownload(await createCustomerAccountPdfFile(options), options.title); }
 
 export function printHtmlDocument({ html, target, features }) {

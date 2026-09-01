@@ -10,7 +10,7 @@ import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { getExitGuardAction, leaveAfterExitConfirmation, primeExitGuardHistory } from "./navigation-guard.js";
 import { randomId } from "./ids.js";
-import { createReportPdfFile, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf } from "./pdf-export.js";
+import { createReportPdfFile, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf, shareOrDownloadPurchaseInvoicePdf } from "./pdf-export.js";
 import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 import { shortRandomId } from "./ids.js";
 import { createBarcodeWorkbook, createPurchaseWorkbook, parseBarcodeFile } from "./barcode-file.js";
@@ -1821,13 +1821,17 @@ async function shareOrDownloadFile(file, title) {
 
 async function sharePurchasePdf(purchase) {
   showToast("جاري تجهيز فاتورة الشراء PDF...");
-  const result = await shareOrDownloadPdf({ html: purchaseInvoiceHtml(purchase), filename: `${purchase.invoiceNumber}.pdf`, title: `فاتورة شراء ${purchase.invoiceNumber}` });
+  const supplier = state.suppliers.find((item) => item.id === purchase.supplierId) || null;
+  const purchaseForPdf = { ...purchase, supplierPhone: supplier?.phone || "", supplierAddress: supplier?.address || "" };
+  const result = await shareOrDownloadPurchaseInvoicePdf({ purchase: purchaseForPdf, supplier, storeName: storeDisplayName(), logoDataUrl: storeLogoDataUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, filename: `${purchase.invoiceNumber}.pdf`, title: `فاتورة شراء ${purchase.invoiceNumber}` });
   showToast(result === "shared" ? "تمت مشاركة فاتورة الشراء PDF." : "تم تنزيل فاتورة الشراء PDF.");
 }
 
 async function exportPurchaseExcel(purchase) {
   showToast("جاري تجهيز فاتورة الشراء Excel...");
-  const file = new File([createPurchaseWorkbook(purchase)], `${purchase.invoiceNumber}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const supplier = state.suppliers.find((item) => item.id === purchase.supplierId) || null;
+  const purchaseForExport = { ...purchase, supplierPhone: supplier?.phone || "", supplierAddress: supplier?.address || "" };
+  const file = new File([createPurchaseWorkbook(purchaseForExport)], `${purchase.invoiceNumber}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const result = await shareOrDownloadFile(file, `فاتورة شراء ${purchase.invoiceNumber}`);
   showToast(result === "shared" ? "تمت مشاركة فاتورة الشراء Excel." : "تم تنزيل فاتورة الشراء Excel.");
 }
