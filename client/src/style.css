@@ -620,3 +620,10 @@ label { font-size:15px; }
   .data-management-page .cloud-backup-card .button, .data-management-page .cloud-backup-card label.button { width:100%; flex-basis:auto; }
   .data-management-page .topbar__copy, .data-management-page .topbar__copy p { min-width:0; max-width:100%; overflow-wrap:anywhere; }
 }
+
+/* إجراء سريع أسفل شاشة المصروفات لتسهيل تسجيل سلفة الكاشير من نهاية القائمة. */
+.expense-page__bottom-action { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-top:16px; }
+.expense-page__bottom-action > div { display:grid; gap:4px; min-width:0; }
+.expense-page__bottom-action strong { color:var(--green-deep); font-size:16px; }
+.expense-page__bottom-action small { color:var(--muted); font-size:11px; }
+@media (max-width:599px) { .expense-page__bottom-action { align-items:stretch; flex-direction:column; } .expense-page__bottom-action .button { justify-content:center; width:100%; } }
