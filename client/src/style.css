@@ -638,3 +638,20 @@ label { font-size:15px; }
 .cashbox-merged-section .toolbar { margin-bottom:12px; }
 [data-theme="dark"] .cashbox-merged-section { border-color:#557267; }
 @media (max-width:599px) { .merged-section-actions { justify-content:stretch; }.merged-section-actions .button { flex:1 1 150px; }.cashbox-merged-section { margin-top:16px; } }
+
+/* خيارات البيع: خانات صغيرة وواضحة في سطر واحد. */
+.settings-inline-checks { display:flex; align-items:stretch; gap:8px; padding:0; }
+.settings-inline-check { display:flex; flex:1 1 0; align-items:center; gap:8px; min-width:0; padding:8px 10px; color:var(--ink); background:#f4f6f1; border:1px solid var(--line); border-radius:10px; cursor:pointer; transition:border-color .16s ease, background .16s ease, box-shadow .16s ease; }
+.settings-inline-check:hover { border-color:rgba(31,107,89,.42); background:var(--green-pale); }
+.settings-inline-check:focus-within { border-color:var(--green); box-shadow:0 0 0 3px rgba(31,107,89,.12); }
+.settings-inline-check input { flex:0 0 auto; width:16px; height:16px; margin:0; accent-color:var(--green); }
+.settings-inline-check span { display:grid; min-width:0; gap:2px; }
+.settings-inline-check strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }
+.settings-inline-check small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--muted); font-size:9px; line-height:1.4; }
+[data-theme="dark"] .settings-inline-check { color:#f2faf5; background:#1a2b25; border-color:#6d9585; }
+[data-theme="dark"] .settings-inline-check strong { color:#f2faf5; }
+[data-theme="dark"] .settings-inline-check small { color:#b7cfc3; }
+@media (max-width:599px) { .settings-inline-checks { flex-direction:column; }.settings-inline-check { flex:1 1 auto; } }
+
+.cart-line__price--locked input { color:rgba(255,255,255,.72); background:rgba(255,255,255,.04); border-style:dashed; cursor:not-allowed; }
+.cart-line__price--locked span::after { content:" · مقفول"; color:#f3d593; font-size:9px; }
