@@ -593,3 +593,15 @@ label { font-size:15px; }
 [data-theme="dark"] .import-choice-button strong { color:#baf2d0; }
 [data-theme="dark"] .import-choice-button span { color:#c4d4cb; }
 @media (max-width:620px) { .category-chips { overflow:visible; flex-wrap:wrap; } .category-chip { flex:0 0 auto; } .import-confirm-choice { grid-template-columns:1fr; } }
+
+/* مؤشر مرئي رفيع لاستهلاك مدة صلاحية المنتج */
+.expiry-meter { width:100%; height:4px; margin-top:8px; overflow:hidden; background:var(--line); border-radius:999px; }
+.expiry-meter span { display:block; height:100%; background:#4fa879; border-radius:inherit; transition:width .25s ease; }
+.expiry-meter--warning span { background:#d39b43; }
+.expiry-meter--danger span { background:var(--danger); }
+.expiry-meter--empty { opacity:.45; }
+[data-theme="dark"] .expiry-meter { background:#456258; }
+[data-theme="dark"] .expiry-meter--safe span { background:#7bd8aa; }
+[data-theme="dark"] .expiry-meter--warning span { background:#ffd07d; }
+[data-theme="dark"] .expiry-meter--danger span { background:#ff938c; }
+.product-name .expiry-meter, .product-card__main .expiry-meter { display:block; min-width:110px; }

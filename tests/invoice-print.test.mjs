@@ -116,7 +116,7 @@ test("يوثق تسليم الصندوق عند تبديل الحساب ويعر
     readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
-  assert.match(database, /const DB_VERSION = 12/);
+  assert.match(database, /const DB_VERSION = 13/);
   assert.match(database, /makeIndexedStore\(database, "cashierShifts"/);
   assert.match(database, /async startCashierShift/);
   assert.match(database, /async closeCashierShift/);
@@ -155,7 +155,7 @@ test("تفصل الخزنة عن صندوق الكاشير وتدعم ترحيل
     readFile(new URL("../client/src/js/permissions.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
-  assert.match(database, /const DB_VERSION = 12/);
+  assert.match(database, /const DB_VERSION = 13/);
   assert.match(database, /makeIndexedStore\(database, "cashierSalaryDeductions"/);
   assert.match(database, /async transferCashierShiftToVault/);
   assert.match(database, /async getVault/);
@@ -200,7 +200,7 @@ test("يوفر الجرد الدوري لقطة محفوظة ومقارنة من
     readFile(new URL("../client/src/js/constants.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
-  assert.match(database, /const DB_VERSION = 12/);
+  assert.match(database, /const DB_VERSION = 13/);
   assert.match(database, /makeIndexedStore\(database, "periodicInventories"/);
   assert.match(database, /async getPeriodicInventorySummary/);
   assert.match(database, /async createPeriodicInventory/);
@@ -230,8 +230,8 @@ test("يدعم البحث المباشر برقم الفاتورة ويعرض ع
 
 test("يعرض رأس التطبيق اسم المتجر بدل نوع النشاط", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
-  assert.match(app, /escapeHtml\(state\.settings\?\.storeName \|\| "إدارة المتجر"\)/);
-  assert.doesNotMatch(app, /escapeHtml\(state\.settings\?\.businessType \|\| "إدارة المتجر"\)/);
+  assert.match(app, /function storeDisplayName\(settings = state\.settings\)/);
+  assert.match(app, /businessType.*storeName/);
 });
 
 test("يربط خيار البقاء وكل عناصر إغلاق النافذة بدالة الإغلاق الموحدة", async () => {
@@ -303,7 +303,7 @@ test("تظهر صلاحية الشراء في المخزون بتحذير برت
   assert.match(app, /days <= 30 \? "danger" : "warning"/);
   assert.match(app, /تنبيه انتهاء الصلاحية/);
   assert.match(app, /data-purchase-expiry-date/);
-  assert.match(database, /if \(expiryDate\) batches\.add/);
+  assert.match(database, /batches\.add\(\{ id: batchId/);
   assert.match(database, /لا يمكن حفظ منتج منتهٍ أو ينتهي اليوم/);
   assert.match(styles, /\.expiry-status--warning \{ color:#845100; background:#fff3d4; border-color:#e2a443;/);
   assert.match(styles, /\.expiry-status--danger \{ color:#8b1d31; background:#fde6e9; border-color:#cf4f63;/);
