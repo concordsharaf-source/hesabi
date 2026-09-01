@@ -613,6 +613,16 @@ export const db = {
       return { accountId: account.id, accountName: account.name, month, monthlySalary, advances, shortageDeductions, remainingSalary: roundMoney(monthlySalary - advances - shortageDeductions) };
     });
   },
+  async listCashierMonthlySalaryExpenses({ from = "", to = "" } = {}) {
+    if (from && to && from > to) return [];
+    const startMonth = String(from || to || dateKey()).slice(0, 7); const endMonth = String(to || from || dateKey()).slice(0, 7);
+    const validMonth = (value) => /^\d{4}-\d{2}$/.test(value);
+    if (!validMonth(startMonth) || !validMonth(endMonth) || startMonth > endMonth) return [];
+    const [startYear, startMonthNumber] = startMonth.split("-").map(Number); const [endYear, endMonthNumber] = endMonth.split("-").map(Number); const startIndex = startYear * 12 + startMonthNumber; const endIndex = endYear * 12 + endMonthNumber;
+    const months = Array.from({ length: endIndex - startIndex + 1 }, (_, index) => { const value = startIndex + index; const year = Math.floor((value - 1) / 12); const month = ((value - 1) % 12) + 1; return `${year}-${String(month).padStart(2, "0")}`; });
+    const summaries = (await Promise.all(months.map((month) => this.listCashierSalarySummaries({ month })))).flat();
+    return summaries.filter((summary) => summary.monthlySalary > 0).map((summary) => ({ id: `cashier-salary-${summary.accountId}-${summary.month}`, amount: summary.monthlySalary, periodType: "monthly", category: "رواتب", description: `راتب ${summary.accountName}`, date: `${summary.month}-01`, month: summary.month, notes: `السلف ${summary.advances} · خصم العجز ${summary.shortageDeductions} · المتبقي ${summary.remainingSalary}`, cashierMonthlySalary: true, cashierId: summary.accountId, cashierName: summary.accountName, advances: summary.advances, shortageDeductions: summary.shortageDeductions, remainingSalary: summary.remainingSalary }));
+  },
   async createExpense(values) {
     const amount = Math.max(0, toNumber(values.amount)); if (amount <= 0) throw new Error("أدخل مبلغ مصروف أكبر من صفر.");
     const isCashierSalaryAdvance = values.cashierSalaryAdvance === true || values.cashierSalaryAdvance === "on";

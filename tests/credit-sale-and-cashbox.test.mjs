@@ -275,6 +275,18 @@ test("تسجل سلفة الكاشير كمصروف واحد وتخصم من ر�
   await db.resetAllData();
 });
 
+test("يعرض راتب الكاشير كبند شهري في المصروفات ويسمح بتعديل الراتب", async () => {
+  await db.resetAllData();
+  const cashier = await db.createAccount({ username: "monthly-expense-cashier", name: "كاشير المصروفات", role: "cashier", pin: "3333", monthlySalary: 1200 });
+  const rows = await db.listCashierMonthlySalaryExpenses({ from: "2026-08-15", to: "2026-08-20" });
+  assert.deepEqual(rows.map((row) => ({ category: row.category, amount: row.amount, month: row.month, cashierName: row.cashierName })), [{ category: "رواتب", amount: 1200, month: "2026-08", cashierName: "كاشير المصروفات" }]);
+  assert.equal(rows[0].cashierMonthlySalary, true);
+  const updated = await db.updateAccount(cashier.id, { name: cashier.name, role: "cashier", isActive: true, monthlySalary: 1500 });
+  assert.equal(updated.monthlySalary, 1500);
+  assert.equal((await db.listCashierSalarySummaries({ month: "2026-08" })).find((item) => item.accountId === cashier.id).monthlySalary, 1500);
+  await db.resetAllData();
+});
+
 test("يرحّل صندوق الكاشير إلى الخزنة مرة واحدة ويخصم العجز المرحّل من الراتب دون تكرار حركة النقد", async () => {
   await db.resetAllData();
   await db.saveSettings({ storeName: "متجر الخزنة", businessType: "بقالة", currency: "YER", openingCash: 500 });
