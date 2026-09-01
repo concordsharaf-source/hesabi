@@ -290,7 +290,7 @@ try {
   await waitFor('#cashier-salary-advance-form');
   await evaluate(`(() => { const form = document.querySelector('#cashier-salary-advance-form'); form.elements.amount.value = '200'; form.requestSubmit(); })()`);
   await waitForGone('#cashier-salary-advance-form');
-  const advanceExpense = await evaluate(`(() => { const row = [...document.querySelectorAll('.entity-row')].find((item) => item.textContent.includes('سلفة راتب كاشير')); return { exists: Boolean(row), linksCashier: row?.textContent.includes('كاشير اختبار الوردية') || false, containsAmount: row?.textContent.includes('200') || false }; })()`);
+  const advanceExpense = await evaluate(`(() => { const row = [...document.querySelectorAll('.entity-row')].find((item) => item.textContent.includes('سلفة موظف')); return { exists: Boolean(row), linksCashier: row?.textContent.includes('كاشير اختبار الوردية') || false, containsAmount: row?.textContent.includes('200') || false }; })()`);
   assert.deepEqual(advanceExpense, { exists: true, linksCashier: true, containsAmount: true });
   await evaluate(`document.querySelector('[data-bottom-nav] [data-view="accounts"]').click()`);
   await waitFor('.account-salary-note');

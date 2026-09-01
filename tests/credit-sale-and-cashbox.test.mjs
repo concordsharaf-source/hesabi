@@ -249,7 +249,7 @@ test("تسجل وردية الكاشير استلام الصندوق ومبيع�
   await db.resetAllData();
 });
 
-test("تسجل سلفة الكاشير كمصروف واحد وتخصم من راتبه الشهري دون تجاوز المتبقي", async () => {
+test("تسجل سلفة الموظف كمصروف نقدي وتخصم من راتبه الشهري دون تجاوز المتبقي", async () => {
   await db.resetAllData();
   const legacyCashier = await db.createAccount({ username: "legacy-cashier", name: "كاشير قديم", role: "cashier", pin: "1111" });
   const cashier = await db.createAccount({ username: "salary-cashier", name: "كاشير الراتب", role: "cashier", pin: "2222", monthlySalary: 1000 });
@@ -257,7 +257,7 @@ test("تسجل سلفة الكاشير كمصروف واحد وتخصم من ر�
   assert.equal(cashier.monthlySalary, 1000);
 
   const advance = await db.createExpense({ cashierSalaryAdvance: true, cashierId: cashier.id, amount: 200, date: "2026-08-15", description: "سلفة منتصف الشهر" });
-  assert.equal(advance.category, "سلفة راتب كاشير");
+  assert.equal(advance.category, "سلفة موظف");
   assert.equal(advance.cashierId, cashier.id);
   assert.equal(advance.cashierName, "كاشير الراتب");
   assert.equal(advance.periodType, "daily");
@@ -275,15 +275,38 @@ test("تسجل سلفة الكاشير كمصروف واحد وتخصم من ر�
   await db.resetAllData();
 });
 
-test("يعرض راتب الكاشير كبند شهري في المصروفات ويسمح بتعديل الراتب", async () => {
+test("لا يظهر راتب الموظف كمصروف إلا بعد تسليمه ويُسجل الراتب الكامل عند التسليم", async () => {
   await db.resetAllData();
   const cashier = await db.createAccount({ username: "monthly-expense-cashier", name: "كاشير المصروفات", role: "cashier", pin: "3333", monthlySalary: 1200 });
+  assert.deepEqual(await db.listCashierMonthlySalaryExpenses({ from: "2026-08-15", to: "2026-08-20" }), []);
+  const settled = await db.settleCashierSalary({ accountId: cashier.id, month: "2026-08", date: "2026-08-20" });
+  assert.equal(settled.amount, 1200);
   const rows = await db.listCashierMonthlySalaryExpenses({ from: "2026-08-15", to: "2026-08-20" });
-  assert.deepEqual(rows.map((row) => ({ category: row.category, amount: row.amount, month: row.month, cashierName: row.cashierName })), [{ category: "رواتب", amount: 1200, month: "2026-08", cashierName: "كاشير المصروفات" }]);
+  assert.deepEqual(rows.map((row) => ({ category: row.category, amount: row.amount, month: row.month, cashierName: row.cashierName })), [{ category: "رواتب مسلمة", amount: 1200, month: "2026-08", cashierName: "كاشير المصروفات" }]);
   assert.equal(rows[0].cashierMonthlySalary, true);
+  assert.equal(rows[0].salaryPayment, true);
   const updated = await db.updateAccount(cashier.id, { name: cashier.name, role: "cashier", isActive: true, monthlySalary: 1500 });
   assert.equal(updated.monthlySalary, 1500);
   assert.equal((await db.listCashierSalarySummaries({ month: "2026-08" })).find((item) => item.accountId === cashier.id).monthlySalary, 1500);
+  await db.resetAllData();
+});
+
+test("يدعم الموظف لقبًا وظيفيًا وسلفة وتسليم المتبقي من راتبه", async () => {
+  await db.resetAllData();
+  const employee = await db.createAccount({ username: "cleaning-employee", name: "موظف النظافة", role: "employee", jobTitle: "موظف نظافة", pin: "4444", monthlySalary: 800 });
+  assert.equal(employee.role, "employee");
+  assert.equal(employee.jobTitle, "موظف نظافة");
+  const advance = await db.createExpense({ salaryAdvance: true, staffId: employee.id, amount: 200, date: "2026-08-15" });
+  assert.equal(advance.category, "سلفة موظف");
+  assert.equal(advance.staffId, employee.id);
+  const summary = (await db.listCashierSalarySummaries({ month: "2026-08" })).find((item) => item.accountId === employee.id);
+  assert.deepEqual({ role: summary.role, jobTitle: summary.jobTitle, remainingSalary: summary.remainingSalary, salaryDelivered: summary.salaryDelivered }, { role: "employee", jobTitle: "موظف نظافة", remainingSalary: 600, salaryDelivered: false });
+  const settled = await db.settleCashierSalary({ accountId: employee.id, month: "2026-08", date: "2026-08-20" });
+  assert.equal(settled.amount, 600);
+  const delivered = (await db.listCashierSalarySummaries({ month: "2026-08" })).find((item) => item.accountId === employee.id);
+  assert.equal(delivered.salaryDelivered, true);
+  assert.equal(delivered.remainingSalary, 0);
+  assert.equal((await db.listCashierMonthlySalaryExpenses({ from: "2026-08-15", to: "2026-08-20" })).find((item) => item.staffId === employee.id).amount, 800);
   await db.resetAllData();
 });
 

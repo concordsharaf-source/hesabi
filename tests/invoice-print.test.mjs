@@ -129,7 +129,7 @@ test("يوثق تسليم الصندوق عند تبديل الحساب ويعر
   assert.match(css, /\.cashier-shift-row \{ display:grid;/);
 });
 
-test("تربط واجهة الحسابات راتب الكاشير بسلفة أدمن وملخص الراتب الشهري", async () => {
+test("تربط واجهة الحسابات راتب الموظف بسلفة أدمن وملخص الراتب الشهري وزر التسليم", async () => {
   const [app, database, permissions, css] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
@@ -142,9 +142,12 @@ test("تربط واجهة الحسابات راتب الكاشير بسلفة أ
   assert.match(app, /function cashierSalarySummaryMarkup\(/);
   assert.match(app, /cashierSalaryAdvance: true/);
   assert.match(database, /async listCashierSalarySummaries/);
-  assert.match(database, /cashierSalaryAdvance && expense\.cashierId === account\.id/);
+  assert.match(app, /data-action="settle-staff-salary"/);
+  assert.match(database, /const staffId = \(expense\) => expense\.staffId \|\| expense\.cashierId/);
+  assert.match(database, /async settleCashierSalary/);
   assert.match(database, /السلفة تتجاوز المتبقي من راتب/);
   assert.match(permissions, /"new-cashier-salary-advance"/);
+  assert.match(permissions, /"settle-staff-salary"/);
   assert.match(css, /\.cashier-salary-row \{ display:grid;/);
 });
 

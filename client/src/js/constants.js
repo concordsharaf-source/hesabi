@@ -43,6 +43,7 @@ export const PAYMENT_METHODS = ["نقدي", "تحويل"];
 export const ACCOUNT_ROLES = [
   { id: "admin", label: "أدمن" },
   { id: "cashier", label: "كاشير" },
+  { id: "employee", label: "موظف" },
 ];
 
 export const DAILY_EXPENSE_CATEGORIES = ["أكل وشرب", "مواصلات", "وقود", "صيانة طارئة", "لوازم تشغيل", "تسويق يومي", "مصروفات يومية أخرى"];

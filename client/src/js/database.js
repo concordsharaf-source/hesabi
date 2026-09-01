@@ -76,7 +76,7 @@ const hashPin = async (pin, salt) => {
   const digest = await secureCrypto().subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 };
-const accountRole = (role) => role === "admin" ? "admin" : "cashier";
+const accountRole = (role) => role === "admin" ? "admin" : role === "employee" ? "employee" : "cashier";
 const makeIndexedStore = (database, name, indexes = []) => {
   if (database.objectStoreNames.contains(name)) return database.transaction?.objectStore?.(name);
   const store = database.createObjectStore(name, { keyPath: "id" });
@@ -104,7 +104,8 @@ async function createAccountRecord(values) {
     pinHash: await hashPin(values.pin, pinSalt),
     mustChangePin: Boolean(values.mustChangePin),
     isActive: values.isActive !== false,
-    monthlySalary: role === "cashier" ? Math.max(0, toNumber(values.monthlySalary)) : 0,
+    jobTitle: normalize(values.jobTitle),
+    monthlySalary: role === "cashier" || role === "employee" ? Math.max(0, toNumber(values.monthlySalary)) : 0,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
@@ -267,8 +268,9 @@ export const db = {
       if (all.filter((account) => account.role === "admin" && account.isActive).length <= 1) throw new Error("يجب الإبقاء على حساب أدمن نشط واحد على الأقل.");
     }
     const name = normalize(values.name ?? current.name); if (!name) throw new Error("اسم الحساب مطلوب.");
-    const monthlySalary = nextRole === "cashier" ? Math.max(0, toNumber(values.monthlySalary ?? current.monthlySalary)) : 0;
-    const updated = { ...current, name, role: nextRole, isActive: nextActive, monthlySalary, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
+    const jobTitle = normalize(values.jobTitle ?? current.jobTitle);
+    const monthlySalary = nextRole === "cashier" || nextRole === "employee" ? Math.max(0, toNumber(values.monthlySalary ?? current.monthlySalary)) : 0;
+    const updated = { ...current, name, role: nextRole, jobTitle, monthlySalary, isActive: nextActive, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
   },
   async deleteCashierAccount(accountId) {
     const database = await this.open(); const transaction = database.transaction("accounts", "readwrite"); const accounts = transaction.objectStore("accounts"); const current = await requestAsPromise(accounts.get(accountId));
@@ -606,12 +608,31 @@ export const db = {
     const database = await this.open(); const transaction = database.transaction(["accounts", "expenses", "cashierSalaryDeductions"], "readonly");
     const [accounts, expenses, deductions] = await Promise.all([requestAsPromise(transaction.objectStore("accounts").getAll()), requestAsPromise(transaction.objectStore("expenses").getAll()), requestAsPromise(transaction.objectStore("cashierSalaryDeductions").getAll())]);
     await transactionDone(transaction);
-    return accounts.filter((account) => account.role === "cashier").sort((a, b) => a.name.localeCompare(b.name, "ar")).map((account) => {
+    const staffAccounts = accounts.filter((account) => account.role === "cashier" || account.role === "employee");
+    return staffAccounts.sort((a, b) => a.name.localeCompare(b.name, "ar")).map((account) => {
       const monthlySalary = Math.max(0, toNumber(account.monthlySalary));
-      const advances = roundMoney(expenses.filter((expense) => expense.cashierSalaryAdvance && expense.cashierId === account.id && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+      const staffId = (expense) => expense.staffId || expense.cashierId;
+      const advances = roundMoney(expenses.filter((expense) => expense.cashierSalaryAdvance && staffId(expense) === account.id && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+      const salaryPayment = expenses.find((expense) => expense.salaryPayment && staffId(expense) === account.id && (expense.month || String(expense.date || "").slice(0, 7)) === month);
+      const salaryPaid = roundMoney(expenses.filter((expense) => expense.salaryPayment && staffId(expense) === account.id && (expense.month || String(expense.date || "").slice(0, 7)) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
       const shortageDeductions = roundMoney(deductions.filter((deduction) => deduction.accountId === account.id && deduction.month === month).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0));
-      return { accountId: account.id, accountName: account.name, month, monthlySalary, advances, shortageDeductions, remainingSalary: roundMoney(monthlySalary - advances - shortageDeductions) };
+      const remainingSalary = roundMoney(Math.max(0, monthlySalary - advances - shortageDeductions - salaryPaid));
+      return { accountId: account.id, accountName: account.name, role: account.role, jobTitle: account.jobTitle || "", month, monthlySalary, advances, shortageDeductions, salaryPaid, remainingSalary, salaryDelivered: Boolean(salaryPayment) };
     });
+  },
+  async settleCashierSalary({ accountId, month = dateKey().slice(0, 7), date = dateKey(), notes = "" } = {}) {
+    const normalizedMonth = String(month || "").slice(0, 7); if (!/^\d{4}-\d{2}$/.test(normalizedMonth)) throw new Error("شهر الراتب غير صالح.");
+    const database = await this.open(); const transaction = database.transaction(["accounts", "expenses", "cashierSalaryDeductions"], "readwrite"); const account = await requestAsPromise(transaction.objectStore("accounts").get(accountId));
+    if (!account || !["cashier", "employee"].includes(account.role)) throw new Error("اختر موظفًا صالحًا لتسليم راتبه.");
+    const monthlySalary = Math.max(0, toNumber(account.monthlySalary)); if (monthlySalary <= 0) throw new Error("سجّل راتبًا شهريًا للموظف أولًا.");
+    const expensesStore = transaction.objectStore("expenses"); const expenses = await requestAsPromise(expensesStore.getAll()); const deductions = await requestAsPromise(transaction.objectStore("cashierSalaryDeductions").index("accountId").getAll(accountId));
+    const belongsToMonth = (item) => (item.month || String(item.date || "").slice(0, 7)) === normalizedMonth && (item.staffId || item.cashierId) === accountId;
+    if (expenses.some((expense) => expense.salaryPayment && belongsToMonth(expense))) throw new Error("تم تسليم راتب هذا الموظف لهذا الشهر مسبقًا.");
+    const advances = roundMoney(expenses.filter((expense) => expense.cashierSalaryAdvance && belongsToMonth(expense)).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+    const shortageDeductions = roundMoney(deductions.filter((deduction) => deduction.month === normalizedMonth).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0));
+    const remaining = roundMoney(Math.max(0, monthlySalary - advances - shortageDeductions)); const now = nowIso();
+    const payment = { id: uid("salary-payment"), amount: remaining, salaryExpenseAmount: monthlySalary, periodType: "monthly", category: "رواتب مسلمة", description: `راتب مسلم لـ ${account.name}`, date: date || dateKey(), month: normalizedMonth, notes: normalize(notes), salaryPayment: true, cashierMonthlySalary: true, staffId: account.id, staffName: account.name, cashierId: account.role === "cashier" ? account.id : "", cashierName: account.role === "cashier" ? account.name : "", advances, shortageDeductions, remainingSalary: 0, createdAt: now, updatedAt: now };
+    expensesStore.add(payment); await transactionDone(transaction); return { payment, accountId: account.id, accountName: account.name, month: normalizedMonth, amount: remaining, salaryExpenseAmount: monthlySalary, advances, shortageDeductions };
   },
   async listCashierMonthlySalaryExpenses({ from = "", to = "" } = {}) {
     if (from && to && from > to) return [];
@@ -621,37 +642,39 @@ export const db = {
     const [startYear, startMonthNumber] = startMonth.split("-").map(Number); const [endYear, endMonthNumber] = endMonth.split("-").map(Number); const startIndex = startYear * 12 + startMonthNumber; const endIndex = endYear * 12 + endMonthNumber;
     const months = Array.from({ length: endIndex - startIndex + 1 }, (_, index) => { const value = startIndex + index; const year = Math.floor((value - 1) / 12); const month = ((value - 1) % 12) + 1; return `${year}-${String(month).padStart(2, "0")}`; });
     const summaries = (await Promise.all(months.map((month) => this.listCashierSalarySummaries({ month })))).flat();
-    return summaries.filter((summary) => summary.monthlySalary > 0).map((summary) => ({ id: `cashier-salary-${summary.accountId}-${summary.month}`, amount: summary.monthlySalary, periodType: "monthly", category: "رواتب", description: `راتب ${summary.accountName}`, date: `${summary.month}-01`, month: summary.month, notes: `السلف ${summary.advances} · خصم العجز ${summary.shortageDeductions} · المتبقي ${summary.remainingSalary}`, cashierMonthlySalary: true, cashierId: summary.accountId, cashierName: summary.accountName, advances: summary.advances, shortageDeductions: summary.shortageDeductions, remainingSalary: summary.remainingSalary }));
+    return summaries.filter((summary) => summary.salaryDelivered).map((summary) => ({ id: `cashier-salary-${summary.accountId}-${summary.month}`, amount: summary.monthlySalary, periodType: "monthly", category: "رواتب مسلمة", description: `راتب مسلم لـ ${summary.accountName}`, date: `${summary.month}-01`, month: summary.month, notes: `الراتب الأساسي ${summary.monthlySalary} · السلف ${summary.advances} · خصم العجز ${summary.shortageDeductions} · المسلم ${summary.salaryPaid}`, cashierMonthlySalary: true, salaryPayment: true, staffId: summary.accountId, cashierId: summary.accountId, cashierName: summary.accountName, advances: summary.advances, shortageDeductions: summary.shortageDeductions, salaryPaid: summary.salaryPaid, remainingSalary: summary.remainingSalary, role: summary.role, jobTitle: summary.jobTitle }));
   },
   async createExpense(values) {
     const amount = Math.max(0, toNumber(values.amount)); if (amount <= 0) throw new Error("أدخل مبلغ مصروف أكبر من صفر.");
-    const isCashierSalaryAdvance = values.cashierSalaryAdvance === true || values.cashierSalaryAdvance === "on";
-    const periodType = isCashierSalaryAdvance ? "daily" : (values.periodType === "monthly" ? "monthly" : "daily"); const date = values.date || dateKey();
-    const database = await this.open(); const transaction = database.transaction(isCashierSalaryAdvance ? ["accounts", "expenses", "cashierSalaryDeductions"] : ["expenses"], "readwrite");
-    let cashier = null;
-    if (isCashierSalaryAdvance) {
-      const cashierId = normalize(values.cashierId); cashier = await requestAsPromise(transaction.objectStore("accounts").get(cashierId));
-      if (!cashier || cashier.role !== "cashier") throw new Error("اختر كاشيرًا صالحًا لسلفة الراتب.");
-      const monthlySalary = Math.max(0, toNumber(cashier.monthlySalary)); if (monthlySalary <= 0) throw new Error("سجّل راتبًا شهريًا للكاشير أولًا.");
-      const month = String(date).slice(0, 7); const expenses = await requestAsPromise(transaction.objectStore("expenses").getAll()); const deductions = await requestAsPromise(transaction.objectStore("cashierSalaryDeductions").index("accountId").getAll(cashierId));
-      const priorAdvances = roundMoney(expenses.filter((expense) => expense.cashierSalaryAdvance && expense.cashierId === cashierId && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+    const isStaffSalaryAdvance = values.cashierSalaryAdvance === true || values.cashierSalaryAdvance === "on" || values.salaryAdvance === true || values.salaryAdvance === "on";
+    const periodType = isStaffSalaryAdvance ? "daily" : (values.periodType === "monthly" ? "monthly" : "daily"); const date = values.date || dateKey();
+    const database = await this.open(); const transaction = database.transaction(isStaffSalaryAdvance ? ["accounts", "expenses", "cashierSalaryDeductions"] : ["expenses"], "readwrite");
+    let staff = null;
+    if (isStaffSalaryAdvance) {
+      const staffId = normalize(values.staffId || values.cashierId); staff = await requestAsPromise(transaction.objectStore("accounts").get(staffId));
+      if (!staff || !["cashier", "employee"].includes(staff.role)) throw new Error("اختر موظفًا صالحًا لسلفة الراتب.");
+      const monthlySalary = Math.max(0, toNumber(staff.monthlySalary)); if (monthlySalary <= 0) throw new Error("سجّل راتبًا شهريًا للموظف أولًا.");
+      const month = String(date).slice(0, 7); const expenses = await requestAsPromise(transaction.objectStore("expenses").getAll()); const deductions = await requestAsPromise(transaction.objectStore("cashierSalaryDeductions").index("accountId").getAll(staffId));
+      const priorAdvances = roundMoney(expenses.filter((expense) => expense.cashierSalaryAdvance && (expense.staffId || expense.cashierId) === staffId && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+      const priorSalaryPaid = roundMoney(expenses.filter((expense) => expense.salaryPayment && (expense.staffId || expense.cashierId) === staffId && (expense.month || String(expense.date || "").slice(0, 7)) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
       const priorDeductions = roundMoney(deductions.filter((deduction) => deduction.month === month).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0));
-      if (roundMoney(priorAdvances + priorDeductions + amount) > monthlySalary) throw new Error(`السلفة تتجاوز المتبقي من راتب ${cashier.name} لهذا الشهر (${roundMoney(monthlySalary - priorAdvances - priorDeductions)}).`);
+      if (roundMoney(priorAdvances + priorDeductions + priorSalaryPaid + amount) > monthlySalary) throw new Error(`السلفة تتجاوز المتبقي من راتب ${staff.name} لهذا الشهر (${roundMoney(monthlySalary - priorAdvances - priorDeductions - priorSalaryPaid)}).`);
     }
-    const expense = { id: uid("expense"), amount, periodType, category: isCashierSalaryAdvance ? "سلفة راتب كاشير" : normalize(values.category || (periodType === "monthly" ? "مصروفات شهرية أخرى" : "مصروفات يومية أخرى")), description: isCashierSalaryAdvance ? normalize(values.description || `سلفة من راتب ${cashier.name}`) : normalize(values.description), date, notes: normalize(values.notes), cashierSalaryAdvance: isCashierSalaryAdvance, cashierId: isCashierSalaryAdvance ? cashier.id : "", cashierName: isCashierSalaryAdvance ? cashier.name : "", createdAt: nowIso(), updatedAt: nowIso() }; transaction.objectStore("expenses").add(expense); await transactionDone(transaction); return expense;
+    const expense = { id: uid("expense"), amount, periodType, category: isStaffSalaryAdvance ? "سلفة موظف" : normalize(values.category || (periodType === "monthly" ? "مصروفات شهرية أخرى" : "مصروفات يومية أخرى")), description: isStaffSalaryAdvance ? normalize(values.description || `سلفة من راتب ${staff.name}`) : normalize(values.description), date, notes: normalize(values.notes), cashierSalaryAdvance: isStaffSalaryAdvance, salaryAdvance: isStaffSalaryAdvance, staffId: isStaffSalaryAdvance ? staff.id : "", staffName: isStaffSalaryAdvance ? staff.name : "", cashierId: isStaffSalaryAdvance && staff.role === "cashier" ? staff.id : "", cashierName: isStaffSalaryAdvance && staff.role === "cashier" ? staff.name : "", createdAt: nowIso(), updatedAt: nowIso() }; transaction.objectStore("expenses").add(expense); await transactionDone(transaction); return expense;
   },
   async updateExpense(expenseId, values) {
     const amount = Math.max(0, toNumber(values.amount)); if (amount <= 0) throw new Error("أدخل مبلغ مصروف أكبر من صفر.");
     const database = await this.open(); const current = await requestAsPromise(database.transaction("expenses", "readonly").objectStore("expenses").get(expenseId)); if (!current) throw new Error("المصروف غير موجود.");
     const transaction = database.transaction(current.cashierSalaryAdvance ? ["accounts", "expenses", "cashierSalaryDeductions"] : ["expenses"], "readwrite"); const store = transaction.objectStore("expenses");
     if (current.cashierSalaryAdvance) {
-      const account = await requestAsPromise(transaction.objectStore("accounts").get(current.cashierId)); if (!account || account.role !== "cashier") throw new Error("حساب الكاشير المرتبط بالسلفة غير متاح.");
-      const date = values.date || current.date; const month = String(date).slice(0, 7); const expenses = await requestAsPromise(store.getAll()); const deductions = await requestAsPromise(transaction.objectStore("cashierSalaryDeductions").index("accountId").getAll(current.cashierId));
-      const otherAdvances = roundMoney(expenses.filter((expense) => expense.id !== expenseId && expense.cashierSalaryAdvance && expense.cashierId === current.cashierId && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
-      const priorDeductions = roundMoney(deductions.filter((deduction) => deduction.month === month).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0)); const remaining = roundMoney(Math.max(0, toNumber(account.monthlySalary) - otherAdvances - priorDeductions));
+      const staffId = current.staffId || current.cashierId; const account = await requestAsPromise(transaction.objectStore("accounts").get(staffId)); if (!account || !["cashier", "employee"].includes(account.role)) throw new Error("حساب الموظف المرتبط بالسلفة غير متاح.");
+      const date = values.date || current.date; const month = String(date).slice(0, 7); const expenses = await requestAsPromise(store.getAll()); const deductions = await requestAsPromise(transaction.objectStore("cashierSalaryDeductions").index("accountId").getAll(staffId));
+      const otherAdvances = roundMoney(expenses.filter((expense) => expense.id !== expenseId && expense.cashierSalaryAdvance && (expense.staffId || expense.cashierId) === staffId && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+      const salaryPaid = roundMoney(expenses.filter((expense) => expense.salaryPayment && (expense.staffId || expense.cashierId) === staffId && (expense.month || String(expense.date || "").slice(0, 7)) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
+      const priorDeductions = roundMoney(deductions.filter((deduction) => deduction.month === month).reduce((sum, deduction) => sum + toNumber(deduction.amount), 0)); const remaining = roundMoney(Math.max(0, toNumber(account.monthlySalary) - otherAdvances - priorDeductions - salaryPaid));
       if (amount > remaining) throw new Error(`السلفة تتجاوز المتبقي من راتب ${account.name} لهذا الشهر (${remaining}).`);
     }
-    const periodType = current.cashierSalaryAdvance ? "daily" : (values.periodType === "monthly" ? "monthly" : "daily"); const updated = { ...current, amount, periodType, category: current.cashierSalaryAdvance ? "سلفة راتب كاشير" : normalize(values.category || current.category), description: current.cashierSalaryAdvance ? normalize(values.description || current.description) : normalize(values.description), date: values.date || current.date, notes: normalize(values.notes), updatedAt: nowIso() }; store.put(updated); await transactionDone(transaction); return updated;
+    const periodType = current.cashierSalaryAdvance ? "daily" : (values.periodType === "monthly" ? "monthly" : "daily"); const staffId = current.staffId || current.cashierId || ""; const updated = { ...current, amount, periodType, category: current.cashierSalaryAdvance ? "سلفة موظف" : normalize(values.category || current.category), description: current.cashierSalaryAdvance ? normalize(values.description || current.description) : normalize(values.description), date: values.date || current.date, notes: normalize(values.notes), staffId, staffName: current.staffName || current.cashierName || "", updatedAt: nowIso() }; store.put(updated); await transactionDone(transaction); return updated;
   },
   async deleteExpense(expenseId) { const database = await this.open(); const transaction = database.transaction("expenses", "readwrite"); transaction.objectStore("expenses").delete(expenseId); await transactionDone(transaction); },
 
@@ -659,7 +682,9 @@ export const db = {
   async getAnalytics({ from = "", to = "" } = {}) {
     const database = await this.open(); const transaction = database.transaction(["sales", "saleItems", "saleReturns", "saleReturnItems", "purchases", "purchaseItems", "purchaseReturns", "purchaseReturnItems", "expenses"], "readonly");
     const [sales, saleItems, saleReturns, saleReturnItems, purchases, purchaseItems, purchaseReturns, purchaseReturnItems, expenses] = await Promise.all(["sales", "saleItems", "saleReturns", "saleReturnItems", "purchases", "purchaseItems", "purchaseReturns", "purchaseReturnItems", "expenses"].map((name) => requestAsPromise(transaction.objectStore(name).getAll())));
-    const filter = (items) => items.filter((item) => isWithinDateRange(item.date, from, to)); const filteredSales = filter(sales); const saleIds = new Set(filteredSales.map((item) => item.id)); const filteredSaleItems = saleItems.filter((item) => saleIds.has(item.saleId)); const filteredReturns = filter(saleReturns); const returnIds = new Set(filteredReturns.map((item) => item.id)); const filteredReturnItems = saleReturnItems.filter((item) => returnIds.has(item.saleReturnId)); const filteredPurchases = filter(purchases); const purchaseIds = new Set(filteredPurchases.map((item) => item.id)); const filteredPurchaseItems = purchaseItems.filter((item) => purchaseIds.has(item.purchaseId)); const filteredPurchaseReturns = filter(purchaseReturns); const purchaseReturnIds = new Set(filteredPurchaseReturns.map((item) => item.id)); const filteredPurchaseReturnItems = purchaseReturnItems.filter((item) => purchaseReturnIds.has(item.purchaseReturnId)); const recognizedExpenses = expenses.map((item) => ({ ...item, recognizedAmount: item.periodType === "monthly" ? calculateMonthlyExpenseAllocation({ amount: item.amount, date: item.date, from, to }) : (isWithinDateRange(item.date, from, to) ? toNumber(item.amount) : 0) })).filter((item) => item.recognizedAmount > 0);
+    const filter = (items) => items.filter((item) => isWithinDateRange(item.date, from, to)); const filteredSales = filter(sales); const saleIds = new Set(filteredSales.map((item) => item.id)); const filteredSaleItems = saleItems.filter((item) => saleIds.has(item.saleId)); const filteredReturns = filter(saleReturns); const returnIds = new Set(filteredReturns.map((item) => item.id)); const filteredReturnItems = saleReturnItems.filter((item) => returnIds.has(item.saleReturnId)); const filteredPurchases = filter(purchases); const purchaseIds = new Set(filteredPurchases.map((item) => item.id)); const filteredPurchaseItems = purchaseItems.filter((item) => purchaseIds.has(item.purchaseId)); const filteredPurchaseReturns = filter(purchaseReturns); const purchaseReturnIds = new Set(filteredPurchaseReturns.map((item) => item.id)); const filteredPurchaseReturnItems = purchaseReturnItems.filter((item) => purchaseReturnIds.has(item.purchaseReturnId));     const salaryPayments = expenses.filter((item) => item.salaryPayment && toNumber(item.salaryExpenseAmount) > 0).map((item) => ({ ...item, amount: toNumber(item.salaryExpenseAmount), periodType: "monthly" }));
+    const operationalExpenses = expenses.filter((item) => !item.cashierSalaryAdvance && !item.salaryAdvance && !item.salaryPayment);
+    const recognizedExpenses = [...operationalExpenses, ...salaryPayments].map((item) => ({ ...item, recognizedAmount: item.periodType === "monthly" ? calculateMonthlyExpenseAllocation({ amount: item.amount, date: item.date, from, to }) : (isWithinDateRange(item.date, from, to) ? toNumber(item.amount) : 0) })).filter((item) => item.recognizedAmount > 0);
     const salesTotal = roundMoney(filteredSales.reduce((sum, item) => sum + toNumber(item.total), 0)); const discounts = roundMoney(filteredSales.reduce((sum, item) => sum + toNumber(item.discount), 0)); const costOfGoods = roundMoney(filteredSaleItems.reduce((sum, item) => sum + toNumber(item.costTotal ?? toNumber(item.unitCost) * toNumber(item.quantity)), 0)); const salesReturnsTotal = roundMoney(filteredReturnItems.reduce((sum, item) => sum + toNumber(item.total), 0)); const returnCosts = roundMoney(filteredReturnItems.reduce((sum, item) => sum + toNumber(item.costTotal ?? toNumber(item.unitCost) * toNumber(item.quantity)), 0)); const expensesTotal = roundMoney(recognizedExpenses.reduce((sum, item) => sum + toNumber(item.recognizedAmount), 0)); const profit = calculateProfit({ sales: salesTotal, costOfGoods, expenses: expensesTotal, salesReturns: salesReturnsTotal, returnCosts }); const purchasesTotal = roundMoney(filteredPurchases.reduce((sum, item) => sum + toNumber(item.total), 0)); const purchasesReturnsTotal = roundMoney(filteredPurchaseReturnItems.reduce((sum, item) => sum + toNumber(item.total), 0)); const expensesByCategory = recognizedExpenses.reduce((groups, item) => ({ ...groups, [item.category]: roundMoney((groups[item.category] || 0) + toNumber(item.recognizedAmount)) }), {});
     return { from, to, sales: { invoices: filteredSales.length, total: salesTotal, discounts, net: profit.netSales, costOfGoods: profit.netCostOfGoods, profit: profit.grossProfit, returns: salesReturnsTotal, items: filteredSales }, purchases: { invoices: filteredPurchases.length, total: purchasesTotal, net: roundMoney(purchasesTotal - purchasesReturnsTotal), products: filteredPurchaseItems.reduce((sum, item) => sum + toNumber(item.quantity), 0), returns: purchasesReturnsTotal, items: filteredPurchases }, expenses: { total: expensesTotal, byCategory: expensesByCategory, items: recognizedExpenses }, profit, saleReturns: filteredReturns, purchaseReturns: filteredPurchaseReturns };
   },
