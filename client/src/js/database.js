@@ -33,6 +33,8 @@ const DB_NAME = "hesabi-pwa";
 const DB_VERSION = 13;
 export const LOCAL_BACKUP_RETENTION_LIMIT = 3;
 let databasePromise;
+let activeDatabaseName = DB_NAME;
+const ACTIVE_STORE_KEY = "hesabi-active-store-id-v1";
 
 const uid = (prefix) => `${prefix}-${randomId()}`;
 const calculateInventoryCost = (products, batches) => {
@@ -167,10 +169,16 @@ async function reconcileLegacyProductCosts(database) {
 }
 
 export const db = {
+  async selectStore(storeId = "default") {
+    const normalized = String(storeId || "default").replace(/[^a-zA-Z0-9_-]/g, "-");
+    if (databasePromise && activeDatabaseName === (normalized === "default" ? DB_NAME : `${DB_NAME}-${normalized}`)) return;
+    if (databasePromise) { const database = await databasePromise.catch(() => null); database?.close(); }
+    databasePromise = null; activeDatabaseName = normalized === "default" ? DB_NAME : `${DB_NAME}-${normalized}`; try { localStorage.setItem(ACTIVE_STORE_KEY, normalized); } catch { /* localStorage قد لا يتوفر. */ }
+  },
   async open() {
     if (databasePromise) return databasePromise;
     databasePromise = new Promise((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION);
+      const request = indexedDB.open(activeDatabaseName, DB_VERSION);
       request.onerror = () => { databasePromise = null; reject(request.error || new Error("تعذر فتح قاعدة البيانات المحلية.")); };
       request.onupgradeneeded = () => {
         const database = request.result;
