@@ -1820,11 +1820,13 @@ async function shareOrDownloadFile(file, title) {
 }
 
 async function sharePurchasePdf(purchase) {
+  showToast("جاري تجهيز فاتورة الشراء PDF...");
   const result = await shareOrDownloadPdf({ html: purchaseInvoiceHtml(purchase), filename: `${purchase.invoiceNumber}.pdf`, title: `فاتورة شراء ${purchase.invoiceNumber}` });
   showToast(result === "shared" ? "تمت مشاركة فاتورة الشراء PDF." : "تم تنزيل فاتورة الشراء PDF.");
 }
 
 async function exportPurchaseExcel(purchase) {
+  showToast("جاري تجهيز فاتورة الشراء Excel...");
   const file = new File([createPurchaseWorkbook(purchase)], `${purchase.invoiceNumber}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const result = await shareOrDownloadFile(file, `فاتورة شراء ${purchase.invoiceNumber}`);
   showToast(result === "shared" ? "تمت مشاركة فاتورة الشراء Excel." : "تم تنزيل فاتورة الشراء Excel.");
