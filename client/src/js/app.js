@@ -1819,10 +1819,15 @@ async function shareOrDownloadFile(file, title) {
   return "downloaded";
 }
 
+function normalizePurchaseSalePrices(purchase) {
+  return { ...purchase, items: (purchase.items || []).map((item) => { const product = state.products.find((candidate) => candidate.id === item.productId); const salePrice = item.salePrice === undefined || item.salePrice === "" ? (product?.salePrice ?? 0) : item.salePrice; return { ...item, salePrice: Math.max(0, toNumber(salePrice)) }; }) };
+}
+
 async function sharePurchasePdf(purchase) {
   showToast("جاري تجهيز فاتورة الشراء PDF...");
   const supplier = state.suppliers.find((item) => item.id === purchase.supplierId) || null;
-  const purchaseForPdf = { ...purchase, supplierPhone: supplier?.phone || "", supplierAddress: supplier?.address || "" };
+  const normalizedPurchase = normalizePurchaseSalePrices(purchase);
+  const purchaseForPdf = { ...normalizedPurchase, supplierPhone: supplier?.phone || "", supplierAddress: supplier?.address || "" };
   const result = await shareOrDownloadPurchaseInvoicePdf({ purchase: purchaseForPdf, supplier, storeName: storeDisplayName(), logoDataUrl: storeLogoDataUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, filename: `${purchase.invoiceNumber}.pdf`, title: `فاتورة شراء ${purchase.invoiceNumber}` });
   showToast(result === "shared" ? "تمت مشاركة فاتورة الشراء PDF." : "تم تنزيل فاتورة الشراء PDF.");
 }
@@ -1830,7 +1835,8 @@ async function sharePurchasePdf(purchase) {
 async function exportPurchaseExcel(purchase) {
   showToast("جاري تجهيز فاتورة الشراء Excel...");
   const supplier = state.suppliers.find((item) => item.id === purchase.supplierId) || null;
-  const purchaseForExport = { ...purchase, supplierPhone: supplier?.phone || "", supplierAddress: supplier?.address || "" };
+  const normalizedPurchase = normalizePurchaseSalePrices(purchase);
+  const purchaseForExport = { ...normalizedPurchase, supplierPhone: supplier?.phone || "", supplierAddress: supplier?.address || "" };
   const file = new File([createPurchaseWorkbook(purchaseForExport)], `${purchase.invoiceNumber}.xlsx`, { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   const result = await shareOrDownloadFile(file, `فاتورة شراء ${purchase.invoiceNumber}`);
   showToast(result === "shared" ? "تمت مشاركة فاتورة الشراء Excel." : "تم تنزيل فاتورة الشراء Excel.");
@@ -1838,7 +1844,8 @@ async function exportPurchaseExcel(purchase) {
 
 function openPurchaseDetail(purchase) {
   if (!purchase) return;
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">فاتورة شراء محفوظة</span><h2>${purchase.invoiceNumber}</h2><p class="dialog__subtext">${escapeHtml(purchase.supplierName)} · ${dateTime(purchase.date)}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="invoice-detail">${purchase.items.map((item) => `<div><span><strong>${escapeHtml(item.productName)}</strong><small>${item.packageQuantity ? `${amount(item.packageQuantity)} ${escapeHtml(item.packageUnit || "عبوة")} × ${money(item.packageCost)} · ` : ""}${amount(item.quantity)} ${escapeHtml(item.unit)} · سعر الحبة ${money(item.unitCost)}${item.salePrice !== undefined ? ` · البيع ${money(item.salePrice)}` : ""}${item.batchNumber ? ` · التشغيلة ${escapeHtml(item.batchNumber)}` : ""}${toNumber(item.returnedQuantity) ? ` · مرتجع ${amount(item.returnedQuantity)}` : ""}</small></span><strong>${money(item.total)}</strong></div>`).join("")}<div class="invoice-detail__final"><span>الإجمالي</span><strong>${money(purchase.total)}</strong></div></div><div class="dialog__actions"><button id="share-purchase-pdf" class="button button--secondary" type="button">مشاركة PDF</button><button id="export-purchase-excel" class="button button--secondary" type="button">مشاركة Excel</button><button id="purchase-return" class="button button--secondary" type="button">مرتجع شراء ${icon("rotate", 17)}</button><button class="button button--primary" data-dialog-close>إغلاق</button></div>`);
+  const displayPurchase = normalizePurchaseSalePrices(purchase);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">فاتورة شراء محفوظة</span><h2>${displayPurchase.invoiceNumber}</h2><p class="dialog__subtext">${escapeHtml(displayPurchase.supplierName)} · ${dateTime(displayPurchase.date)}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="invoice-detail">${displayPurchase.items.map((item) => `<div><span><strong>${escapeHtml(item.productName)}</strong><small>${item.packageQuantity ? `${amount(item.packageQuantity)} ${escapeHtml(item.packageUnit || "عبوة")} × ${money(item.packageCost)} · ` : ""}${amount(item.quantity)} ${escapeHtml(item.unit)} · سعر الحبة ${money(item.unitCost)} · سعر البيع ${money(item.salePrice)}${item.batchNumber ? ` · التشغيلة ${escapeHtml(item.batchNumber)}` : ""}${toNumber(item.returnedQuantity) ? ` · مرتجع ${amount(item.returnedQuantity)}` : ""}</small></span><strong>${money(item.total)}</strong></div>`).join("")}<div class="invoice-detail__final"><span>الإجمالي</span><strong>${money(displayPurchase.total)}</strong></div></div><div class="dialog__actions"><button id="share-purchase-pdf" class="button button--secondary" type="button">مشاركة PDF</button><button id="export-purchase-excel" class="button button--secondary" type="button">مشاركة Excel</button><button id="purchase-return" class="button button--secondary" type="button">مرتجع شراء ${icon("rotate", 17)}</button><button class="button button--primary" data-dialog-close>إغلاق</button></div>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelector("#share-purchase-pdf").addEventListener("click", () => sharePurchasePdf(purchase).catch((error) => showToast(error.message || "تعذر تجهيز PDF.", "error")));
   overlay.querySelector("#export-purchase-excel").addEventListener("click", () => exportPurchaseExcel(purchase).catch((error) => showToast(error.message || "تعذر تجهيز ملف Excel.", "error")));
