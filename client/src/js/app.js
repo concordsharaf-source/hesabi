@@ -794,8 +794,6 @@ function openCloudRestoreOnSetupDialog() {
           const { payload } = await readCloudBackup(latest.id);
           db.validateBackup(payload);
           const restoredUser = await db.authenticateBackupAccount(payload, values);
-          const safetyBackup = await db.exportBackup();
-          downloadBackupPayload(safetyBackup, `before-cloud-restore-${dateKey()}`);
           await db.restoreBackup(payload);
           state.settings = await db.getSettings();
           state.accounts = await db.listAccounts();
@@ -803,6 +801,7 @@ function openCloudRestoreOnSetupDialog() {
           await db.savePersistentSession(state.currentUser.id);
           installAutomaticBackups();
           state.cart = [];
+          state.showSetupHome = false;
           state.view = "dashboard";
           await refresh();
           closeDialog();
