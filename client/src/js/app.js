@@ -697,6 +697,7 @@ function settingsMarkup() {
     { view: "general-settings", iconName: "box", eyebrow: "المتجر", title: "إعدادات عامة", description: "الاسم والنشاط والعملة ورصيد البداية" },
     { view: "brand-settings", iconName: "layers", eyebrow: "الهوية", title: "شعار المتجر", description: "اختر شعارًا محفوظًا محليًا وضمن PDF" },
     { view: "periodic-inventory", iconName: "chart", eyebrow: "الحسابات", title: "الجرد المحاسبي", description: "راجع أو اعتمد لقطات شهرية وسنوية" },
+    { view: "accounts", iconName: "users", eyebrow: "الفريق", title: "إدارة الحسابات", description: "أضف الحسابات وحدد الأدوار والرواتب" },
     { view: "navigation-settings", iconName: "grid", eyebrow: "الهاتف", title: "ترتيب الأيقونات", description: "غيّر أولوية شريط التنقل حسب متجرِك" },
     { view: "data-management", iconName: "restore", eyebrow: "الحفظ", title: "إدارة البيانات", description: "نسخ محلية وسحابية واستعادة آمنة" },
   ];

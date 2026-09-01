@@ -62,6 +62,5 @@ export const NAV_ITEMS = [
   { id: "cashbox", label: "الصندوق", icon: "wallet" },
   { id: "reports", label: "التقارير", icon: "chart" },
   { id: "periodic-inventory", label: "الجرد الدوري", icon: "layers" },
-  { id: "accounts", label: "الحسابات", icon: "users" },
   { id: "settings", label: "الإعدادات", icon: "box" },
 ];

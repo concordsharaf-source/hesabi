@@ -149,11 +149,12 @@ try {
   await waitFor('.settings-hub__grid');
   const settingsHub = await evaluate(`(() => ({ title: document.querySelector('.workspace h1')?.textContent.trim(), cards: [...document.querySelectorAll('.settings-hub__card')].map((card) => card.textContent.replace(/\s+/g, ' ').trim()), count: document.querySelectorAll('.settings-hub__icon').length, overflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth }))()`);
   assert.equal(settingsHub.title, 'مركز الإعدادات');
-  assert.equal(settingsHub.count, 5);
+  assert.equal(settingsHub.count, 6);
   assert.equal(settingsHub.overflow, true);
   assert.ok(settingsHub.cards.some((text) => text.includes('إعدادات عامة')));
   assert.ok(settingsHub.cards.some((text) => text.includes('شعار المتجر')));
   assert.ok(settingsHub.cards.some((text) => text.includes('الجرد المحاسبي')));
+  assert.ok(settingsHub.cards.some((text) => text.includes('إدارة الحسابات')));
   assert.ok(settingsHub.cards.some((text) => text.includes('ترتيب الأيقونات')));
   assert.ok(settingsHub.cards.some((text) => text.includes('إدارة البيانات')));
   await evaluate(`document.querySelector('.settings-hub__card[data-view="general-settings"]').click()`);
@@ -169,7 +170,7 @@ try {
   const arrowDirections = await evaluate(`(() => { const previous = document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"] svg'); const next = document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="1"] svg'); return { previous: getComputedStyle(previous).transform, next: getComputedStyle(next).transform }; })()`);
   assert.deepEqual(arrowDirections, { previous: 'matrix(-1, 0, 0, -1, 0, 0)', next: 'none' });
   const reordered = await evaluate(`new Promise((resolve) => { document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"]').click(); setTimeout(() => resolve({ order: [...document.querySelectorAll('[data-bottom-nav] [data-view]')].map((item) => item.dataset.view), settingRows: document.querySelectorAll('.mobile-nav-settings__item').length }), 350); })`);
-  assert.equal(reordered.settingRows, 13);
+  assert.equal(reordered.settingRows, 12);
   assert.ok(reordered.order.indexOf("inventory") < reordered.order.indexOf("products"), "يجب أن ينتقل المخزون خطوة للأمام بعد تغيير الترتيب.");
   await evaluate(`document.querySelector('[data-action="navigate"][data-view="settings"]').click()`);
   await waitFor('.settings-hub__grid');
@@ -184,7 +185,9 @@ try {
     const viewResult = await evaluate(`new Promise((resolve) => { document.querySelector('[data-bottom-nav] [data-view="${view}"]').click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim() }), 250); })`);
     assert.deepEqual(viewResult, { active: view, title });
   }
-  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="accounts"]').click()`);
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="settings"]').click()`);
+  await waitFor('.settings-hub__grid');
+  await evaluate(`document.querySelector('.settings-hub__card[data-view="accounts"]').click()`);
   await waitFor('[data-action="new-account"]');
   await evaluate(`document.querySelector('[data-action="new-account"]').click()`);
   await waitFor('#account-form');
@@ -291,7 +294,9 @@ try {
   await waitForGone('#cashier-salary-advance-form');
   const advanceExpense = await evaluate(`(() => { const row = [...document.querySelectorAll('.entity-row')].find((item) => item.textContent.includes('سلفة موظف')); return { exists: Boolean(row), linksCashier: row?.textContent.includes('كاشير اختبار الوردية') || false, containsAmount: row?.textContent.includes('200') || false }; })()`);
   assert.deepEqual(advanceExpense, { exists: true, linksCashier: true, containsAmount: true });
-  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="accounts"]').click()`);
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="settings"]').click()`);
+  await waitFor('.settings-hub__grid');
+  await evaluate(`document.querySelector('.settings-hub__card[data-view="accounts"]').click()`);
   await waitFor('.account-salary-note');
   const accountSalary = await evaluate(`document.querySelector('.account-salary-note')?.textContent.replace(/\s+/g, ' ').trim()`);
   assert.match(accountSalary, /راتب الشهر.*1,?000/);
