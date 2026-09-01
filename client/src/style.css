@@ -605,3 +605,17 @@ label { font-size:15px; }
 [data-theme="dark"] .expiry-meter--warning span { background:linear-gradient(90deg,#7bd8aa 0%,#ffd07d 52%,#ff938c 100%); }
 [data-theme="dark"] .expiry-meter--danger span { background:#ff938c; }
 .product-name .expiry-meter, .product-card__main .expiry-meter { display:block; min-width:110px; }
+
+/* إدارة البيانات: احتواء النصوص والأزرار داخل شاشة الهاتف */
+.data-management-page { min-width:0; max-width:100%; overflow:hidden; }
+.data-management-page .panel, .data-management-page .report-grid, .data-management-page .barcode-tools { min-width:0; max-width:100%; }
+.data-management-page p, .data-management-page .field-hint, .data-management-page h2 { overflow-wrap:anywhere; word-break:normal; }
+.data-management-page .dialog__actions { display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; min-width:0; }
+.data-management-page .dialog__actions .button, .data-management-page .dialog__actions label.button { flex:1 1 150px; min-width:0; max-width:100%; white-space:normal; text-align:center; line-height:1.45; }
+@media (max-width:620px) {
+  .data-management-page .report-grid { grid-template-columns:minmax(0,1fr); }
+  .data-management-page .barcode-tools .dialog__actions .button, .data-management-page .barcode-tools .dialog__actions label.button { flex-basis:100%; width:100%; }
+  .data-management-page .cloud-backup-card__actions, .data-management-page .cloud-backup-card .dialog__actions { flex-direction:column; }
+  .data-management-page .cloud-backup-card .button, .data-management-page .cloud-backup-card label.button { width:100%; flex-basis:auto; }
+  .data-management-page .topbar__copy, .data-management-page .topbar__copy p { min-width:0; max-width:100%; overflow-wrap:anywhere; }
+}
