@@ -189,7 +189,14 @@ function installExitGuard() {
   if (exitGuardInstalled) return;
   exitGuardInstalled = true;
   const guardState = () => ({ ...(history.state || {}), hesabiExitGuard: true });
-  primeExitGuardHistory(history, window.location.href);
+  const armExitGuard = () => {
+    if (exitAllowed || history.state?.hesabiExitGuard) return;
+    primeExitGuardHistory(history, window.location.href);
+    exitGuardEntries = 1;
+  };
+  armExitGuard();
+  window.addEventListener("pageshow", armExitGuard, { passive: true });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") armExitGuard(); }, { passive: true });
   window.addEventListener("popstate", () => {
     const action = getExitGuardAction({ exitAllowed, hasOpenOverlay: Boolean(document.querySelector("#scanner-backdrop") || document.querySelector("#dialog-backdrop")) });
     if (action === "allow-exit") return;
