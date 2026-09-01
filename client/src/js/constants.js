@@ -59,6 +59,5 @@ export const NAV_ITEMS = [
   { id: "purchases", label: "المشتريات", icon: "truck" },
   { id: "cashbox", label: "الصندوق", icon: "wallet" },
   { id: "reports", label: "التقارير", icon: "chart" },
-  { id: "periodic-inventory", label: "الجرد الدوري", icon: "layers" },
   { id: "settings", label: "الإعدادات", icon: "box" },
 ];

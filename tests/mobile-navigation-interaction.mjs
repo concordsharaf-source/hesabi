@@ -172,7 +172,7 @@ try {
   const arrowDirections = await evaluate(`(() => { const previous = document.querySelector('[data-action="move-mobile-nav"][data-id="products"][data-direction="-1"] svg'); const next = document.querySelector('[data-action="move-mobile-nav"][data-id="products"][data-direction="1"] svg'); return { previous: getComputedStyle(previous).transform, next: getComputedStyle(next).transform }; })()`);
   assert.deepEqual(arrowDirections, { previous: 'matrix(-1, 0, 0, -1, 0, 0)', next: 'none' });
   const reordered = await evaluate(`new Promise((resolve) => { document.querySelector('[data-action="move-mobile-nav"][data-id="products"][data-direction="-1"]').click(); setTimeout(() => resolve({ order: [...document.querySelectorAll('[data-bottom-nav] [data-view]')].map((item) => item.dataset.view), settingRows: document.querySelectorAll('.mobile-nav-settings__item').length }), 350); })`);
-  assert.equal(reordered.settingRows, 10);
+  assert.equal(reordered.settingRows, 9);
   assert.ok(reordered.order.indexOf("products") < reordered.order.indexOf("purchases"), "يجب أن ينتقل المنتجات خطوة للأمام بعد تغيير الترتيب.");
   await evaluate(`document.querySelector('[data-action="navigate"][data-view="settings"]').click()`);
   await waitFor('.settings-hub__grid');
@@ -338,7 +338,9 @@ try {
   assert.match(cashierSalarySummary.text, /200/);
   assert.match(cashierSalarySummary.text, /10/);
   assert.match(cashierSalarySummary.text, /790/);
-  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="periodic-inventory"]').click()`);
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="reports"]').click()`);
+  await waitFor('.topbar [data-action="navigate"][data-view="periodic-inventory"]');
+  await evaluate(`document.querySelector('.topbar [data-action="navigate"][data-view="periodic-inventory"]').click()`);
   await waitFor('#periodic-inventory-filter');
   const periodicInventoryPage = await evaluate(`(() => ({ title: document.querySelector('.workspace h1')?.textContent?.trim(), approveVisible: Boolean(document.querySelector('[data-action="save-periodic-inventory"]')), noOverflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth, sourceNotice: document.querySelector('.periodic-inventory-notice')?.textContent.includes('اللقطة لا تنشئ حركة جديدة') || false, containsDamageDisclosure: document.querySelector('.report-grid')?.textContent.includes('لا يوجد في التطبيق سجل مستقل للتالف') || false, metricLabels: [...document.querySelectorAll('.metric-card')].map((card) => card.textContent.replace(/\s+/g, ' ').trim()) }))()`);
   assert.equal(periodicInventoryPage.title, 'الجرد المحاسبي الدوري');

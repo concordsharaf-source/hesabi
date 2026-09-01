@@ -215,7 +215,7 @@ test("يوفر الجرد الدوري لقطة محفوظة ومقارنة من
   assert.match(app, /data-action="save-periodic-inventory"/);
   assert.match(app, /data-action="open-periodic-inventory"/);
   assert.match(app, /"periodic-inventory": periodicInventoryMarkup/);
-  assert.match(constants, /id: "periodic-inventory", label: "الجرد الدوري"/);
+  assert.doesNotMatch(constants, /id: "periodic-inventory", label: "الجرد الدوري"/);
   assert.match(permissions, /"save-periodic-inventory"/);
   assert.match(permissions, /"open-periodic-inventory"/);
   assert.match(css, /\.periodic-inventory-page/);
