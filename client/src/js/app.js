@@ -1532,8 +1532,33 @@ async function downloadReportPdf() { try { const file = await createReportPdfFil
 function downloadReportDoc() { try { downloadGeneratedFile(new File([`\uFEFF${reportExportHtml()}`], `hesabi-report-${dateKey()}.doc`, { type: "application/msword" })); showToast("تم تصدير تقرير DOC"); } catch (error) { showToast(error.message || "تعذر إنشاء تقرير DOC.", "error"); } }
 function openReportExportDialog() { const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تصدير التقرير</span><h2>اختر صيغة الملف</h2><p class="dialog__subtext">ينشأ الملف على جهازك من نطاق التقرير الحالي.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="report-export-options"><button class="button button--primary" data-report-export="csv">CSV للجداول</button><button class="button button--secondary" data-report-export="pdf">PDF للطباعة والمشاركة</button><button class="button button--secondary" data-report-export="doc">DOC لبرامج المستندات</button></div>`); overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); overlay.querySelectorAll("[data-report-export]").forEach((button) => button.addEventListener("click", async () => { const format = button.dataset.reportExport; if (format === "csv") downloadReportCsv(); else if (format === "pdf") await downloadReportPdf(); else downloadReportDoc(); closeDialog(); })); }
 
-async function restoreBackupFromFile(event) { const file = event.currentTarget.files?.[0]; if (!file) return; try { const parsed = JSON.parse(await file.text()); db.validateBackup(parsed); if (!window.confirm("ستستبدل الاستعادة كل بيانات هذا الجهاز بالنسخة المختارة. ستفتح النسخة داخل متجرها المرتبط. هل تريد المتابعة؟")) { event.currentTarget.value = ""; return; } await db.restoreBackup(parsed); await db.clearPersistentSession(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = null; state.cart = []; state.cartDiscount = ""; state.view = "sales"; await refresh(); render(); showToast("تمت استعادة النسخة الاحتياطية بنجاح"); } catch (error) { showToast(error.message || "تعذر استعادة ملف النسخة الاحتياطية.", "error"); } finally { event.currentTarget.value = ""; } }
-
+async function restoreBackupFromFile(event) {
+  const input = event.currentTarget;
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    let parsed;
+    try { parsed = JSON.parse(await file.text()); }
+    catch { throw new Error("ملف النسخة ليس ملف JSON صالحًا. اختر نسخة حسابي بصيغة JSON."); }
+    db.validateBackup(parsed);
+    if (!window.confirm("ستستبدل الاستعادة كل بيانات هذا الجهاز بالنسخة المختارة، ثم تفتح صفحة تسجيل الدخول. هل تريد المتابعة؟")) return;
+    await db.restoreBackup(parsed);
+    try { await db.clearPersistentSession(); } catch (error) { console.warn("[Hesabi restore session cleanup]", error); }
+    state.settings = await db.getSettings();
+    state.accounts = await db.listAccounts();
+    state.currentUser = null;
+    state.activeCashierShift = null;
+    state.cart = [];
+    state.cartDiscount = "";
+    state.showSetupHome = false;
+    state.view = "sales";
+    render();
+    showToast("تمت استعادة البيانات. أدخل اسم المستخدم ورمز الدخول للمتجر.");
+  } catch (error) {
+    console.error("[Hesabi local restore error]", error);
+    showToast(error.message || "تعذرت استعادة ملف النسخة الاحتياطية.", "error");
+  } finally { input.value = ""; }
+}
 async function resetAllData() { if (!window.confirm("سيُمسح كل السجل المحلي على هذا الجهاز. صدّر نسخة احتياطية أولًا. هل تريد المتابعة؟")) return; if (!window.confirm("تأكيد نهائي: لا يمكن التراجع من داخل التطبيق. هل تمضي في المسح؟")) return; try { await db.resetAllData(); state.settings = null; state.cart = []; state.view = "dashboard"; await refresh(); render(); showToast("مُسحت البيانات المحلية. يمكنك بدء سجل متجر جديد."); } catch (error) { showToast(error.message, "error"); } }
 
 async function toggleTheme() { try { const theme = state.settings?.theme === "dark" ? "light" : "dark"; await db.saveSettings({ ...state.settings, theme }); state.settings = await db.getSettings(); applyTheme(); render(); showToast(theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح"); } catch (error) { showToast(error.message, "error"); } }
