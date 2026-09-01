@@ -105,7 +105,7 @@ async function createAccountRecord(values) {
     mustChangePin: Boolean(values.mustChangePin),
     isActive: values.isActive !== false,
     jobTitle: normalize(values.jobTitle),
-    monthlySalary: role === "cashier" || role === "employee" ? Math.max(0, toNumber(values.monthlySalary)) : 0,
+    monthlySalary: Math.max(0, toNumber(values.monthlySalary)),
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
@@ -269,7 +269,7 @@ export const db = {
     }
     const name = normalize(values.name ?? current.name); if (!name) throw new Error("اسم الحساب مطلوب.");
     const jobTitle = normalize(values.jobTitle ?? current.jobTitle);
-    const monthlySalary = nextRole === "cashier" || nextRole === "employee" ? Math.max(0, toNumber(values.monthlySalary ?? current.monthlySalary)) : 0;
+    const monthlySalary = Math.max(0, toNumber(values.monthlySalary ?? current.monthlySalary));
     const updated = { ...current, name, role: nextRole, jobTitle, monthlySalary, isActive: nextActive, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
   },
   async deleteCashierAccount(accountId) {
@@ -607,7 +607,7 @@ export const db = {
     const database = await this.open(); const transaction = database.transaction(["accounts", "expenses", "cashierSalaryDeductions"], "readonly");
     const [accounts, expenses, deductions] = await Promise.all([requestAsPromise(transaction.objectStore("accounts").getAll()), requestAsPromise(transaction.objectStore("expenses").getAll()), requestAsPromise(transaction.objectStore("cashierSalaryDeductions").getAll())]);
     await transactionDone(transaction);
-    const staffAccounts = accounts.filter((account) => account.role === "cashier" || account.role === "employee");
+    const staffAccounts = accounts.filter((account) => ["admin", "cashier", "employee"].includes(account.role) && (account.role !== "admin" || toNumber(account.monthlySalary) > 0));
     return staffAccounts.sort((a, b) => a.name.localeCompare(b.name, "ar")).map((account) => {
       const monthlySalary = Math.max(0, toNumber(account.monthlySalary));
       const staffId = (expense) => expense.staffId || expense.cashierId;
@@ -622,7 +622,7 @@ export const db = {
   async settleCashierSalary({ accountId, month = dateKey().slice(0, 7), date = dateKey(), notes = "" } = {}) {
     const normalizedMonth = String(month || "").slice(0, 7); if (!/^\d{4}-\d{2}$/.test(normalizedMonth)) throw new Error("شهر الراتب غير صالح.");
     const database = await this.open(); const transaction = database.transaction(["accounts", "expenses", "cashierSalaryDeductions"], "readwrite"); const account = await requestAsPromise(transaction.objectStore("accounts").get(accountId));
-    if (!account || !["cashier", "employee"].includes(account.role)) throw new Error("اختر موظفًا صالحًا لتسليم راتبه.");
+    if (!account || !["admin", "cashier", "employee"].includes(account.role)) throw new Error("اختر حسابًا صالحًا لتسليم راتبه.");
     const monthlySalary = Math.max(0, toNumber(account.monthlySalary)); if (monthlySalary <= 0) throw new Error("سجّل راتبًا شهريًا للموظف أولًا.");
     const expensesStore = transaction.objectStore("expenses"); const expenses = await requestAsPromise(expensesStore.getAll()); const deductions = await requestAsPromise(transaction.objectStore("cashierSalaryDeductions").index("accountId").getAll(accountId));
     const belongsToMonth = (item) => (item.month || String(item.date || "").slice(0, 7)) === normalizedMonth && (item.staffId || item.cashierId) === accountId;
@@ -651,7 +651,7 @@ export const db = {
     let staff = null;
     if (isStaffSalaryAdvance) {
       const staffId = normalize(values.staffId || values.cashierId); staff = await requestAsPromise(transaction.objectStore("accounts").get(staffId));
-      if (!staff || !["cashier", "employee"].includes(staff.role)) throw new Error("اختر موظفًا صالحًا لسلفة الراتب.");
+      if (!staff || !["admin", "cashier", "employee"].includes(staff.role)) throw new Error("اختر حسابًا صالحًا لسلفة الراتب.");
       const monthlySalary = Math.max(0, toNumber(staff.monthlySalary)); if (monthlySalary <= 0) throw new Error("سجّل راتبًا شهريًا للموظف أولًا.");
       const month = String(date).slice(0, 7); const expenses = await requestAsPromise(transaction.objectStore("expenses").getAll()); const deductions = await requestAsPromise(transaction.objectStore("cashierSalaryDeductions").index("accountId").getAll(staffId));
       const priorAdvances = roundMoney(expenses.filter((expense) => expense.cashierSalaryAdvance && (expense.staffId || expense.cashierId) === staffId && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
@@ -666,7 +666,7 @@ export const db = {
     const database = await this.open(); const current = await requestAsPromise(database.transaction("expenses", "readonly").objectStore("expenses").get(expenseId)); if (!current) throw new Error("المصروف غير موجود.");
     const transaction = database.transaction(current.cashierSalaryAdvance ? ["accounts", "expenses", "cashierSalaryDeductions"] : ["expenses"], "readwrite"); const store = transaction.objectStore("expenses");
     if (current.cashierSalaryAdvance) {
-      const staffId = current.staffId || current.cashierId; const account = await requestAsPromise(transaction.objectStore("accounts").get(staffId)); if (!account || !["cashier", "employee"].includes(account.role)) throw new Error("حساب الموظف المرتبط بالسلفة غير متاح.");
+      const staffId = current.staffId || current.cashierId; const account = await requestAsPromise(transaction.objectStore("accounts").get(staffId)); if (!account || !["admin", "cashier", "employee"].includes(account.role)) throw new Error("حساب الراتب المرتبط بالسلفة غير متاح.");
       const date = values.date || current.date; const month = String(date).slice(0, 7); const expenses = await requestAsPromise(store.getAll()); const deductions = await requestAsPromise(transaction.objectStore("cashierSalaryDeductions").index("accountId").getAll(staffId));
       const otherAdvances = roundMoney(expenses.filter((expense) => expense.id !== expenseId && expense.cashierSalaryAdvance && (expense.staffId || expense.cashierId) === staffId && String(expense.date || "").slice(0, 7) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));
       const salaryPaid = roundMoney(expenses.filter((expense) => expense.salaryPayment && (expense.staffId || expense.cashierId) === staffId && (expense.month || String(expense.date || "").slice(0, 7)) === month).reduce((sum, expense) => sum + toNumber(expense.amount), 0));

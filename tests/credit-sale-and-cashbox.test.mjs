@@ -288,6 +288,19 @@ test("تسجل سلفة الموظف كمصروف نقدي وتخصم من را�
   await db.resetAllData();
 });
 
+test("يستطيع الأدمن تعديل اسمه وراتبه الشهري ورمز دخوله", async () => {
+  await db.resetAllData();
+  const admin = await db.createAccount({ username: "profile-admin", name: "الأدمن القديم", role: "admin", pin: "2468" });
+  const updated = await db.updateAccount(admin.id, { name: "الأدمن الجديد", role: "admin", isActive: true, monthlySalary: 3000 });
+  assert.deepEqual({ name: updated.name, role: updated.role, monthlySalary: updated.monthlySalary }, { name: "الأدمن الجديد", role: "admin", monthlySalary: 3000 });
+  await db.changeAccountPin(admin.id, "9753");
+  assert.equal((await db.authenticateAccount({ username: "profile-admin", pin: "9753" })).name, "الأدمن الجديد");
+  await assert.rejects(() => db.authenticateAccount({ username: "profile-admin", pin: "2468" }), /بيانات الدخول غير صحيحة/);
+  const summary = (await db.listCashierSalarySummaries({ month: "2026-08" })).find((item) => item.accountId === admin.id);
+  assert.equal(summary.monthlySalary, 3000);
+  await db.resetAllData();
+});
+
 test("لا يظهر راتب الموظف كمصروف إلا بعد تسليمه ويُسجل الراتب الكامل عند التسليم", async () => {
   await db.resetAllData();
   const cashier = await db.createAccount({ username: "monthly-expense-cashier", name: "كاشير المصروفات", role: "cashier", pin: "3333", monthlySalary: 1200 });
