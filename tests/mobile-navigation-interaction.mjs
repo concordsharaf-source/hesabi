@@ -60,7 +60,7 @@ try {
   await evaluate(`(() => { const form = document.querySelector('#required-pin-form'); form.elements.pin.value = '1234'; form.elements.pinConfirm.value = '1234'; form.requestSubmit(); })()`);
   await waitFor('[data-bottom-nav] [data-view="inventory"]');
   const storeNameInHeader = await evaluate(`document.querySelector('.topbar .eyebrow')?.textContent?.trim()`);
-  assert.equal(storeNameInHeader, 'متجر اختبار');
+  assert.equal(storeNameInHeader, 'بقالة متجر اختبار');
   await evaluate(`document.querySelector('[data-action="account-session"]').click()`);
   await waitFor('#open-local-logout-confirm');
   await evaluate(`document.querySelector('#open-local-logout-confirm').click()`);
@@ -131,7 +131,7 @@ try {
   await waitFor('#purchase-lines .purchase-line [data-purchase-sale-price]');
   const priorProductPurchaseLine = await evaluate(`(() => { const salePrice = document.querySelector('#purchase-lines .purchase-line [data-purchase-sale-price]'); const row = salePrice?.closest('.purchase-line'); const directPrice = row?.querySelector('[data-purchase-sale-price-visible="0"]'); const expiry = row?.querySelector('[data-purchase-expiry-date="0"]'); if (!salePrice || !row || !directPrice || !expiry) return null; const visibleStyle = getComputedStyle(directPrice); return { salePrice: salePrice.value, visiblePrice: directPrice.textContent.trim(), overlayVisibleBeforeFocus: visibleStyle.display === 'flex' && visibleStyle.opacity === '1' && visibleStyle.pointerEvents === 'none', rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length, expiryType: expiry.type, expiryValue: expiry.value, expiryDirection: getComputedStyle(expiry).direction }; })()`);
   assert.ok(priorProductPurchaseLine, 'لم يستقر سطر شراء المنتج السابق بعد إعادة العرض.');
-  assert.deepEqual(priorProductPurchaseLine, { salePrice: '50', visiblePrice: '50', overlayVisibleBeforeFocus: true, rowDisplay: 'grid', fieldCount: 7, expiryType: 'date', expiryValue: '', expiryDirection: 'ltr' });
+  assert.deepEqual(priorProductPurchaseLine, { salePrice: '50', visiblePrice: '50', overlayVisibleBeforeFocus: true, rowDisplay: 'grid', fieldCount: 8, expiryType: 'date', expiryValue: '', expiryDirection: 'ltr' });
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await sleep(120);
   const desktopDialogBounds = await evaluate(`(() => { const dialog = document.querySelector('.dialog'); const purchaseLine = document.querySelector('.purchase-line--pack'); const dialogBox = dialog.getBoundingClientRect(); const lineBox = purchaseLine.getBoundingClientRect(); return { dialogScrollFits: dialog.scrollWidth <= dialog.clientWidth, lineFitsDialog: lineBox.left >= dialogBox.left && lineBox.right <= dialogBox.right, formFitsDialog: document.querySelector('#purchase-form').scrollWidth <= dialog.clientWidth }; })()`);
@@ -169,7 +169,7 @@ try {
   const arrowDirections = await evaluate(`(() => { const previous = document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"] svg'); const next = document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="1"] svg'); return { previous: getComputedStyle(previous).transform, next: getComputedStyle(next).transform }; })()`);
   assert.deepEqual(arrowDirections, { previous: 'matrix(-1, 0, 0, -1, 0, 0)', next: 'none' });
   const reordered = await evaluate(`new Promise((resolve) => { document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"]').click(); setTimeout(() => resolve({ order: [...document.querySelectorAll('[data-bottom-nav] [data-view]')].map((item) => item.dataset.view), settingRows: document.querySelectorAll('.mobile-nav-settings__item').length }), 350); })`);
-  assert.equal(reordered.settingRows, 17);
+  assert.equal(reordered.settingRows, 13);
   assert.ok(reordered.order.indexOf("inventory") < reordered.order.indexOf("products"), "يجب أن ينتقل المخزون خطوة للأمام بعد تغيير الترتيب.");
   await evaluate(`document.querySelector('[data-action="navigate"][data-view="settings"]').click()`);
   await waitFor('.settings-hub__grid');
@@ -259,10 +259,10 @@ try {
   assert.equal(transferCheckout, 'تحويل');
   await evaluate(`document.querySelector('#checkout-form').requestSubmit()`);
   await waitFor('[data-bottom-nav] [data-view="invoices"].is-active');
-  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="transfers"]').click()`);
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="cashbox"]').click()`);
   await waitFor('[data-action="deposit-incoming-transfer"]');
   const transferPageBeforeDeposit = await evaluate(`(() => { const metrics = [...document.querySelectorAll('.metric-card')].map((card) => card.textContent.replace(/\s+/g, ' ').trim()); return { title: document.querySelector('.workspace h1')?.textContent?.trim(), actionVisible: Boolean(document.querySelector('[data-action="deposit-incoming-transfer"]')), hasTransferNote: Boolean(document.querySelector('.transfer-vault-note')), available: metrics.find((text) => text.includes('متاح للتوريد')) || '' }; })()`);
-  assert.equal(transferPageBeforeDeposit.title, 'التحويلات');
+  assert.equal(transferPageBeforeDeposit.title, 'الخزنة والصناديق');
   assert.equal(transferPageBeforeDeposit.actionVisible, true);
   assert.equal(transferPageBeforeDeposit.hasTransferNote, true);
   assert.match(transferPageBeforeDeposit.available, /50/);
@@ -284,7 +284,6 @@ try {
   await waitFor('.cashier-shift-summary');
   const cashboxAfterTransferDeposit = await evaluate(`(() => ({ transferSummaryHidden: !document.querySelector('.cash-transfer-note'), transferMovementVisible: [...document.querySelectorAll('.report-card')].some((card) => card.textContent.includes('توريد من حوالة واردة')) }))()`);
   assert.deepEqual(cashboxAfterTransferDeposit, { transferSummaryHidden: true, transferMovementVisible: true });
-  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="expenses"]').click()`);
   await waitFor('[data-action="new-cashier-salary-advance"]');
   await evaluate(`document.querySelector('[data-action="new-cashier-salary-advance"]').click()`);
   await waitFor('#cashier-salary-advance-form');

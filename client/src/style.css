@@ -627,3 +627,14 @@ label { font-size:15px; }
 .expense-page__bottom-action strong { color:var(--green-deep); font-size:16px; }
 .expense-page__bottom-action small { color:var(--muted); font-size:11px; }
 @media (max-width:599px) { .expense-page__bottom-action { align-items:stretch; flex-direction:column; } .expense-page__bottom-action .button { justify-content:center; width:100%; } }
+
+/* أقسام الحسابات والصندوق المدمجة لتقليل ازدحام التنقل مع إبقاء كل العمليات واضحة. */
+.merged-section-head { display:grid; gap:3px; margin:20px 0 10px; padding-top:4px; }
+.merged-section-head h2 { margin:0; font-size:17px; }
+.merged-section-head small { color:var(--muted); font-size:11px; }
+.merged-section-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin:-2px 0 12px; }
+.cashbox-merged-section { padding-top:8px; margin-top:20px; border-top:1px solid var(--line); }
+.cashbox-merged-section > .merged-section-head { margin-top:8px; }
+.cashbox-merged-section .toolbar { margin-bottom:12px; }
+[data-theme="dark"] .cashbox-merged-section { border-color:#557267; }
+@media (max-width:599px) { .merged-section-actions { justify-content:stretch; }.merged-section-actions .button { flex:1 1 150px; }.cashbox-merged-section { margin-top:16px; } }
