@@ -66,6 +66,7 @@ const bindCategoryField = (container) => { const select = container.querySelecto
 let root;
 let exitGuardInstalled = false;
 let exitAllowed = false;
+let exitGuardEntries = 1;
 let runtimeGuardsInstalled = false;
 let desktopBarcodeReaderInstalled = false;
 let automaticBackupTimer = null;
@@ -195,10 +196,12 @@ function installExitGuard() {
     if (action === "close-overlay") {
       closeDialog();
       history.pushState(guardState(), "", window.location.href);
+      exitGuardEntries += 1;
       showToast("أُغلقت النافذة. اضغط رجوع مرة أخرى لعرض تأكيد الخروج.", "error");
       return;
     }
     history.pushState(guardState(), "", window.location.href);
+    exitGuardEntries += 1;
     openExitConfirmDialog();
   });
 }
@@ -211,6 +214,7 @@ function openExitConfirmDialog() {
     closeDialog();
     leaveAfterExitConfirmation(
       (steps) => history.go(steps),
+      -exitGuardEntries,
     );
   });
 }
