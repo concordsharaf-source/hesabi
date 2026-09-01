@@ -58,7 +58,7 @@ try {
   await evaluate(`(() => { const form = document.querySelector('#login-form'); form.elements.username.value = 'admin'; form.elements.pin.value = '1234'; form.requestSubmit(); })()`);
   await waitFor("#required-pin-form");
   await evaluate(`(() => { const form = document.querySelector('#required-pin-form'); form.elements.pin.value = '1234'; form.elements.pinConfirm.value = '1234'; form.requestSubmit(); })()`);
-  await waitFor('[data-bottom-nav] [data-view="inventory"]');
+  await waitFor('[data-bottom-nav] [data-view="products"]');
   const storeNameInHeader = await evaluate(`document.querySelector('.topbar .eyebrow')?.textContent?.trim()`);
   assert.equal(storeNameInHeader, 'بقالة متجر اختبار');
   await evaluate(`document.querySelector('[data-action="account-session"]').click()`);
@@ -76,7 +76,7 @@ try {
   assert.equal(recoveryRequest.data.رقم_الجوال, '777123456');
   assert.match(recoveryRequest.data.التعليمات, /اتصل بصاحب الرقم/);
   await evaluate(`(() => { const form = document.querySelector('#login-form'); form.elements.username.value = 'admin'; form.elements.pin.value = '1234'; form.requestSubmit(); })()`);
-  await waitFor('[data-bottom-nav] [data-view="inventory"]');
+  await waitFor('[data-bottom-nav] [data-view="products"]');
   await evaluate(`document.querySelector('[data-bottom-nav] [data-view="products"]').click()`);
   await waitFor('[data-action="new-product"]');
   await evaluate(`document.querySelector('[data-action="new-product"]').click()`);
@@ -86,7 +86,7 @@ try {
   await evaluate(`document.querySelector('.product-card [data-action="open-product"]').click()`);
   await waitFor('#product-form');
   await evaluate(`(() => { const date = new Date(); date.setDate(date.getDate() + 10); document.querySelector('#product-form').elements.nearestExpiryDate.value = date.toISOString().slice(0, 10); document.querySelector('#product-form').requestSubmit(); })()`);
-  await waitFor('[data-bottom-nav] [data-view="inventory"]');
+  await waitFor('[data-bottom-nav] [data-view="products"]');
   let purchaseDialogOpened = false;
   for (let attempt = 0; attempt < 2 && !purchaseDialogOpened; attempt += 1) {
     await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]')?.click()`);
@@ -143,8 +143,10 @@ try {
   await evaluate(`(() => { const input = document.querySelector('[data-purchase-sale-price="0"]'); input.value = '50'; input.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#purchase-form').requestSubmit(); })()`);
   await waitForGone('#purchase-form');
   await waitFor('[data-action="new-purchase"]');
-  const result = await evaluate(`new Promise((resolve) => { const inventory = document.querySelector('[data-bottom-nav] [data-view="inventory"]'); inventory.click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim(), inventoryVisible: Boolean(document.querySelector('.inventory-list')), expiryAlertVisible: Boolean(document.querySelector('.expiry-inventory-alert')), expiryStatusVisible: Boolean(document.querySelector('.expiry-status')) }), 350); })`);
-  assert.deepEqual(result, { active: "inventory", title: "المخزون", inventoryVisible: true, expiryAlertVisible: true, expiryStatusVisible: true });
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="products"]').click()`);
+  await waitFor('.topbar [data-action="navigate"][data-view="inventory"]');
+  const result = await evaluate(`new Promise((resolve) => { const inventory = document.querySelector('.topbar [data-action="navigate"][data-view="inventory"]'); inventory.click(); setTimeout(() => resolve({ title: document.querySelector('.workspace h1')?.textContent?.trim(), inventoryVisible: Boolean(document.querySelector('.inventory-list')), expiryAlertVisible: Boolean(document.querySelector('.expiry-inventory-alert')), expiryStatusVisible: Boolean(document.querySelector('.expiry-status')) }), 350); })`);
+  assert.deepEqual(result, { title: "المخزون", inventoryVisible: true, expiryAlertVisible: true, expiryStatusVisible: true });
   await evaluate(`document.querySelector('[data-bottom-nav] [data-view="settings"]').click()`);
   await waitFor('.settings-hub__grid');
   const settingsHub = await evaluate(`(() => ({ title: document.querySelector('.workspace h1')?.textContent.trim(), cards: [...document.querySelectorAll('.settings-hub__card')].map((card) => card.textContent.replace(/\s+/g, ' ').trim()), count: document.querySelectorAll('.settings-hub__icon').length, overflow: document.documentElement.scrollWidth <= document.documentElement.clientWidth }))()`);
@@ -164,14 +166,14 @@ try {
   await evaluate(`document.querySelector('[data-action="navigate"][data-view="settings"]').click()`);
   await waitFor('.settings-hub__grid');
   await evaluate(`document.querySelector('.settings-hub__card[data-view="navigation-settings"]').click()`);
-  await waitFor('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"]');
+  await waitFor('[data-action="move-mobile-nav"][data-id="products"][data-direction="-1"]');
   const darkNavigationColors = await evaluate(`(() => { document.documentElement.setAttribute('data-theme', 'dark'); const row = document.querySelector('.mobile-nav-settings__item'); const arrow = document.querySelector('.mobile-nav-settings__actions .icon-button:not(:disabled)'); const result = { text: getComputedStyle(row.querySelector('strong')).color, arrow: getComputedStyle(arrow).color, arrowBackground: getComputedStyle(arrow).backgroundImage }; document.documentElement.removeAttribute('data-theme'); return result; })()`);
   assert.deepEqual(darkNavigationColors, { text: 'rgb(255, 255, 255)', arrow: 'rgb(255, 244, 246)', arrowBackground: 'linear-gradient(145deg, rgb(196, 42, 71), rgb(132, 19, 43))' });
-  const arrowDirections = await evaluate(`(() => { const previous = document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"] svg'); const next = document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="1"] svg'); return { previous: getComputedStyle(previous).transform, next: getComputedStyle(next).transform }; })()`);
+  const arrowDirections = await evaluate(`(() => { const previous = document.querySelector('[data-action="move-mobile-nav"][data-id="products"][data-direction="-1"] svg'); const next = document.querySelector('[data-action="move-mobile-nav"][data-id="products"][data-direction="1"] svg'); return { previous: getComputedStyle(previous).transform, next: getComputedStyle(next).transform }; })()`);
   assert.deepEqual(arrowDirections, { previous: 'matrix(-1, 0, 0, -1, 0, 0)', next: 'none' });
-  const reordered = await evaluate(`new Promise((resolve) => { document.querySelector('[data-action="move-mobile-nav"][data-id="inventory"][data-direction="-1"]').click(); setTimeout(() => resolve({ order: [...document.querySelectorAll('[data-bottom-nav] [data-view]')].map((item) => item.dataset.view), settingRows: document.querySelectorAll('.mobile-nav-settings__item').length }), 350); })`);
-  assert.equal(reordered.settingRows, 12);
-  assert.ok(reordered.order.indexOf("inventory") < reordered.order.indexOf("products"), "يجب أن ينتقل المخزون خطوة للأمام بعد تغيير الترتيب.");
+  const reordered = await evaluate(`new Promise((resolve) => { document.querySelector('[data-action="move-mobile-nav"][data-id="products"][data-direction="-1"]').click(); setTimeout(() => resolve({ order: [...document.querySelectorAll('[data-bottom-nav] [data-view]')].map((item) => item.dataset.view), settingRows: document.querySelectorAll('.mobile-nav-settings__item').length }), 350); })`);
+  assert.equal(reordered.settingRows, 10);
+  assert.ok(reordered.order.indexOf("products") < reordered.order.indexOf("purchases"), "يجب أن ينتقل المنتجات خطوة للأمام بعد تغيير الترتيب.");
   await evaluate(`document.querySelector('[data-action="navigate"][data-view="settings"]').click()`);
   await waitFor('.settings-hub__grid');
   await evaluate(`document.querySelector('.settings-hub__card[data-view="data-management"]').click()`);
@@ -180,11 +182,21 @@ try {
   assert.deepEqual(dataManagement, { title: "إدارة البيانات", exportVisible: true, restoreVisible: true, cloudVisible: true });
   const darkDangerButton = await evaluate(`(() => { document.documentElement.setAttribute('data-theme', 'dark'); const button = document.querySelector('.data-management-page .button--danger'); const result = { color: getComputedStyle(button).color, background: getComputedStyle(button).backgroundImage }; document.documentElement.removeAttribute('data-theme'); return result; })()`);
   assert.deepEqual(darkDangerButton, { color: 'rgb(255, 255, 255)', background: 'linear-gradient(145deg, rgb(196, 42, 71), rgb(132, 19, 43))' });
-  const views = [["dashboard", "نظرة على يومك"], ["sales", "بيع جديد"], ["invoices", "الفواتير"], ["purchases", "المشتريات"], ["inventory", "المخزون"]];
+  const views = [["dashboard", "نظرة على يومك"], ["sales", "بيع جديد"], ["purchases", "المشتريات"]];
   for (const [view, title] of views) {
     const viewResult = await evaluate(`new Promise((resolve) => { document.querySelector('[data-bottom-nav] [data-view="${view}"]').click(); setTimeout(() => resolve({ active: document.querySelector('[data-bottom-nav] .is-active')?.dataset.view, title: document.querySelector('.workspace h1')?.textContent?.trim() }), 250); })`);
     assert.deepEqual(viewResult, { active: view, title });
   }
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="products"]').click()`);
+  await waitFor('.topbar [data-action="navigate"][data-view="inventory"]');
+  await evaluate(`document.querySelector('.topbar [data-action="navigate"][data-view="inventory"]').click()`);
+  await waitFor('.inventory-list');
+  assert.equal(await evaluate(`document.querySelector('.workspace h1')?.textContent?.trim()`), 'المخزون');
+  await evaluate(`document.querySelector('[data-bottom-nav] [data-view="sales"]').click()`);
+  await waitFor('.topbar [data-action="navigate"][data-view="invoices"]');
+  await evaluate(`document.querySelector('.topbar [data-action="navigate"][data-view="invoices"]').click()`);
+  await waitFor('.invoice-list');
+  assert.equal(await evaluate(`document.querySelector('.workspace h1')?.textContent?.trim()`), 'الفواتير');
   await evaluate(`document.querySelector('[data-bottom-nav] [data-view="settings"]').click()`);
   await waitFor('.settings-hub__grid');
   await evaluate(`document.querySelector('.settings-hub__card[data-view="accounts"]').click()`);
@@ -227,7 +239,7 @@ try {
   const checkoutDiscountLimit = await evaluate(`({ note: document.querySelector('#cashier-discount-limit')?.textContent, total: document.querySelector('#checkout-total')?.textContent, submitDisabled: document.querySelector('.checkout-submit')?.disabled })`);
   assert.deepEqual(checkoutDiscountLimit, { note: 'خصم السطور والخصم العام: 60 ر.ي من سقف الكاشير 10% (60 ر.ي).', total: '540 ر.ي', submitDisabled: false });
   await evaluate(`document.querySelector('#checkout-form').requestSubmit()`);
-  await waitFor('[data-bottom-nav] [data-view="invoices"].is-active');
+  await waitFor('.invoice-list');
   await evaluate(`document.querySelector('[data-action="open-invoice"]').click()`);
   await waitFor('#share-invoice');
   if (new URL(target).hostname === 'localhost') {
@@ -261,7 +273,7 @@ try {
   const transferCheckout = await evaluate(`document.querySelector('#checkout-form [name="paymentMethod"]')?.value`);
   assert.equal(transferCheckout, 'تحويل');
   await evaluate(`document.querySelector('#checkout-form').requestSubmit()`);
-  await waitFor('[data-bottom-nav] [data-view="invoices"].is-active');
+  await waitFor('.invoice-list');
   await evaluate(`document.querySelector('[data-bottom-nav] [data-view="cashbox"]').click()`);
   await waitFor('[data-action="deposit-incoming-transfer"]');
   const transferPageBeforeDeposit = await evaluate(`(() => { const metrics = [...document.querySelectorAll('.metric-card')].map((card) => card.textContent.replace(/\s+/g, ' ').trim()); return { title: document.querySelector('.workspace h1')?.textContent?.trim(), actionVisible: Boolean(document.querySelector('[data-action="deposit-incoming-transfer"]')), hasTransferNote: Boolean(document.querySelector('.transfer-vault-note')), available: metrics.find((text) => text.includes('متاح للتوريد')) || '' }; })()`);

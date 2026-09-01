@@ -317,7 +317,7 @@ test("يبدأ شريط الهاتف بترتيب افتراضي قابل للت
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
-  assert.match(app, /const DEFAULT_MOBILE_NAVIGATION_ORDER = \["dashboard", "sales", "invoices", "purchases"/);
+  assert.match(app, /const DEFAULT_MOBILE_NAVIGATION_ORDER = \["dashboard", "sales", "purchases"/);
   assert.match(app, /function normalizedMobileNavigationOrder\(order = \[\]\)/);
   assert.match(app, /function mobileNavigationSettingsMarkup\(\)/);
   assert.match(app, /data-action="move-mobile-nav"/);

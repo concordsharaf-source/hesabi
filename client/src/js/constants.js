@@ -53,9 +53,7 @@ export const EXPENSE_CATEGORIES = [...DAILY_EXPENSE_CATEGORIES, ...MONTHLY_EXPEN
 export const NAV_ITEMS = [
   { id: "dashboard", label: "الرئيسية", icon: "grid" },
   { id: "products", label: "المنتجات", icon: "package" },
-  { id: "inventory", label: "المخزون", icon: "layers" },
   { id: "sales", label: "المبيعات", icon: "cart" },
-  { id: "invoices", label: "الفواتير", icon: "receipt" },
   { id: "customers", label: "العملاء", icon: "users" },
   { id: "suppliers", label: "الموردون", icon: "users" },
   { id: "purchases", label: "المشتريات", icon: "truck" },
