@@ -9,6 +9,7 @@ const aliases = {
   salePrice: ["saleprice", "sellprice", "سعر البيع", "سعرالبيع"],
   quantity: ["quantity", "qty", "الكمية", "الكمية الحالية"],
   unit: ["unit", "الوحدة"],
+  category: ["category", "categories", "الفئة", "الفئات", "التصنيف", "التصنيفات"],
 };
 const findColumn = (headers, field) => {
   const options = aliases[field].map(normalizeHeader);
@@ -40,6 +41,7 @@ export async function parseBarcodeFile(file) {
     salePrice: columns.salePrice >= 0 ? numberValue(row[columns.salePrice]) : 0,
     quantity: columns.quantity >= 0 ? numberValue(row[columns.quantity]) : 0,
     unit: columns.unit >= 0 ? String(row[columns.unit] ?? "حبة").trim() || "حبة" : "حبة",
+    category: columns.category >= 0 ? String(row[columns.category] ?? "").trim() : "",
     providedFields,
   })).filter((record) => record.barcode);
   if (!records.length) throw new Error("لم أجد أي صف يحتوي على باركود صالح.");
@@ -55,6 +57,7 @@ export function createBarcodeWorkbook(products) {
     "سعر البيع": product.salePrice ?? 0,
     "الكمية": product.quantity ?? 0,
     "الوحدة": product.unit || "حبة",
+    "الفئة": product.category || "",
   }));
   const sheet = XLSX.utils.json_to_sheet(rows);
   sheet["!cols"] = [{ wch: 28 }, { wch: 18 }, { wch: 18 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }];

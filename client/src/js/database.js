@@ -54,6 +54,8 @@ const transactionDone = (transaction) => new Promise((resolve, reject) => {
   transaction.onabort = () => reject(transaction.error || new Error("تم إلغاء العملية المحلية: تعارض أو بيانات غير صالحة."));
 });
 const normalize = (value) => String(value || "").trim();
+const PRODUCT_UNITS = new Set(["حبة", "علبة", "كرتون", "كيس", "حزمة", "كيلو", "جرام", "لتر", "قطعة", "جهاز", "شريط", "عبوة", "طقم", "دزينة", "صندوق"]);
+const normalizeProductCategory = (value, unit = "") => { const category = normalize(value); return !category || category === normalize(unit) || PRODUCT_UNITS.has(category) ? "أخرى" : category; };
 const LOCAL_STORE_LOGO_PATTERN = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+={0,2}$/i;
 const LOCAL_STORE_LOGO_MAX_LENGTH = 620_000;
 const normalizeStoreLogoDataUrl = (value) => {
@@ -288,7 +290,7 @@ export const db = {
   async listProducts({ includeDeleted = false } = {}) {
     const database = await this.open();
     const products = await requestAsPromise(database.transaction("products", "readonly").objectStore("products").getAll());
-    return products.filter((product) => includeDeleted || !product.isDeleted).sort((a, b) => a.name.localeCompare(b.name, "ar"));
+    return products.filter((product) => includeDeleted || !product.isDeleted).map((product) => ({ ...product, category: normalizeProductCategory(product.category, product.unit) })).sort((a, b) => a.name.localeCompare(b.name, "ar"));
   },
   async listProductSupplierLinks() {
     const database = await this.open(); const transaction = database.transaction(["products", "purchases", "purchaseItems", "suppliers"], "readonly");
@@ -322,7 +324,7 @@ export const db = {
     if (nearestExpiryDate && (!/^\d{4}-\d{2}-\d{2}$/.test(nearestExpiryDate) || nearestExpiryDate <= dateKey())) throw new Error("أدخل تاريخ انتهاء مستقبليًا صالحًا أو اترك الحقل فارغًا.");
     if (nearestProductionDate && nearestExpiryDate && nearestProductionDate > nearestExpiryDate) throw new Error("تاريخ الإنتاج يجب أن يسبق تاريخ الانتهاء.");
     const purchasePackageUnit = normalize(values.purchasePackageUnit || values.packageUnit || "حبة") || "حبة";
-    const product = { id: uid("product"), name: normalize(values.name), nameLower: normalize(values.name).toLocaleLowerCase("ar"), barcode, internalCode: normalize(values.internalCode), category: normalize(values.category || values.unit || "عام"), purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)), quantity, minimumStock: Math.max(0, toNumber(values.minimumStock)), legacyQuantity: quantity, legacyUnitCost: Math.max(0, toNumber(values.purchasePrice)), nearestProductionDate, unit: values.unit || "حبة", purchasePackageUnit, unitsPerPackage, lastPackageCost: Math.max(0, toNumber(values.lastPackageCost ?? values.packageCost)), nearestExpiryDate, createdAt, updatedAt: createdAt, isDeleted: false };
+    const product = { id: uid("product"), name: normalize(values.name), nameLower: normalize(values.name).toLocaleLowerCase("ar"), barcode, internalCode: normalize(values.internalCode), category: normalizeProductCategory(values.category, values.unit), purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)), quantity, minimumStock: Math.max(0, toNumber(values.minimumStock)), legacyQuantity: quantity, legacyUnitCost: Math.max(0, toNumber(values.purchasePrice)), nearestProductionDate, unit: values.unit || "حبة", purchasePackageUnit, unitsPerPackage, lastPackageCost: Math.max(0, toNumber(values.lastPackageCost ?? values.packageCost)), nearestExpiryDate, createdAt, updatedAt: createdAt, isDeleted: false };
     if (!product.name) throw new Error("اسم المنتج مطلوب.");
     products.add(product);
     if (quantity > 0) createStockMovement(transaction.objectStore("stockMovements"), { productId: product.id, type: "INITIAL", quantity, previousQuantity: 0, newQuantity: quantity, date: createdAt, note: "كمية افتتاحية", referenceType: "PRODUCT", referenceId: product.id });
@@ -337,7 +339,7 @@ export const db = {
     if (nearestProductionDate && !/^\d{4}-\d{2}-\d{2}$/.test(nearestProductionDate)) throw new Error("أدخل تاريخ إنتاج صالحًا أو اترك الحقل فارغًا.");
     if (nearestExpiryDate && (!/^\d{4}-\d{2}-\d{2}$/.test(nearestExpiryDate) || nearestExpiryDate <= dateKey())) throw new Error("أدخل تاريخ انتهاء مستقبليًا صالحًا أو اترك الحقل فارغًا.");
     if (nearestProductionDate && nearestExpiryDate && nearestProductionDate > nearestExpiryDate) throw new Error("تاريخ الإنتاج يجب أن يسبق تاريخ الانتهاء.");
-    const updated = { ...current, name: normalize(values.name), nameLower: normalize(values.name).toLocaleLowerCase("ar"), barcode, internalCode: normalize(values.internalCode), category: normalize(values.category || current.category || values.unit), purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)), minimumStock: Math.max(0, toNumber(values.minimumStock)), nearestProductionDate, unit: values.unit, purchasePackageUnit: normalize(values.purchasePackageUnit || current.purchasePackageUnit || "حبة") || "حبة", unitsPerPackage: Math.max(1, toNumber(values.unitsPerPackage ?? current.unitsPerPackage) || 1), lastPackageCost: Math.max(0, toNumber(values.lastPackageCost ?? current.lastPackageCost)), nearestExpiryDate, updatedAt: nowIso() };
+    const updated = { ...current, name: normalize(values.name), nameLower: normalize(values.name).toLocaleLowerCase("ar"), barcode, internalCode: normalize(values.internalCode), category: normalizeProductCategory(values.category || current.category, values.unit || current.unit), purchasePrice: Math.max(0, toNumber(values.purchasePrice)), salePrice: Math.max(0, toNumber(values.salePrice)), minimumStock: Math.max(0, toNumber(values.minimumStock)), nearestProductionDate, unit: values.unit, purchasePackageUnit: normalize(values.purchasePackageUnit || current.purchasePackageUnit || "حبة") || "حبة", unitsPerPackage: Math.max(1, toNumber(values.unitsPerPackage ?? current.unitsPerPackage) || 1), lastPackageCost: Math.max(0, toNumber(values.lastPackageCost ?? current.lastPackageCost)), nearestExpiryDate, updatedAt: nowIso() };
     if (!updated.name) throw new Error("اسم المنتج مطلوب."); store.put(updated); await transactionDone(transaction); return updated;
   },
   async softDeleteProduct(productId) {
