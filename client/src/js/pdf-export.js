@@ -432,13 +432,13 @@ function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
   y += 11 * mm;
   context.fillStyle = "#e8f2ee";
   context.fillRect(left, y - 7 * mm, right - left, 14 * mm);
-  text(rows[0]?.[0] || "البند", right - 5 * mm, y, "right", 28, 700, "#145d4d");
-  text(rows[0]?.[1] || "القيمة", left + 5 * mm, y, "left", 28, 700, "#145d4d");
+  const columnCount = Math.max(2, rows[0]?.length || 2);
+  const columnX = Array.from({ length: columnCount }, (_, index) => right - 5 * mm - index * ((right - left - 10 * mm) / Math.max(1, columnCount - 1)));
+  rows[0]?.forEach((value, index) => text(value, columnX[index], y, index === 0 ? "right" : "center", 25, 700, "#145d4d"));
   y += 15 * mm;
-  dataRows.forEach(([label, value], index) => {
+  dataRows.forEach((row, index) => {
     if (index % 2 === 1) { context.fillStyle = "#f8fbfa"; context.fillRect(left, y - 7 * mm, right - left, 14 * mm); }
-    text(label, right - 5 * mm, y, "right", 28, 600);
-    text(value, left + 5 * mm, y, "left", 28, 700, /^[-−]/.test(String(value)) ? "#a74340" : "#172e27");
+    row.forEach((value, columnIndex) => text(value, columnX[columnIndex], y, columnIndex === 0 ? "right" : "center", 24, columnIndex === 0 ? 600 : 700, /^[-−]/.test(String(value)) ? "#a74340" : "#172e27", columnIndex === 0 ? "rtl" : "ltr"));
     context.strokeStyle = "#cad8d3"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(left, y + 7 * mm); context.lineTo(right, y + 7 * mm); context.stroke();
     y += 15 * mm;
   });
