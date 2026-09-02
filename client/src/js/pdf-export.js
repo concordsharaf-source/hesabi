@@ -64,12 +64,14 @@ async function fileOrDownload(file, title) {
 }
 
 async function loadStoreLogoImage(logoDataUrl) {
-  if (!/^data:image\/(?:png|jpeg|webp);base64,/i.test(String(logoDataUrl || ""))) return null;
+  const source = String(logoDataUrl || "");
+  if (!/^data:image\/(?:png|jpeg|webp);base64,/i.test(source) && !/^https?:\/\//i.test(source)) return null;
   return new Promise((resolve) => {
     const image = new Image();
+    if (/^https?:\/\//i.test(source)) image.crossOrigin = "anonymous";
     image.onload = () => resolve(image);
     image.onerror = () => resolve(null);
-    image.src = logoDataUrl;
+    image.src = source;
   });
 }
 
