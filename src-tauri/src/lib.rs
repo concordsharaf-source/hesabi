@@ -1,4 +1,4 @@
-use tauri::{menu::{Menu, MenuItem, Submenu}, Emitter};
+use tauri::{menu::{Menu, MenuItem, Submenu}, Manager};
 
 #[tauri::command]
 fn desktop_app_name() -> &'static str { "حسابي" }
@@ -36,7 +36,24 @@ pub fn run() {
             app.on_menu_event(|app, event| {
                 if event.id().as_ref() == "quit" { app.exit(0); return; }
                 let command = event.id().as_ref().to_string();
-                let _ = app.emit("desktop-command", command);
+                let script = match command.as_str() {
+                    "new-sale" => "document.querySelector('[data-action=\"navigate\"][data-view=\"sales\"]')?.click()",
+                    "new-purchase" => "document.querySelector('[data-action=\"navigate\"][data-view=\"purchases\"]')?.click(); setTimeout(() => document.querySelector('[data-action=\"new-purchase\"]')?.click(), 120)",
+                    "sales" => "document.querySelector('[data-action=\"navigate\"][data-view=\"sales\"]')?.click()",
+                    "customers" => "document.querySelector('[data-action=\"navigate\"][data-view=\"customers\"]')?.click()",
+                    "purchases" => "document.querySelector('[data-action=\"navigate\"][data-view=\"purchases\"]')?.click()",
+                    "inventory" => "document.querySelector('[data-action=\"navigate\"][data-view=\"inventory\"]')?.click()",
+                    "reports" => "document.querySelector('[data-action=\"navigate\"][data-view=\"reports\"]')?.click()",
+                    "settings" => "document.querySelector('[data-action=\"navigate\"][data-view=\"settings\"]')?.click()",
+                    "general-settings" => "document.querySelector('[data-action=\"navigate\"][data-view=\"general-settings\"]')?.click()",
+                    "backup" => "document.querySelector('[data-action=\"navigate\"][data-view=\"data-management\"]')?.click(); setTimeout(() => document.querySelector('[data-action=\"export-backup\"]')?.click(), 120)",
+                    "restore" => "document.querySelector('#restore-file')?.click()",
+                    "print" => "document.querySelector('[data-action=\"export-report\"]')?.click()",
+                    _ => "",
+                };
+                if !script.is_empty() {
+                    if let Some(window) = app.get_webview_window("main") { let _ = window.eval(script); }
+                }
             });
             Ok(())
         })
