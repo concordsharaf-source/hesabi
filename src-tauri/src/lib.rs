@@ -1,4 +1,4 @@
-use tauri::{menu::{Menu, MenuItem, Submenu}, Emitter, Manager};
+use tauri::{menu::{Menu, MenuItem, Submenu}, Emitter};
 
 #[tauri::command]
 fn desktop_app_name() -> &'static str { "حسابي" }
@@ -35,10 +35,8 @@ pub fn run() {
             app.set_menu(menu)?;
             app.on_menu_event(|app, event| {
                 if event.id().as_ref() == "quit" { app.exit(0); return; }
-                if let Some(window) = app.get_webview_window("main") {
-                    let command = event.id().as_ref().to_string();
-                    let _ = window.emit("desktop-command", command);
-                }
+                let command = event.id().as_ref().to_string();
+                let _ = app.emit("desktop-command", command);
             });
             Ok(())
         })

@@ -536,6 +536,17 @@ export async function shareOrDownloadPurchaseInvoicePdf(options) { return fileOr
 export async function shareOrDownloadCustomerAccountPdf(options) { return fileOrDownload(await createCustomerAccountPdfFile(options), options.title); }
 
 export function printHtmlDocument({ html, target, features }) {
+  if (window.__TAURI_INTERNALS__ || window.__TAURI__) {
+    const frame = document.createElement("iframe");
+    frame.title = target || "print";
+    frame.style.cssText = "position:fixed;right:0;bottom:0;width:1px;height:1px;border:0;opacity:0;";
+    document.body.appendChild(frame);
+    const printWindow = frame.contentWindow;
+    const cleanup = () => window.setTimeout(() => frame.remove(), 500);
+    frame.onload = () => { printWindow?.focus(); printWindow?.print(); cleanup(); };
+    frame.srcdoc = html;
+    return true;
+  }
   const popup = window.open("", target, features);
   if (!popup) return false;
   popup.document.write(html);
