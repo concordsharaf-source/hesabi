@@ -509,6 +509,7 @@ export async function createReportPdfFile({ rows, storeName, storeInfo, logoData
 }
 
 export async function shareOrDownloadPdf({ html, filename, title, page = "a4" }) { return fileOrDownload(await createPdfFileFromHtml({ html, filename, page }), title); }
+export async function shareOrDownloadReportPdf(options) { return fileOrDownload(await createReportPdfFile(options), options.title); }
 export async function shareOrDownloadInvoicePdf(options) { return fileOrDownload(await createThermalInvoicePdfFile(options), options.title); }
 export async function shareOrDownloadPurchaseInvoicePdf(options) { return fileOrDownload(await createPurchaseInvoicePdfFile(options), options.title); }
 export async function shareOrDownloadCustomerAccountPdf(options) { return fileOrDownload(await createCustomerAccountPdfFile(options), options.title); }
