@@ -1561,6 +1561,7 @@ function openPairingRedeemDialog() {
   overlay.querySelector("#pairing-redeem-form")?.addEventListener("submit", async (event) => { event.preventDefault(); try { state.cloud.identity = await redeemPairingInvite(new FormData(event.currentTarget).get("token")); if (state.cloud.identity.bootstrapChanges?.length) { await db.applySyncChanges(state.cloud.identity.bootstrapChanges); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); await refresh(); } closeDialog(); showToast(`تم ربط الجهاز بحساب ${state.cloud.identity.accountName}.`); render(); } catch (error) { showToast(error.message || "تعذر ربط الجهاز.", "error"); } });
 }
 
+function reportDateInRange(value, from = "", to = "") { const key = dateKey(value); return (!from || key >= from) && (!to || key <= to); }
 function financialReportRows(type = "summary") {
   const data = state.analytics || { sales: {}, purchases: {}, expenses: {}, profit: {} };
   const cash = state.cashbox || {};
@@ -1572,7 +1573,7 @@ function financialReportRows(type = "summary") {
   const equity = assets - payables;
   const header = [["البند", "القيمة"], ["من", state.reportFrom || "بداية السجل"], ["إلى", state.reportTo || "اليوم"]];
   if (type === "cash") {
-    const movements = (state.cashMovements || []).filter((item) => isWithinDateRange(item.date, state.reportFrom || "", state.reportTo || ""));
+    const movements = (state.cashMovements || []).filter((item) => reportDateInRange(item.date, state.reportFrom || "", state.reportTo || ""));
     const rows = movements.map((item) => [dateTime(item.date), `${item.type === "inflow" ? "وارد" : "صادر"} · ${item.notes || "حركة صندوق"}`, money(item.amount)]);
     const totals = movements.reduce((out, item) => { out[item.type === "inflow" ? 0 : 1] += toNumber(item.amount); return out; }, [0, 0]);
     return [["التاريخ", "البيان", "المبلغ"], ...rows, ["", "إجمالي الوارد", money(totals[0])], ["", "إجمالي الصادر", money(totals[1])], ["", "الرصيد الختامي", money(cashBalance)]];

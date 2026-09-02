@@ -400,7 +400,7 @@ function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
   const mm = 12;
   const width = 210 * mm;
   const dataRows = rows.slice(1);
-  const height = Math.max(297 * mm, (88 + Math.max(1, dataRows.length) * 15) * mm);
+  const height = Math.max(297 * mm, (92 + Math.max(1, dataRows.length) * 19) * mm);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -420,11 +420,11 @@ function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
   };
   let y = 20 * mm;
   if (logoImage) drawStoreLogo(context, logoImage, left + 13 * mm, y, 22 * mm);
-  text(storeName || "حسابي", right, y, "right", 62, 700, "#174c3f");
+  text(storeName || "حسابي", right, y, "right", 70, 700, "#174c3f");
   y += 9 * mm;
-  text("تقرير تشغيلي", right, y, "right", 40, 700, "#172e27");
+  text("تقرير مالي وتحليلي", right, y, "right", 46, 700, "#172e27");
   y += 9 * mm;
-  text(`الفترة: ${from || "بداية السجل"} إلى ${to || "اليوم"}`, right, y, "right", 26, 400, "#52645b");
+  text(`الفترة: ${from || "بداية السجل"} إلى ${to || "اليوم"}`, right, y, "right", 32, 400, "#52645b");
   y += 10 * mm;
   context.strokeStyle = "#1f6b59";
   context.lineWidth = 3;
@@ -434,13 +434,13 @@ function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
   context.fillRect(left, y - 7 * mm, right - left, 14 * mm);
   const columnCount = Math.max(2, rows[0]?.length || 2);
   const columnX = Array.from({ length: columnCount }, (_, index) => right - 5 * mm - index * ((right - left - 10 * mm) / Math.max(1, columnCount - 1)));
-  rows[0]?.forEach((value, index) => text(value, columnX[index], y, index === 0 ? "right" : "center", 25, 700, "#145d4d"));
-  y += 15 * mm;
+  rows[0]?.forEach((value, index) => text(value, columnX[index], y, index === 0 ? "right" : "center", 34, 700, "#145d4d"));
+  y += 19 * mm;
   dataRows.forEach((row, index) => {
-    if (index % 2 === 1) { context.fillStyle = "#f8fbfa"; context.fillRect(left, y - 7 * mm, right - left, 14 * mm); }
-    row.forEach((value, columnIndex) => text(value, columnX[columnIndex], y, columnIndex === 0 ? "right" : "center", 24, columnIndex === 0 ? 600 : 700, /^[-−]/.test(String(value)) ? "#a74340" : "#172e27", columnIndex === 0 ? "rtl" : "ltr"));
-    context.strokeStyle = "#cad8d3"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(left, y + 7 * mm); context.lineTo(right, y + 7 * mm); context.stroke();
-    y += 15 * mm;
+    if (index % 2 === 1) { context.fillStyle = "#f8fbfa"; context.fillRect(left, y - 9 * mm, right - left, 18 * mm); }
+    row.forEach((value, columnIndex) => text(value, columnX[columnIndex], y, columnIndex === 0 ? "right" : "center", 31, columnIndex === 0 ? 600 : 700, /^[-−]/.test(String(value)) ? "#a74340" : "#172e27", columnIndex === 0 ? "rtl" : "ltr"));
+    context.strokeStyle = "#cad8d3"; context.lineWidth = 1.5; context.beginPath(); context.moveTo(left, y + 9 * mm); context.lineTo(right, y + 9 * mm); context.stroke();
+    y += 19 * mm;
   });
   y += 7 * mm;
   drawPdfFooter(context, { center: width / 2, width, height, y: height - 17 * mm });
