@@ -15,6 +15,7 @@ import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
 import { shortRandomId } from "./ids.js";
 import { createBarcodeWorkbook, createPurchaseWorkbook, parseBarcodeFile } from "./barcode-file.js";
 import { CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isDesktopBarcodeWedge, isNewContinuousBarcode, shouldAcceptDesktopBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
+import { installDesktopIntegration } from "./desktop.js";
 
 const icon = (name, size = 20) => {
   const paths = {
@@ -2172,6 +2173,7 @@ function stopScanner() {
 
 export async function bootApp(target) {
   root = target;
+  installDesktopIntegration();
   installRuntimeGuards();
   installDesktopBarcodeReader();
   try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
