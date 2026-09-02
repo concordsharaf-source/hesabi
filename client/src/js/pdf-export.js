@@ -325,6 +325,7 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
   context.textBaseline = "middle";
   const right = 196 * mm;
   const left = 14 * mm;
+  const center = width / 2;
   const text = (value, x, y, align = "right", size = 28, weight = 400, direction = "rtl", color = "#172e27") => {
     context.direction = direction;
     context.textAlign = align;
@@ -397,80 +398,29 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
 }
 
 function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
-  const mm = 12;
-  const width = 210 * mm;
-  const pageHeight = 297 * mm;
-  const headerHeight = 72 * mm;
-  const footerHeight = 18 * mm;
-  const rowHeight = 15 * mm;
+  const mm = 12, width = 210 * mm, pageHeight = 297 * mm, left = 14 * mm, right = 196 * mm, center = 105 * mm;
+  const headerHeight = 72 * mm, footerHeight = 18 * mm, rowHeight = 15 * mm;
   const rowsPerPage = Math.max(8, Math.floor((pageHeight - headerHeight - footerHeight) / rowHeight));
-  const bodyRows = rows.slice(1);
-  const pageCount = Math.max(1, Math.ceil(bodyRows.length / rowsPerPage));
-  const height = pageCount * pageHeight;
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, width, height);
-  context.textBaseline = "middle";
-  const right = 196 * mm;
-  const left = 14 * mm;
-  const center = width / 2;
-  const text = (value, x, y, align = "right", size = 30, weight = 400, color = "#172e27", direction = "rtl") => {
-    context.direction = direction;
-    context.textAlign = align;
-    context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
-    context.fillStyle = color;
-    context.fillText(String(value ?? ""), x, y);
+  const bodyRows = rows.slice(1), pageCount = Math.max(1, Math.ceil(bodyRows.length / rowsPerPage));
+  const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = pageCount * pageHeight;
+  const context = canvas.getContext('2d'); context.fillStyle = '#fff'; context.fillRect(0, 0, width, canvas.height); context.textBaseline = 'middle';
+  const text = (value, x, y, align='right', size=29, weight=400, color='#172e27', direction='rtl', maxWidth=Infinity) => {
+    context.save(); context.direction = direction; context.textAlign = align; context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`; context.fillStyle = color;
+    let output = String(value ?? ''); if (Number.isFinite(maxWidth) && context.measureText(output).width > maxWidth) { const suffix = '…'; while (output.length && context.measureText(output + suffix).width > maxWidth) output = output.slice(0, -1); output += suffix; } context.fillText(output, x, y); context.restore();
   };
-  const drawLine = (x1, y1, x2, y2, color = "#1d2925", lineWidth = 1.5) => {
-    context.strokeStyle = color; context.lineWidth = lineWidth;
-    context.beginPath(); context.moveTo(x1, y1); context.lineTo(x2, y2); context.stroke();
+  const line = (x1,y1,x2,y2,color='#1d2925',w=1.5) => { context.strokeStyle=color; context.lineWidth=w; context.beginPath(); context.moveTo(x1,y1); context.lineTo(x2,y2); context.stroke(); };
+  const xFor = count => Array.from({length: Math.max(2,count)}, (_,i) => right - 5*mm - i*((right-left-10*mm)/Math.max(1,count-1)));
+  const drawHeader = (page, xs) => {
+    const top = page * pageHeight; context.strokeStyle='#1d2925'; context.lineWidth=1.5; context.strokeRect(left,top+8*mm,right-left,31*mm);
+    if (logoImage) drawStoreLogo(context,logoImage,center,top+20*mm,21*mm);
+    text(storeName || 'حسابي',right-5*mm,top+15*mm,'right',34,700,'#174c3f','rtl',62*mm); text('تقرير مالي وتحليلي',right-5*mm,top+25*mm,'right',25,600,'#52645b','rtl',62*mm);
+    text('Hesabi · Store Report',left+5*mm,top+15*mm,'left',28,700,'#174c3f','ltr',62*mm); text(`${from||'بداية السجل'} - ${to||'اليوم'}`,left+5*mm,top+25*mm,'left',23,500,'#52645b','ltr',62*mm);
+    line(left,top+43*mm,right,top+43*mm); text(`الفترة: ${from||'بداية السجل'} إلى ${to||'اليوم'}`,center,top+50*mm,'center',30,700,'#172e27','rtl',170*mm); text(`صفحة ${page+1} من ${pageCount}`,center,top+60*mm,'center',21,400,'#52645b','rtl',170*mm);
+    const tableTop=top+headerHeight, count=xs.length, bounds=[left,...xs.slice(1).map((x,i)=>(x+xs[i])/2),right]; context.fillStyle='#e1e4e2'; context.fillRect(left,tableTop,right-left,rowHeight); line(left,tableTop,right,tableTop); line(left,tableTop+rowHeight,right,tableTop+rowHeight);
+    rows[0].forEach((value,i)=>{ const cellLeft=bounds[count-1-i], cellRight=bounds[count-i]; text(value,xs[i],tableTop+rowHeight/2,i===0?'right':'center',30,700,'#172e27',i===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); if(i) line(cellLeft,tableTop,cellLeft,tableTop+rowHeight,'#1d2925',1.2); });
+    return { y: tableTop+rowHeight, bounds };
   };
-  const columnsFor = (header) => {
-    const count = Math.max(2, header.length);
-    return Array.from({ length: count }, (_, index) => right - 5 * mm - index * ((right - left - 10 * mm) / Math.max(1, count - 1)));
-  };
-  const drawPageHeader = (pageIndex, columnX) => {
-    const top = pageIndex * pageHeight;
-    context.strokeStyle = "#1d2925"; context.lineWidth = 1.5;
-    context.strokeRect(left, top + 8 * mm, right - left, 31 * mm);
-    if (logoImage) drawStoreLogo(context, logoImage, center, top + 20 * mm, 21 * mm);
-    text(storeName || "حسابي", right - 5 * mm, top + 15 * mm, "right", 34, 700, "#174c3f");
-    text("تقرير مالي وتحليلي", right - 5 * mm, top + 25 * mm, "right", 25, 600, "#52645b");
-    text("Hesabi · Store Report", left + 5 * mm, top + 15 * mm, "left", 28, 700, "#174c3f", "ltr");
-    text(`${from || "بداية السجل"} - ${to || "اليوم"}`, left + 5 * mm, top + 25 * mm, "left", 23, 500, "#52645b", "ltr");
-    drawLine(left, top + 43 * mm, right, top + 43 * mm, "#1d2925", 1.5);
-    text(`الفترة: ${from || "بداية السجل"} إلى ${to || "اليوم"}`, center, top + 50 * mm, "center", 30, 700, "#172e27");
-    text(`صفحة ${pageIndex + 1} من ${pageCount}`, center, top + 60 * mm, "center", 21, 400, "#52645b");
-    const tableTop = top + headerHeight;
-    context.fillStyle = "#e1e4e2";
-    context.fillRect(left, tableTop, right - left, rowHeight);
-    drawLine(left, tableTop, right, tableTop, "#1d2925", 1.5);
-    drawLine(left, tableTop + rowHeight, right, tableTop + rowHeight, "#1d2925", 1.5);
-    for (let index = 0; index < columnX.length; index += 1) {
-      const x = columnX[index];
-      text(rows[0]?.[index] || "", x, tableTop + rowHeight / 2, index === 0 ? "right" : "center", 30, 700, "#172e27", index === 0 ? "rtl" : "ltr");
-      if (index > 0) drawLine(x - 34 * mm, tableTop, x - 34 * mm, tableTop + rowHeight, "#1d2925", 1.2);
-    }
-    return tableTop + rowHeight;
-  };
-  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
-    const columnX = columnsFor(rows[0] || ["البند", "القيمة"]);
-    let y = drawPageHeader(pageIndex, columnX);
-    const pageRows = bodyRows.slice(pageIndex * rowsPerPage, (pageIndex + 1) * rowsPerPage);
-    pageRows.forEach((row, index) => {
-      if (index % 2 === 1) { context.fillStyle = "#f7f8f7"; context.fillRect(left, y, right - left, rowHeight); }
-      drawLine(left, y, right, y, "#69736e", 1);
-      row.forEach((value, columnIndex) => text(value, columnX[columnIndex], y + rowHeight / 2, columnIndex === 0 ? "right" : "center", 29, columnIndex === 0 ? 600 : 700, /^[-−]/.test(String(value)) ? "#a74340" : "#172e27", columnIndex === 0 ? "rtl" : "ltr"));
-      y += rowHeight;
-    });
-    drawLine(left, y, right, y, "#1d2925", 1.5);
-    drawLine(left, pageIndex * pageHeight + headerHeight, left, y, "#1d2925", 1.5);
-    drawLine(right, pageIndex * pageHeight + headerHeight, right, y, "#1d2925", 1.5);
-    drawPdfFooter(context, { center, width, height, y: (pageIndex + 1) * pageHeight - 14 * mm });
-  }
+  for (let page=0; page<pageCount; page++) { const xs=xFor(rows[0].length), header=drawHeader(page,xs); let y=header.y; const pageRows=bodyRows.slice(page*rowsPerPage,(page+1)*rowsPerPage); pageRows.forEach((row,i)=>{ const count=xs.length; if(i%2) { context.fillStyle='#f7f8f7'; context.fillRect(left,y,right-left,rowHeight); } line(left,y,right,y,'#69736e',1); row.forEach((value,col)=>{ const cellLeft=header.bounds[count-1-col], cellRight=header.bounds[count-col]; text(value,xs[col],y+rowHeight/2,col===0?'right':'center',29,col===0?600:700,/^[-−]/.test(String(value))?'#a74340':'#172e27',col===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); }); y+=rowHeight; }); line(left,y,right,y); line(left,page*pageHeight+headerHeight,left,y); line(right,page*pageHeight+headerHeight,right,y); drawPdfFooter(context,{center,width,height:canvas.height,y:(page+1)*pageHeight-14*mm}); }
   return canvas;
 }
 function createA4PdfFromCanvas(canvas) {
