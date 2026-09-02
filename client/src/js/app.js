@@ -73,6 +73,7 @@ let runtimeGuardsInstalled = false;
 let desktopBarcodeReaderInstalled = false;
 let automaticBackupTimer = null;
 let automaticBackupBusy = false;
+let localBackupDirectoryHandle = null;
 const AUTOMATIC_BACKUP_CHECK_MS = 5 * 60 * 1000;
 const AUTOMATIC_CLOUD_BACKUP_INTERVAL_MS = 60 * 60 * 1000;
 const AUTOMATIC_LOCAL_BACKUP_MARKER = "hesabi-last-local-daily-backup";
@@ -686,7 +687,7 @@ function mobileNavigationSettingsMarkup() {
 
 function dataManagementMarkup() {
   return `${topbarMarkup("إدارة البيانات", "احفظ نسخة محلية أو سحابية واستعدها عند الحاجة، دون مزامنة تلقائية بين الأجهزة.", `<button class="button button--secondary" data-action="navigate" data-view="settings">${icon("arrow", 17)}<span>الإعدادات</span></button>`)}
-  <div class="data-management-page"><section class="panel barcode-tools"><div class="panel__head"><div><span class="eyebrow">كتالوج الباركود</span><h2>استيراد أو تصدير الباركودات</h2></div></div><p>صدّر منتجاتك إلى Excel، أو استورد ملف Excel/CSV/TSV. تُطابق الأعمدة العربية أو الإنجليزية تلقائيًا وتظهر المنتجات والباركودات فورًا في القوائم.</p><div class="dialog__actions"><button class="button button--secondary" type="button" data-action="export-barcodes">تصدير Excel</button><label class="button button--primary" for="barcode-import-file">استيراد ملف الباركود<input id="barcode-import-file" type="file" accept=".xlsx,.xls,.csv,.tsv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden /></label></div><small class="field-hint">يفضل أن يحتوي الملف على عمود «الباركود» و«اسم المنتج». إذا كان المنتج موجودًا سيتم تحديث باركوده، وإذا لم يكن موجودًا سيُضاف إلى المنتجات.</small></section><section class="report-grid"><section class="panel report-card data-management-card"><span class="eyebrow">نسخة محلية</span><h2>تصدير واستيراد البيانات</h2><p>صدّر ملف JSON يحتفظ بكل بيانات هذا الجهاز، واستعده فقط من ملف حسابي موثوق.</p><div class="dialog__actions"><button class="button button--primary" data-action="export-backup">${icon("download", 17)} تصدير نسخة</button><label class="button button--primary" for="restore-file">${icon("restore", 17)} استيراد واستعادة</label><input id="restore-file" type="file" accept="application/json,.json" hidden /></div></section>${cloudBackupMarkup()}<section class="panel report-card data-management-card data-management-card--danger"><span class="eyebrow">منطقة حساسة</span><h2>مسح البيانات</h2><p>يمسح كل بيانات هذا الجهاز ويعيد التطبيق إلى شاشة الإعداد. صدّر نسخة احتياطية أولًا.</p><button class="button button--danger" data-action="reset-data">مسح جميع البيانات</button></section></section></div>`;
+  <div class="data-management-page"><section class="panel barcode-tools"><div class="panel__head"><div><span class="eyebrow">كتالوج الباركود</span><h2>استيراد أو تصدير الباركودات</h2></div></div><p>صدّر منتجاتك إلى Excel، أو استورد ملف Excel/CSV/TSV. تُطابق الأعمدة العربية أو الإنجليزية تلقائيًا وتظهر المنتجات والباركودات فورًا في القوائم.</p><div class="dialog__actions"><button class="button button--secondary" type="button" data-action="export-barcodes">تصدير Excel</button><label class="button button--primary" for="barcode-import-file">استيراد ملف الباركود<input id="barcode-import-file" type="file" accept=".xlsx,.xls,.csv,.tsv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden /></label></div><small class="field-hint">يفضل أن يحتوي الملف على عمود «الباركود» و«اسم المنتج». إذا كان المنتج موجودًا سيتم تحديث باركوده، وإذا لم يكن موجودًا سيُضاف إلى المنتجات.</small></section><section class="report-grid"><section class="panel report-card data-management-card"><span class="eyebrow">نسخة محلية</span><h2>تصدير واستيراد البيانات</h2><p>صدّر ملف JSON يحتفظ بكل بيانات هذا الجهاز، واستعده فقط من ملف حسابي موثوق.</p>${state.settings?.localBackupDirectoryName ? `<small class="field-hint">الحفظ التلقائي في: ${escapeHtml(state.settings.localBackupDirectoryName)}</small>` : `<small class="field-hint">اختر مجلدًا ليُحفظ فيه النسخ اليومية تلقائيًا على سطح المكتب.</small>`}<div class="dialog__actions"><button class="button button--primary" data-action="export-backup">${icon("download", 17)} تصدير نسخة</button><button class="button button--secondary" data-action="choose-backup-directory">${icon("box", 17)} اختيار مجلد الحفظ</button><label class="button button--primary" for="restore-file">${icon("restore", 17)} استيراد واستعادة</label><input id="restore-file" type="file" accept="application/json,.json" hidden /></div></section>${cloudBackupMarkup()}<section class="panel report-card data-management-card data-management-card--danger"><span class="eyebrow">منطقة حساسة</span><h2>مسح البيانات</h2><p>يمسح كل بيانات هذا الجهاز ويعيد التطبيق إلى شاشة الإعداد. صدّر نسخة احتياطية أولًا.</p><button class="button button--danger" data-action="reset-data">مسح جميع البيانات</button></section></section></div>`;
 }
 
 function storeLogoSettingsMarkup() {
@@ -1093,6 +1094,7 @@ async function handleActionUnsafe(event) {
   if (action === "open-periodic-inventory") { openPeriodicInventoryDialog(id); return; }
   if (action === "clear-store-logo") { await clearStoreLogo(); return; }
   if (action === "export-backup") { downloadBackup(); return; }
+  if (action === "choose-backup-directory") { chooseBackupDirectory(); return; }
   if (action === "export-barcodes") { exportBarcodesFile(); return; }
   if (action === "open-cloud-auth") { openCloudAuthDialog(); return; }
   if (action === "pairing-invite") { openPairingInviteDialog(); return; }
@@ -1436,6 +1438,13 @@ async function importBarcodeFile(event) {
   finally { input.value = ""; }
 }
 
+function supportsLocalBackupDirectory() { return typeof window.showDirectoryPicker === "function"; }
+function openBackupHandleDb() { return new Promise((resolve, reject) => { const request = indexedDB.open("hesabi-backup-handles", 1); request.onupgradeneeded = () => request.result.createObjectStore("handles"); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
+async function storeBackupDirectoryHandle(handle) { const database = await openBackupHandleDb(); await new Promise((resolve, reject) => { const tx = database.transaction("handles", "readwrite"); tx.objectStore("handles").put(handle, "local"); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error); }); database.close(); }
+async function readBackupDirectoryHandle() { if (localBackupDirectoryHandle) return localBackupDirectoryHandle; try { const database = await openBackupHandleDb(); localBackupDirectoryHandle = await new Promise((resolve, reject) => { const tx = database.transaction("handles", "readonly"); const request = tx.objectStore("handles").get("local"); request.onsuccess = () => resolve(request.result || null); request.onerror = () => reject(request.error); }); database.close(); return localBackupDirectoryHandle; } catch { return null; } }
+async function chooseBackupDirectory() { if (!supportsLocalBackupDirectory()) { showToast("اختيار مجلد النسخ غير مدعوم في هذا الجهاز. استخدم نسخة سطح المكتب الحديثة أو التصدير اليدوي.", "error"); return; } try { const handle = await window.showDirectoryPicker({ mode: "readwrite" }); localBackupDirectoryHandle = handle; await storeBackupDirectoryHandle(handle); await db.saveSettings({ localBackupDirectoryName: handle.name }); state.settings = await db.getSettings(); render(); showToast(`تم اختيار مجلد النسخ: ${handle.name}`); } catch (error) { if (error?.name !== "AbortError") showToast("تعذر اختيار مجلد النسخ.", "error"); } }
+async function saveBackupToLocalDirectory(backup) { const handle = await readBackupDirectoryHandle(); if (!handle) return false; try { if (handle.queryPermission && await handle.queryPermission({ mode: "readwrite" }) !== "granted") return false; const fileHandle = await handle.getFileHandle(`hesabi-backup-${dateKey()}.json`, { create: true }); const writable = await fileHandle.createWritable(); await writable.write(JSON.stringify(backup, null, 2)); await writable.close(); return true; } catch (error) { console.warn("[Hesabi local backup directory unavailable]", error); return false; } }
+
 async function runAutomaticBackups({ force = false } = {}) {
   if (automaticBackupBusy || !state.settings?.setupCompleted || !state.currentUser) return;
   automaticBackupBusy = true;
@@ -1443,7 +1452,8 @@ async function runAutomaticBackups({ force = false } = {}) {
     const now = Date.now();
     const localMarker = localStorage.getItem(AUTOMATIC_LOCAL_BACKUP_MARKER) || "";
     if (force || localMarker !== dateKey()) {
-      await db.createLocalBackup();
+      const savedToDirectory = await saveBackupToLocalDirectory(await db.exportBackup());
+      if (!savedToDirectory) await db.createLocalBackup();
       localStorage.setItem(AUTOMATIC_LOCAL_BACKUP_MARKER, dateKey());
     }
     const cloudMarker = Number(localStorage.getItem(AUTOMATIC_CLOUD_BACKUP_MARKER) || 0);
