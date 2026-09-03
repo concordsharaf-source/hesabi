@@ -400,8 +400,9 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
 }
 
 function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
-  const mm = 12, width = 210 * mm, pageHeight = 297 * mm, left = 14 * mm, right = 196 * mm, center = 105 * mm;
-  const headerHeight = 72 * mm, footerHeight = 18 * mm, rowHeight = 15 * mm;
+  const mm = 12, wide = rows[0]?.length > 6, width = (wide ? 297 : 210) * mm, pageHeight = (wide ? 210 : 297) * mm, left = 14 * mm, right = width - left, center = width / 2;
+  const headerHeight = (wide ? 55 : 72) * mm, footerHeight = 18 * mm, rowHeight = (wide ? 18 : 15) * mm;
+  const tableFont = wide ? 17 : 30, bodyFont = wide ? 16 : 29;
   const rowsPerPage = Math.max(8, Math.floor((pageHeight - headerHeight - footerHeight) / rowHeight));
   const bodyRows = rows.slice(1), pageCount = Math.max(1, Math.ceil(bodyRows.length / rowsPerPage));
   const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = pageCount * pageHeight;
@@ -419,14 +420,14 @@ function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
     text('Hesabi · Store Report',left+5*mm,top+15*mm,'left',28,700,'#174c3f','ltr',62*mm); text(`${from||'بداية السجل'} - ${to||'اليوم'}`,left+5*mm,top+25*mm,'left',23,500,'#52645b','ltr',62*mm);
     line(left,top+43*mm,right,top+43*mm); text(`الفترة: ${from||'بداية السجل'} إلى ${to||'اليوم'}`,center,top+50*mm,'center',30,700,'#172e27','rtl',170*mm); text(`صفحة ${page+1} من ${pageCount}`,center,top+60*mm,'center',21,400,'#52645b','rtl',170*mm);
     const tableTop=top+headerHeight, count=xs.length, bounds=[left,...xs.slice(1).map((x,i)=>(x+xs[i])/2),right]; context.fillStyle='#e1e4e2'; context.fillRect(left,tableTop,right-left,rowHeight); line(left,tableTop,right,tableTop); line(left,tableTop+rowHeight,right,tableTop+rowHeight);
-    rows[0].forEach((value,i)=>{ const cellLeft=bounds[count-1-i], cellRight=bounds[count-i]; text(value,xs[i],tableTop+rowHeight/2,i===0?'right':'center',30,700,'#172e27',i===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); if(i) line(cellLeft,tableTop,cellLeft,tableTop+rowHeight,'#1d2925',1.2); });
+    rows[0].forEach((value,i)=>{ const cellLeft=bounds[count-1-i], cellRight=bounds[count-i]; text(value,xs[i],tableTop+rowHeight/2,i===0?'right':'center',tableFont,700,'#172e27',i===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); if(i) line(cellLeft,tableTop,cellLeft,tableTop+rowHeight,'#1d2925',1.2); });
     return { y: tableTop+rowHeight, bounds };
   };
-  for (let page=0; page<pageCount; page++) { const xs=xFor(rows[0].length), header=drawHeader(page,xs); let y=header.y; const pageRows=bodyRows.slice(page*rowsPerPage,(page+1)*rowsPerPage); pageRows.forEach((row,i)=>{ const count=xs.length; if(i%2) { context.fillStyle='#f7f8f7'; context.fillRect(left,y,right-left,rowHeight); } line(left,y,right,y,'#69736e',1); row.forEach((value,col)=>{ const cellLeft=header.bounds[count-1-col], cellRight=header.bounds[count-col]; text(value,xs[col],y+rowHeight/2,col===0?'right':'center',29,col===0?600:700,/^[-−]/.test(String(value))?'#a74340':'#172e27',col===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); }); y+=rowHeight; }); line(left,y,right,y); line(left,page*pageHeight+headerHeight,left,y); line(right,page*pageHeight+headerHeight,right,y); drawPdfFooter(context,{center,width,height:canvas.height,y:(page+1)*pageHeight-14*mm}); }
+  for (let page=0; page<pageCount; page++) { const xs=xFor(rows[0].length), header=drawHeader(page,xs); let y=header.y; const pageRows=bodyRows.slice(page*rowsPerPage,(page+1)*rowsPerPage); pageRows.forEach((row,i)=>{ const count=xs.length; if(i%2) { context.fillStyle='#f7f8f7'; context.fillRect(left,y,right-left,rowHeight); } line(left,y,right,y,'#69736e',1); row.forEach((value,col)=>{ const cellLeft=header.bounds[count-1-col], cellRight=header.bounds[count-col]; text(value,xs[col],y+rowHeight/2,col===0?'right':'center',bodyFont,col===0?600:700,/^[-−]/.test(String(value))?'#a74340':'#172e27',col===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); }); y+=rowHeight; }); line(left,y,right,y); line(left,page*pageHeight+headerHeight,left,y); line(right,page*pageHeight+headerHeight,right,y); drawPdfFooter(context,{center,width,height:canvas.height,y:(page+1)*pageHeight-14*mm}); }
   return canvas;
 }
-function createA4PdfFromCanvas(canvas) {
-  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait", compress: true });
+function createA4PdfFromCanvas(canvas, orientation = "portrait") {
+  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation, compress: true });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const pixelsPerMm = canvas.width / pageWidth;
@@ -502,7 +503,7 @@ export async function createCustomerAccountPdfFile({ account, storeName, storeIn
 export async function createReportPdfFile({ rows, storeName, storeInfo, logoDataUrl, from, to, filename }) {
   await loadCanvasArabicFont();
   const logoImage = await loadStoreLogoImage(logoDataUrl);
-  const pdf = createA4PdfFromCanvas(drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }));
+  const pdf = createA4PdfFromCanvas(drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }), rows[0]?.length > 6 ? "landscape" : "portrait");
   const blob = pdf.output("blob");
   if (!blob || blob.size < 800) throw new Error("تعذر إنشاء تقرير PDF عربي واضح.");
   return new File([blob], filename, { type: "application/pdf" });
