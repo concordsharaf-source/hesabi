@@ -1075,7 +1075,7 @@ async function handleActionUnsafe(event) {
   if (action === "delete-supplier") { deleteSupplier(id); return; }
   if (action === "new-supplier-payment") { openSupplierPaymentDialog(); return; }
   if (action === "record-supplier-payment") { openSupplierPaymentDialog(id); return; }
-  if (action === "new-purchase") { openPurchaseDialog(); return; }
+  if (action === "new-purchase") { openPurchaseEntryDialog(); return; }
   if (action === "open-purchase") { openPurchaseDialog(id); return; }
   if (action === "purchase-return") { openPurchaseReturnDialog(id); return; }
   if (action === "sale-return") { openSaleReturnDialog(id); return; }
@@ -1811,6 +1811,11 @@ function openExpenseDialog(expense = null) {
 
 async function deleteCashierAccount(accountId) { const account = state.accounts.find((item) => item.id === accountId); if (!account || account.role !== "cashier") return; if (!window.confirm(`حذف حساب ${account.name}؟ سيُوقف الحساب عن الدخول مع الاحتفاظ بكل الفواتير والسلف والورديات.`)) return; try { await db.deleteCashierAccount(accountId); state.accounts = await db.listAccounts(); await refresh(); render(); showToast(`تم حذف حساب الكاشير ${account.name} مع الاحتفاظ بسجله.`); } catch (error) { showToast(error.message || "تعذر حذف حساب الكاشير.", "error"); } }
 async function deleteExpense(expenseId) { if (!window.confirm("هل تريد حذف المصروف؟")) return; try { await db.deleteExpense(expenseId); await refresh(); render(); showToast("تم حذف المصروف"); } catch (error) { showToast(error.message, "error"); } }
+
+function openPurchaseEntryDialog() {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">فاتورة شراء</span><h2>اختر نوع المنتج</h2><p class="dialog__subtext">حدد نوع المنتج الذي تريد إضافته إلى فاتورة الشراء.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section class="purchase-entry-choice" aria-label="اختيار نوع المنتج"><button type="button" class="purchase-entry-choice__button purchase-entry-choice__button--existing" data-purchase-entry="existing"><span class="purchase-entry-choice__icon">${icon("search", 25)}</span><span><strong>منتج موجود</strong><small>اختر منتجًا محفوظًا من المخزون وأدخل بيانات التوريد.</small></span>${icon("arrow", 19)}</button><button type="button" class="purchase-entry-choice__button purchase-entry-choice__button--new" data-purchase-entry="new"><span class="purchase-entry-choice__icon">${icon("plus", 25)}</span><span><strong>منتج جديد</strong><small>أنشئ منتجًا جديدًا ثم أضفه مباشرة إلى فاتورة الشراء.</small></span>${icon("arrow", 19)}</button></section>`);
+  overlay.querySelectorAll("[data-purchase-entry]").forEach((button) => button.addEventListener("click", () => { const draft = { supplierId: "", notes: "", lines: [], paymentType: "نقدي", paidAmount: "", paymentMethod: "نقدي" }; closeDialog(); if (button.dataset.purchaseEntry === "new") openPurchaseProductDialog(draft); else openPurchaseDialog(draft); }));
+}
 
 async function openPurchaseDialog(purchaseIdOrDraft = null) {
   if (typeof purchaseIdOrDraft === "string") { openPurchaseDetail(await db.getPurchase(purchaseIdOrDraft)); return; }
