@@ -124,7 +124,7 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
   const mm = 12;
   const width = 80 * mm;
   const details = invoice.customerName ? 1 + Number(Boolean(customer?.phone)) + Number(Boolean(customer?.address)) : 0;
-  const height = Math.max(1420, (160 + details * 11 + Math.max(1, invoice.items?.length || 0) * 20 + (logoImage ? 17 : 0) + (toNumber(invoice.deliveryFee) > 0 ? 9 : 0)) * mm);
+  const height = Math.max(1650, (190 + details * 13 + Math.max(1, invoice.items?.length || 0) * 24 + (logoImage ? 17 : 0) + (toNumber(invoice.deliveryFee) > 0 ? 11 : 0)) * mm);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
@@ -138,19 +138,20 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
   const left = 4 * mm;
   const center = 40 * mm;
   let y = 9 * mm;
+  const thermalFontScale = 1.35;
   const text = (value, x, align = "right", size = 28, weight = 400, direction = "rtl") => {
     context.direction = direction;
     context.textAlign = align;
-    context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
+    context.font = `${weight} ${Math.round(size * thermalFontScale)}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
     context.fillText(String(value ?? ""), x, y);
   };
   const divider = () => {
-    context.save(); context.strokeStyle = "#444"; context.setLineDash([6, 5]); context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke(); context.restore();
+    context.save(); context.strokeStyle = "#111"; context.lineWidth = 1.5; context.setLineDash([7, 4]); context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke(); context.restore();
   };
   const pair = (label, value, options = {}) => {
     text(label, right, "right", options.labelSize || 27, options.bold ? 700 : 400);
     text(value, left, "left", options.valueSize || 27, options.bold ? 700 : 400, options.ltr ? "ltr" : "rtl");
-    y += options.gap || 6.5 * mm;
+    y += options.gap || 8.5 * mm;
   };
   if (logoImage) { drawStoreLogo(context, logoImage, center, y + 7 * mm, 14 * mm); y += 17 * mm; }
   text(storeName || "حسابي", center, "center", 44, 700); y += 8 * mm;
@@ -168,12 +169,12 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
     if (customer?.address) pair("العنوان", customer.address, { gap: 6.5 * mm });
     y += 2 * mm;
   }
-  divider(); y += 6 * mm;
-  for (const item of invoice.items || []) {
-    text(item.productName, right, "right", 30, 700); text(formatMoney(item.total), left, "left", 28, 700, "ltr"); y += 6 * mm;
-    text(`${formatAmount(item.quantity)} ${item.unit} × ${formatMoney(item.unitPrice)}`, right, "right", 22); y += 8 * mm;
-  }
   divider(); y += 7 * mm;
+  for (const item of invoice.items || []) {
+    text(item.productName, right, "right", 30, 700); text(formatMoney(item.total), left, "left", 28, 700, "ltr"); y += 8 * mm;
+    text(`${formatAmount(item.quantity)} ${item.unit} × ${formatMoney(item.unitPrice)}`, right, "right", 22); y += 10 * mm;
+  }
+  divider(); y += 8 * mm;
   pair("الإجمالي قبل الخصم", formatMoney(invoice.subtotal));
   pair("الخصم", formatMoney(invoice.discount));
   if (toNumber(invoice.deliveryFee) > 0) pair(`التوصيل · ${invoice.deliveryChargeType === "customer" ? "على العميل ضمن الفاتورة" : "حساب المحل"}`, formatMoney(invoice.deliveryFee));
@@ -227,8 +228,9 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
     rows.slice(0, options.maxRows || 3).forEach((row, index) => text(row, x, y + index * (options.lineHeight || 6.5 * mm), options.align || "right", options.size || 22, options.weight || 400, options.direction || "rtl", options.color || "#172e27"));
     return Math.min(rows.length, options.maxRows || 3);
   };
-  const rule = (y, color = "#b9cbc1") => { context.strokeStyle = color; context.lineWidth = 2; context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke(); };
-  const box = (top, boxHeight, fill = "#f1f7f3") => { context.fillStyle = fill; context.strokeStyle = "#c4d5cc"; context.lineWidth = 2; context.beginPath(); context.roundRect(left, top, right - left, boxHeight, 10); context.fill(); context.stroke(); };
+  const rule = (y, color = "#1d2925") => { context.strokeStyle = color; context.lineWidth = 2; context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke(); };
+  const vline = (x, y1, y2, color = "#1d2925") => { context.strokeStyle = color; context.lineWidth = 1.5; context.beginPath(); context.moveTo(x, y1); context.lineTo(x, y2); context.stroke(); };
+  const box = (top, boxHeight, fill = "#f1f7f3") => { context.fillStyle = fill; context.strokeStyle = "#7f9689"; context.lineWidth = 2; context.beginPath(); context.roundRect(left, top, right - left, boxHeight, 10); context.fill(); context.stroke(); };
   const pair = (label, value, y, options = {}) => { text(label, right - 5 * mm, y, "right", options.labelSize || 24, options.labelWeight || 600); text(value, left + 5 * mm, y, "left", options.valueSize || 25, options.valueWeight || 700, options.ltr ? "ltr" : "rtl", options.color || "#172e27"); };
 
   let y = 17 * mm;
@@ -253,6 +255,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
   supplierRows.forEach(([label, value, ltr]) => { pair(label, value, y, { ltr, valueSize: 23 }); y += lineHeight; });
   y += 7 * mm;
 
+  const colBounds = [right, 138 * mm, 117 * mm, 85 * mm, 53 * mm, left];
   const tableTop = y;
   context.fillStyle = "#174c3f";
   context.fillRect(left, tableTop, right - left, 12 * mm);
@@ -261,6 +264,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
   text("سعر الشراء", 101 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
   text("سعر البيع", 69 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
   text("الإجمالي", left + 5 * mm, tableTop + 6 * mm, "left", 24, 700, "rtl", "#ffffff");
+  colBounds.slice(1, -1).forEach((x) => vline(x, tableTop, tableTop + 12 * mm, "rgba(255,255,255,0.45)"));
   y += 12 * mm;
   items.forEach((item, index) => {
     if (index % 2 === 0) { context.fillStyle = "#f5faf7"; context.fillRect(left, y, right - left, itemHeight); }
@@ -285,8 +289,10 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
     ].filter(Boolean).join(" · ");
     if (purchaseDetails) { context.font = `400 ${19 * fontScale}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; wrapped(purchaseDetails, right - 5 * mm, detailY, right - left - 10 * mm, { size: 19, maxRows: 2, lineHeight: 7 * mm, color: "#52645b" }); }
     y += itemHeight;
+    colBounds.slice(1, -1).forEach((x) => vline(x, y - itemHeight, y, "#c4d5cc"));
     rule(y);
   });
+  colBounds.forEach((x) => vline(x, tableTop, y));
   y += 9 * mm;
 
   const summaryTop = y;
@@ -381,19 +387,28 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
   text("تفاصيل العمليات", right, y, "right", 40, 700, "rtl", "#174c3f");
   y += 9 * mm;
   const columns = [right, 151 * mm, 105 * mm, 59 * mm, left];
-  context.fillStyle = "#f4f6f1"; context.fillRect(left, y - 6 * mm, right - left, 12 * mm);
-  ["العملية", "التاريخ", "المرجع", "القيمة", "الرصيد بعد العملية"].forEach((label, index) => text(label, columns[index] - (index ? 3 * mm : 0), y, index === 4 ? "left" : "right", 23, 700, "rtl", "#52645b"));
-  y += 12 * mm;
-  if (!rows.length) { text("لا توجد عمليات مسجلة.", right, y, "right", 30, 400, "rtl", "#52645b"); y += 14 * mm; }
-  rows.forEach((transaction) => {
-    text(transaction.typeLabel || transaction.type || "", columns[0], y, "right", 26, 700);
-    text(formatDateTime(transaction.date), columns[1], y, "right", 20, 400, "rtl", "#52645b");
-    text(transaction.invoiceNumber || "—", columns[2], y, "right", 22, 600, "ltr", "#52645b");
-    text(formatMoney(transaction.amount), columns[3], y, "right", 24, 700, "ltr", Number(transaction.amount) < 0 ? "#a74340" : "#172e27");
-    text(formatMoney(transaction.remainingAmount), columns[4], y, "left", 24, 700, "ltr");
-    y += 10 * mm;
-    line(left, y - 5 * mm, right, y - 5 * mm);
+  const colBoundsAcct = [right + 2 * mm, 165 * mm, 130 * mm, 85 * mm, 40 * mm, left - 2 * mm];
+  const tableTopAcct = y - 8 * mm;
+  const rowHeightAcct = 12 * mm;
+  context.fillStyle = "#e7efe9"; context.fillRect(left, tableTopAcct, right - left, rowHeightAcct);
+  ["العملية", "التاريخ", "المرجع", "القيمة", "الرصيد بعد العملية"].forEach((label, index) => text(label, columns[index] - (index ? 3 * mm : 0), y, index === 4 ? "left" : "right", 26, 700, "rtl", "#172e27"));
+  colBoundsAcct.slice(1, -1).forEach((x) => line(x, tableTopAcct, x, tableTopAcct + rowHeightAcct, "#8fa89a", 1.5));
+  y = tableTopAcct + rowHeightAcct;
+  if (!rows.length) { text("لا توجد عمليات مسجلة.", right, y + 8 * mm, "right", 30, 400, "rtl", "#52645b"); y += 20 * mm; }
+  rows.forEach((transaction, index) => {
+    const rowTop = y;
+    if (index % 2 === 1) { context.fillStyle = "#f7f9f7"; context.fillRect(left, rowTop, right - left, rowHeightAcct); }
+    const textY = rowTop + rowHeightAcct / 2;
+    text(transaction.typeLabel || transaction.type || "", columns[0], textY, "right", 28, 700);
+    text(formatDateTime(transaction.date), columns[1], textY, "right", 23, 400, "rtl", "#52645b");
+    text(transaction.invoiceNumber || "—", columns[2], textY, "right", 25, 600, "ltr", "#52645b");
+    text(formatMoney(transaction.amount), columns[3], textY, "right", 27, 700, "ltr", Number(transaction.amount) < 0 ? "#a74340" : "#172e27");
+    text(formatMoney(transaction.remainingAmount), columns[4], textY, "left", 27, 700, "ltr");
+    y += rowHeightAcct;
+    line(left, y, right, y, "#c7d3cb", 1.5);
   });
+  colBoundsAcct.forEach((x) => line(x, tableTopAcct, x, y, "#7f9689", 1.5));
+  line(left, tableTopAcct, right, tableTopAcct, "#1f6b59", 2);
   y += 7 * mm;
   drawPdfFooter(context, { center: width / 2, width, height, y: height - 17 * mm });
   return canvas;
@@ -401,8 +416,8 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
 
 function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
   const mm = 12, wide = rows[0]?.length > 6, width = (wide ? 297 : 210) * mm, pageHeight = (wide ? 210 : 297) * mm, left = 14 * mm, right = width - left, center = width / 2;
-  const headerHeight = (wide ? 55 : 72) * mm, footerHeight = 18 * mm, rowHeight = (wide ? 18 : 15) * mm;
-  const tableFont = wide ? 17 : 30, bodyFont = wide ? 16 : 29;
+  const headerHeight = (wide ? 55 : 72) * mm, footerHeight = 18 * mm, rowHeight = (wide ? 24 : 21) * mm;
+  const tableFont = wide ? 24 : 40, bodyFont = wide ? 22 : 38;
   const rowsPerPage = Math.max(8, Math.floor((pageHeight - headerHeight - footerHeight) / rowHeight));
   const bodyRows = rows.slice(1), pageCount = Math.max(1, Math.ceil(bodyRows.length / rowsPerPage));
   const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = pageCount * pageHeight;
@@ -420,10 +435,10 @@ function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
     text('Hesabi · Store Report',left+5*mm,top+15*mm,'left',28,700,'#174c3f','ltr',62*mm); text(`${from||'بداية السجل'} - ${to||'اليوم'}`,left+5*mm,top+25*mm,'left',23,500,'#52645b','ltr',62*mm);
     line(left,top+43*mm,right,top+43*mm); text(`الفترة: ${from||'بداية السجل'} إلى ${to||'اليوم'}`,center,top+50*mm,'center',30,700,'#172e27','rtl',170*mm); text(`صفحة ${page+1} من ${pageCount}`,center,top+60*mm,'center',21,400,'#52645b','rtl',170*mm);
     const tableTop=top+headerHeight, count=xs.length, bounds=[left,...xs.slice(1).map((x,i)=>(x+xs[i])/2),right]; context.fillStyle='#e1e4e2'; context.fillRect(left,tableTop,right-left,rowHeight); line(left,tableTop,right,tableTop); line(left,tableTop+rowHeight,right,tableTop+rowHeight);
-    rows[0].forEach((value,i)=>{ const cellLeft=bounds[count-1-i], cellRight=bounds[count-i]; text(value,xs[i],tableTop+rowHeight/2,i===0?'right':'center',tableFont,700,'#172e27',i===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); if(i) line(cellLeft,tableTop,cellLeft,tableTop+rowHeight,'#1d2925',1.2); });
+    rows[0].forEach((value,i)=>{ const cellLeft=bounds[count-1-i], cellRight=bounds[count-i]; text(value,xs[i],tableTop+rowHeight/2,i===0?'right':'center',tableFont,700,'#172e27',i===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); if(i) line(cellLeft,tableTop,cellLeft,tableTop+rowHeight,'#1d2925',1.5); });
     return { y: tableTop+rowHeight, bounds };
   };
-  for (let page=0; page<pageCount; page++) { const xs=xFor(rows[0].length), header=drawHeader(page,xs); let y=header.y; const pageRows=bodyRows.slice(page*rowsPerPage,(page+1)*rowsPerPage); pageRows.forEach((row,i)=>{ const count=xs.length; if(i%2) { context.fillStyle='#f7f8f7'; context.fillRect(left,y,right-left,rowHeight); } line(left,y,right,y,'#69736e',1); row.forEach((value,col)=>{ const cellLeft=header.bounds[count-1-col], cellRight=header.bounds[count-col]; text(value,xs[col],y+rowHeight/2,col===0?'right':'center',bodyFont,col===0?600:700,/^[-−]/.test(String(value))?'#a74340':'#172e27',col===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); }); y+=rowHeight; }); line(left,y,right,y); line(left,page*pageHeight+headerHeight,left,y); line(right,page*pageHeight+headerHeight,right,y); drawPdfFooter(context,{center,width,height:canvas.height,y:(page+1)*pageHeight-14*mm}); }
+  for (let page=0; page<pageCount; page++) { const xs=xFor(rows[0].length), header=drawHeader(page,xs); let y=header.y; const bodyTop=y; const pageRows=bodyRows.slice(page*rowsPerPage,(page+1)*rowsPerPage); pageRows.forEach((row,i)=>{ const count=xs.length; if(i%2) { context.fillStyle='#f2f4f2'; context.fillRect(left,y,right-left,rowHeight); } line(left,y,right,y,'#1d2925',1.5); row.forEach((value,col)=>{ const cellLeft=header.bounds[count-1-col], cellRight=header.bounds[count-col]; text(value,xs[col],y+rowHeight/2,col===0?'right':'center',bodyFont,col===0?600:700,/^[-−]/.test(String(value))?'#a74340':'#172e27',col===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); }); y+=rowHeight; }); line(left,y,right,y,'#1d2925',2); header.bounds.forEach((x)=>line(x,bodyTop,x,y,'#1d2925',1.5)); line(left,page*pageHeight+headerHeight,left,y,'#1d2925',2); line(right,page*pageHeight+headerHeight,right,y,'#1d2925',2); drawPdfFooter(context,{center,width,height:canvas.height,y:(page+1)*pageHeight-14*mm}); }
   return canvas;
 }
 function createA4PdfFromCanvas(canvas, orientation = "portrait") {
@@ -534,4 +549,4 @@ export function printHtmlDocument({ html, target, features }) {
   popup.focus();
   window.setTimeout(() => popup.print(), 180);
   return true;
-}
+                }
