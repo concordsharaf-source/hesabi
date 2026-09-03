@@ -698,3 +698,13 @@ label { font-size:15px; }
   .purchase-entry-choice__button strong { font-size:15px; }
   .purchase-entry-choice__button small { font-size:11px; }
 }
+
+/* انتقال واضح إلى سجل فواتير المبيعات في أسفل الصفحة. */
+.sales-bottom-action { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:18px 20px; margin-top:16px; background:linear-gradient(135deg, var(--green-deep), var(--green)); border:1px solid rgba(255,255,255,.2); border-radius:16px; box-shadow:var(--shadow-soft); color:#fff; }
+.sales-bottom-action > div { display:grid; gap:3px; min-width:0; }
+.sales-bottom-action .eyebrow { color:#dfc188; }
+.sales-bottom-action strong { font-size:18px; }
+.sales-bottom-action small { color:rgba(255,255,255,.78); font-size:11px; line-height:1.6; }
+.sales-bottom-action .button { flex:0 0 auto; min-height:52px; padding:0 20px; color:var(--green-deep); background:#fffefa; font-size:14px; box-shadow:0 7px 16px rgba(0,0,0,.14); }
+.sales-bottom-action .button:hover { background:#f3fbf6; }
+@media(max-width:680px){.sales-bottom-action{align-items:stretch; flex-direction:column; gap:12px; padding:16px}.sales-bottom-action .button{width:100%; min-height:56px}}
