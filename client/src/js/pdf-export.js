@@ -83,20 +83,21 @@ function drawStoreLogo(context, image, centerX, centerY, boxSize) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  ألوان التصميم الفخم - لوحة ألوان احترافية
+//  لوحة تصميم PDF مطابقة لتصميم تطبيق شرفسوفت Inv1.170
+//  iTextPDF reference: A4, RTL, Noto Naskh Arabic, gray table headers.
 // ═══════════════════════════════════════════════════════════════════════════
 const LUXURY_COLORS = {
-  primary: "#0d4a3c",        // أخضر داكن فخم
-  primaryLight: "#146052",   // أخضر متوسط
-  accent: "#c9a84c",         // ذهبي أنيق
-  accentLight: "#e6d5a8",    // ذهبي فاتح
-  bgLight: "#f8faf9",        // خلفية فاتحة جداً
-  bgCard: "#f0f6f3",         // خلفية بطاقات
-  textDark: "#1a2e28",       // نص داكن
-  textMuted: "#5a7268",      // نص رمادي مزرق
-  border: "#b8d4c9",         // حدود ناعمة
+  primary: "#20304c",        // أزرق داكن للعناوين
+  primaryLight: "#324b70",   // أزرق متوسط للإطارات
+  accent: "#e0e0e0",         // رمادي خلفية رأس الجدول
+  accentLight: "#f2f2f2",    // رمادي فاتح
+  bgLight: "#ffffff",        // ورق أبيض
+  bgCard: "#f5f5f5",         // خلفية بطاقات محايدة
+  textDark: "#323232",       // نص داكن
+  textMuted: "#666666",      // نص رمادي
+  border: "#999999",         // حدود رمادية
   white: "#ffffff",
-  red: "#b03a2e",            // أحمر للمبالغ السالبة
+  red: "#5e1025",            // عنابي للمبالغ السالبة
 };
 
 const PDF_FOOTER_TITLE = "تم إصدار هذه الفاتورة من حسابي";
@@ -186,20 +187,19 @@ function drawLuxuryText(context, value, x, y, options = {}) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  دالة لرسم خلفية متدرجة فخمة
+//  دالة لرسم خلفية بطاقة مسطحة
 // ═══════════════════════════════════════════════════════════════════════════
 function drawLuxuryGradientBg(context, x, y, width, height, colorStart, colorEnd, radius = 12) {
-  const gradient = context.createLinearGradient(x, y, x + width, y + height);
-  gradient.addColorStop(0, colorStart);
-  gradient.addColorStop(1, colorEnd);
-  context.fillStyle = gradient;
+  // التصميم المستخرج يستخدم تعبئة ثابتة للخلايا والبطاقات، وليس تدرجات ذهبية.
+  // نحتفظ باسم الدالة لتجنب تغيير منطق الرسم في بقية القوالب.
+  context.fillStyle = colorStart || colorEnd || LUXURY_COLORS.bgLight;
   context.beginPath();
   context.roundRect(x, y, width, height, radius);
   context.fill();
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  دالة لرسم إطار ذهبي مزخرف
+//  دالة لرسم إطار بسيط حول البطاقة
 // ═══════════════════════════════════════════════════════════════════════════
 function drawLuxuryBorder(context, x, y, width, height, color = LUXURY_COLORS.accent, lineWidth = 2.5, radius = 12) {
   context.strokeStyle = color;
@@ -677,16 +677,7 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
   summary.forEach(([label, value, background, color, borderColor], index) => {
     const x = right - (index + 1) * boxWidth - index * boxGap;
 
-    // ظل ناعم
-    context.shadowColor = "rgba(0,0,0,0.1)";
-    context.shadowBlur = 8;
-    context.shadowOffsetY = 3;
-
     drawLuxuryGradientBg(context, x, y, boxWidth, 32 * mm, background, background === LUXURY_COLORS.primary ? LUXURY_COLORS.primaryLight : "#ffffff", 12);
-
-    context.shadowColor = "transparent";
-    context.shadowBlur = 0;
-    context.shadowOffsetY = 0;
 
     drawLuxuryBorder(context, x, y, boxWidth, 32 * mm, borderColor, 2, 12);
 
