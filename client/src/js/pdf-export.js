@@ -82,9 +82,27 @@ function drawStoreLogo(context, image, centerX, centerY, boxSize) {
   context.drawImage(image, centerX - width / 2, centerY - height / 2, width, height);
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  ألوان التصميم الفخم - لوحة ألوان احترافية
+// ═══════════════════════════════════════════════════════════════════════════
+const LUXURY_COLORS = {
+  primary: "#0d4a3c",        // أخضر داكن فخم
+  primaryLight: "#146052",   // أخضر متوسط
+  accent: "#c9a84c",         // ذهبي أنيق
+  accentLight: "#e6d5a8",    // ذهبي فاتح
+  bgLight: "#f8faf9",        // خلفية فاتحة جداً
+  bgCard: "#f0f6f3",         // خلفية بطاقات
+  textDark: "#1a2e28",       // نص داكن
+  textMuted: "#5a7268",      // نص رمادي مزرق
+  border: "#b8d4c9",         // حدود ناعمة
+  white: "#ffffff",
+  red: "#b03a2e",            // أحمر للمبالغ السالبة
+};
+
 const PDF_FOOTER_TITLE = "تم إصدار هذه الفاتورة من حسابي";
 const PDF_FOOTER_DESIGN = "تصميم شرف غالب قحطان · الجمهورية اليمنية · +967770388100";
 const PDF_FOOTER_EMAIL = "concordsharaf@gmail.com";
+
 function drawStoreDetails(context, { storeInfo = {}, right, top, width = 210 * 12 }) {
   const details = [
     storeInfo.storePhone ? `هاتف: ${storeInfo.storePhone}` : "",
@@ -94,9 +112,9 @@ function drawStoreDetails(context, { storeInfo = {}, right, top, width = 210 * 1
   ].filter(Boolean);
   if (!details.length) return;
   context.save();
-  context.direction = "rtl"; context.textAlign = "right"; context.textBaseline = "middle"; context.fillStyle = "#52645b";
-  context.font = '400 17px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
-  details.slice(0, 4).forEach((value, index) => context.fillText(value, right, top + index * 6.5 * 12, width - 30 * 12));
+  context.direction = "rtl"; context.textAlign = "right"; context.textBaseline = "middle"; context.fillStyle = LUXURY_COLORS.textMuted;
+  context.font = '600 22px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
+  details.slice(0, 4).forEach((value, index) => context.fillText(value, right, top + index * 8 * 12, width - 30 * 12));
   context.restore();
 }
 
@@ -105,117 +123,247 @@ function drawPdfFooter(context, { center, width, height, y = height - 22 * 12 })
   const right = width - left;
   const footerY = Math.min(y, height - 25 * 12);
   context.save();
-  context.strokeStyle = "#b9cbc1";
-  context.lineWidth = 2;
+  // خط ذهبي مزخرف
+  context.strokeStyle = LUXURY_COLORS.accent;
+  context.lineWidth = 3;
   context.beginPath(); context.moveTo(left, footerY - 12 * 12); context.lineTo(right, footerY - 12 * 12); context.stroke();
+  // خط أخضر رفيع
+  context.strokeStyle = LUXURY_COLORS.primary;
+  context.lineWidth = 1.5;
+  context.beginPath(); context.moveTo(left, footerY - 11 * 12); context.lineTo(right, footerY - 11 * 12); context.stroke();
+
   context.direction = "rtl"; context.textAlign = "center"; context.textBaseline = "middle";
-  context.fillStyle = "#52645b";
-  context.font = '400 21px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
+  context.fillStyle = LUXURY_COLORS.primary;
+  context.font = '700 26px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
   context.fillText(PDF_FOOTER_TITLE, center, footerY - 7 * 12);
-  context.font = '400 16px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
+  context.fillStyle = LUXURY_COLORS.textMuted;
+  context.font = '500 20px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
   context.fillText(PDF_FOOTER_DESIGN, center, footerY);
   context.direction = "ltr";
-  context.font = '400 15px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
+  context.font = '500 18px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
   context.fillText(PDF_FOOTER_EMAIL, center, footerY + 6 * 12);
   context.restore();
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  دالة مساعدة لرسم نص مع منع الخروج من الخانة (ellipsis)
+// ═══════════════════════════════════════════════════════════════════════════
+function drawLuxuryText(context, value, x, y, options = {}) {
+  const {
+    align = "right",
+    size = 28,
+    weight = 400,
+    color = LUXURY_COLORS.textDark,
+    direction = "rtl",
+    maxWidth = Infinity,
+    fontFamily = '"HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif'
+  } = options;
+
+  context.save();
+  context.direction = direction;
+  context.textAlign = align;
+  context.textBaseline = "middle";
+  context.font = `${weight} ${size}px ${fontFamily}`;
+  context.fillStyle = color;
+
+  let output = String(value ?? "");
+
+  // منع خروج النص من الخانة باستخدام ellipsis
+  if (Number.isFinite(maxWidth) && maxWidth > 0) {
+    const measured = context.measureText(output).width;
+    if (measured > maxWidth) {
+      const suffix = "…";
+      while (output.length > 1 && context.measureText(output + suffix).width > maxWidth) {
+        output = output.slice(0, -1);
+      }
+      output += suffix;
+    }
+  }
+
+  context.fillText(output, x, y);
+  context.restore();
+  return output;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  دالة لرسم خلفية متدرجة فخمة
+// ═══════════════════════════════════════════════════════════════════════════
+function drawLuxuryGradientBg(context, x, y, width, height, colorStart, colorEnd, radius = 12) {
+  const gradient = context.createLinearGradient(x, y, x + width, y + height);
+  gradient.addColorStop(0, colorStart);
+  gradient.addColorStop(1, colorEnd);
+  context.fillStyle = gradient;
+  context.beginPath();
+  context.roundRect(x, y, width, height, radius);
+  context.fill();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  دالة لرسم إطار ذهبي مزخرف
+// ═══════════════════════════════════════════════════════════════════════════
+function drawLuxuryBorder(context, x, y, width, height, color = LUXURY_COLORS.accent, lineWidth = 2.5, radius = 12) {
+  context.strokeStyle = color;
+  context.lineWidth = lineWidth;
+  context.beginPath();
+  context.roundRect(x, y, width, height, radius);
+  context.stroke();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  الفاتورة الحرارية - تصميم محسّن
+// ═══════════════════════════════════════════════════════════════════════════
 function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, logoImage, formatMoney, formatAmount, formatDateTime, paymentLabel }) {
   const mm = 12;
   const width = 80 * mm;
   const details = invoice.customerName ? 1 + Number(Boolean(customer?.phone)) + Number(Boolean(customer?.address)) : 0;
-  const height = Math.max(1650, (190 + details * 13 + Math.max(1, invoice.items?.length || 0) * 24 + (logoImage ? 17 : 0) + (toNumber(invoice.deliveryFee) > 0 ? 11 : 0)) * mm);
+  const height = Math.max(1750, (200 + details * 15 + Math.max(1, invoice.items?.length || 0) * 28 + (logoImage ? 20 : 0) + (toNumber(invoice.deliveryFee) > 0 ? 13 : 0)) * mm);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
+
+  // خلفية بيضاء نظيفة
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
-  context.fillStyle = "#111111";
-  context.direction = "rtl";
-  context.textBaseline = "middle";
+
   const right = 76 * mm;
   const left = 4 * mm;
   const center = 40 * mm;
-  let y = 9 * mm;
-  const thermalFontScale = 1.35;
-  const text = (value, x, align = "right", size = 28, weight = 400, direction = "rtl") => {
-    context.direction = direction;
-    context.textAlign = align;
-    context.font = `${weight} ${Math.round(size * thermalFontScale)}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
-    context.fillText(String(value ?? ""), x, y);
+  let y = 10 * mm;
+
+  const thermalFontScale = 1.5; // خط أكبر
+
+  // تروس فخمة للفاتورة الحرارية
+  const text = (value, x, align = "right", size = 32, weight = 400, direction = "rtl", color = LUXURY_COLORS.textDark) => {
+    drawLuxuryText(context, value, x, y, { align, size: Math.round(size * thermalFontScale), weight, color, direction, maxWidth: align === "right" ? right - left - 4*mm : align === "left" ? right - left - 4*mm : right - left - 4*mm });
   };
-  const divider = () => {
-    context.save(); context.strokeStyle = "#111"; context.lineWidth = 1.5; context.setLineDash([7, 4]); context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke(); context.restore();
+
+  const divider = (color = LUXURY_COLORS.primary) => {
+    context.save();
+    context.strokeStyle = color;
+    context.lineWidth = 2;
+    context.setLineDash([8, 4]);
+    context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke();
+    context.restore();
   };
+
   const pair = (label, value, options = {}) => {
-    text(label, right, "right", options.labelSize || 27, options.bold ? 700 : 400);
-    text(value, left, "left", options.valueSize || 27, options.bold ? 700 : 400, options.ltr ? "ltr" : "rtl");
-    y += options.gap || 8.5 * mm;
+    const labelSize = options.labelSize || 30;
+    const valueSize = options.valueSize || 30;
+    const gap = options.gap || 9 * mm;
+    const maxW = right - left - 8 * mm;
+
+    drawLuxuryText(context, label, right - 2*mm, y, { align: "right", size: Math.round(labelSize * thermalFontScale), weight: options.bold ? 700 : 500, color: LUXURY_COLORS.textMuted, maxWidth: maxW / 2 });
+    drawLuxuryText(context, value, left + 2*mm, y, { align: "left", size: Math.round(valueSize * thermalFontScale), weight: options.bold ? 700 : 600, color: options.color || LUXURY_COLORS.textDark, direction: options.ltr ? "ltr" : "rtl", maxWidth: maxW / 2 });
+    y += gap;
   };
-  if (logoImage) { drawStoreLogo(context, logoImage, center, y + 7 * mm, 14 * mm); y += 17 * mm; }
-  text(storeName || "حسابي", center, "center", 44, 700); y += 8 * mm;
-  text("فاتورة بيع", right, "right", 30, 700); text(invoice.invoiceNumber, left, "left", 27, 700, "ltr"); y += 6 * mm;
-  text(formatDateTime(invoice.date), center, "center", 20); y += 7 * mm;
-  context.fillStyle = "#f7f7f7"; context.strokeStyle = "#111"; context.lineWidth = 1.5; context.roundRect(left, y - 5 * mm, right - left, 12 * mm, 6); context.fill(); context.stroke(); context.fillStyle = "#111";
-  pair("الكاشير المنفذ", invoice.cashierName || "الأدمن", { gap: 6.5 * mm });
-  y += 1 * mm;
+
+  // الشعار والاسم
+  if (logoImage) { 
+    drawStoreLogo(context, logoImage, center, y + 8 * mm, 16 * mm); 
+    y += 19 * mm; 
+  }
+
+  // اسم المتجر بخط كبير فخم
+  drawLuxuryText(context, storeName || "حسابي", center, y, { align: "center", size: Math.round(52 * thermalFontScale), weight: 700, color: LUXURY_COLORS.primary });
+  y += 10 * mm;
+
+  // عنوان الفاتورة
+  drawLuxuryText(context, "فاتورة بيع", right - 2*mm, y, { align: "right", size: Math.round(36 * thermalFontScale), weight: 700, color: LUXURY_COLORS.accent });
+  drawLuxuryText(context, invoice.invoiceNumber, left + 2*mm, y, { align: "left", size: Math.round(32 * thermalFontScale), weight: 700, color: LUXURY_COLORS.textDark, direction: "ltr" });
+  y += 7 * mm;
+
+  drawLuxuryText(context, formatDateTime(invoice.date), center, y, { align: "center", size: Math.round(24 * thermalFontScale), weight: 400, color: LUXURY_COLORS.textMuted });
+  y += 8 * mm;
+
+  // بطاقة الكاشير
+  drawLuxuryGradientBg(context, left, y - 5*mm, right - left, 14*mm, LUXURY_COLORS.bgCard, LUXURY_COLORS.bgLight, 8);
+  drawLuxuryBorder(context, left, y - 5*mm, right - left, 14*mm, LUXURY_COLORS.border, 1.5, 8);
+  pair("الكاشير المنفذ", invoice.cashierName || "الأدمن", { gap: 7 * mm });
+  y += 2 * mm;
+
+  // بطاقة العميل
   if (invoice.customerName) {
-    const cardHeight = (8 + details * 8) * mm;
-    context.fillStyle = "#f7f7f7"; context.strokeStyle = "#111"; context.lineWidth = 1.5; context.roundRect(left, y - 5 * mm, right - left, cardHeight, 6); context.fill(); context.stroke(); context.fillStyle = "#111";
-    text("بيانات العميل", right - 2 * mm, "right", 30, 700); y += 7 * mm;
-    pair("الاسم", invoice.customerName, { gap: 6.5 * mm });
-    if (customer?.phone) pair("الهاتف", customer.phone, { ltr: true, gap: 6.5 * mm });
-    if (customer?.address) pair("العنوان", customer.address, { gap: 6.5 * mm });
+    const cardHeight = (9 + details * 9) * mm;
+    drawLuxuryGradientBg(context, left, y - 5*mm, right - left, cardHeight, LUXURY_COLORS.bgCard, LUXURY_COLORS.bgLight, 8);
+    drawLuxuryBorder(context, left, y - 5*mm, right - left, cardHeight, LUXURY_COLORS.primaryLight, 2, 8);
+    drawLuxuryText(context, "بيانات العميل", right - 3*mm, y + 2*mm, { align: "right", size: Math.round(34 * thermalFontScale), weight: 700, color: LUXURY_COLORS.primary });
+    y += 8 * mm;
+    pair("الاسم", invoice.customerName, { gap: 7 * mm });
+    if (customer?.phone) pair("الهاتف", customer.phone, { ltr: true, gap: 7 * mm });
+    if (customer?.address) pair("العنوان", customer.address, { gap: 7 * mm });
     y += 2 * mm;
   }
-  divider(); y += 7 * mm;
-  for (const item of invoice.items || []) {
-    text(item.productName, right, "right", 30, 700); text(formatMoney(item.total), left, "left", 28, 700, "ltr"); y += 8 * mm;
-    text(`${formatAmount(item.quantity)} ${item.unit} × ${formatMoney(item.unitPrice)}`, right, "right", 22); y += 10 * mm;
-  }
+
   divider(); y += 8 * mm;
+
+  // الأصناف
+  for (const item of invoice.items || []) {
+    const itemMaxW = right - left - 4*mm;
+    drawLuxuryText(context, item.productName, right - 2*mm, y, { align: "right", size: Math.round(34 * thermalFontScale), weight: 700, color: LUXURY_COLORS.textDark, maxWidth: itemMaxW * 0.6 });
+    drawLuxuryText(context, formatMoney(item.total), left + 2*mm, y, { align: "left", size: Math.round(32 * thermalFontScale), weight: 700, color: LUXURY_COLORS.primary, direction: "ltr", maxWidth: itemMaxW * 0.35 });
+    y += 9 * mm;
+    drawLuxuryText(context, `${formatAmount(item.quantity)} ${item.unit} × ${formatMoney(item.unitPrice)}`, right - 2*mm, y, { align: "right", size: Math.round(26 * thermalFontScale), weight: 400, color: LUXURY_COLORS.textMuted });
+    y += 11 * mm;
+  }
+
+  divider(); y += 9 * mm;
+
+  // الملخص
   pair("الإجمالي قبل الخصم", formatMoney(invoice.subtotal));
   pair("الخصم", formatMoney(invoice.discount));
-  if (toNumber(invoice.deliveryFee) > 0) pair(`التوصيل · ${invoice.deliveryChargeType === "customer" ? "على العميل ضمن الفاتورة" : "حساب المحل"}`, formatMoney(invoice.deliveryFee));
-  context.strokeStyle = "#111"; context.beginPath(); context.moveTo(left, y - 4 * mm); context.lineTo(right, y - 4 * mm); context.stroke();
-  pair("الإجمالي", formatMoney(invoice.total), { bold: true, labelSize: 32, valueSize: 32, gap: 7.5 * mm });
+  if (toNumber(invoice.deliveryFee) > 0) pair(`التوصيل`, formatMoney(invoice.deliveryFee));
+
+  // خط فاصل مزدوج
+  context.strokeStyle = LUXURY_COLORS.primary;
+  context.lineWidth = 2;
+  context.beginPath(); context.moveTo(left, y - 4*mm); context.lineTo(right, y - 4*mm); context.stroke();
+  context.strokeStyle = LUXURY_COLORS.accent;
+  context.lineWidth = 1;
+  context.beginPath(); context.moveTo(left, y - 3*mm); context.lineTo(right, y - 3*mm); context.stroke();
+
+  pair("الإجمالي", formatMoney(invoice.total), { bold: true, labelSize: 38, valueSize: 38, color: LUXURY_COLORS.primary, gap: 8 * mm });
   pair("طريقة السداد", paymentLabel);
   pair("حالة السداد", invoice.paymentStatus || (invoice.paymentType === "آجل" ? "آجل" : "مدفوعة"));
   pair("المدفوع", formatMoney(invoice.paidAmount));
-  if (invoice.paymentType === "آجل") pair("المتبقي", formatMoney(invoice.remainingAmount));
-  y += 3 * mm;
-  text("شكرًا لتعاملكم معنا", center, "center", 22);
-  drawPdfFooter(context, { center, width, height, y: height - 17 * mm });
+  if (invoice.paymentType === "آجل") pair("المتبقي", formatMoney(invoice.remainingAmount), { color: LUXURY_COLORS.red });
+
+  y += 4 * mm;
+  drawLuxuryText(context, "شكرًا لتعاملكم معنا", center, y, { align: "center", size: Math.round(28 * thermalFontScale), weight: 500, color: LUXURY_COLORS.accent });
+
+  drawPdfFooter(context, { center, width, height, y: height - 18 * mm });
   return canvas;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  فاتورة الشراء - تصميم فخم A4
+// ═══════════════════════════════════════════════════════════════════════════
 function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, logoImage, formatMoney, formatAmount, formatDateTime }) {
   const mm = 12;
   const width = 210 * mm;
   const left = 14 * mm;
   const right = 196 * mm;
   const center = width / 2;
-  const fontScale = 3;
-  const lineHeight = 8 * mm;
-  const itemHeight = 48 * mm;
+  const fontScale = 3.2; // خط أكبر
+  const lineHeight = 9 * mm;
+  const itemHeight = 52 * mm;
   const items = purchase.items || [];
-  const height = Math.max(297 * mm, (72 + Math.max(1, items.length) * 48 + 105) * mm);
+  const height = Math.max(297 * mm, (80 + Math.max(1, items.length) * 52 + 115) * mm);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
+
+  // خلفية بيضاء
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
   context.textBaseline = "middle";
-  context.direction = "rtl";
-  const text = (value, x, y, align = "right", size = 26, weight = 400, direction = "rtl", color = "#172e27") => {
-    context.direction = direction;
-    context.textAlign = align;
-    context.font = `${weight} ${Math.round(size * fontScale)}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
-    context.fillStyle = color;
-    context.fillText(String(value ?? ""), x, y);
+
+  // دالة النص المحسّنة مع منع الخروج
+  const text = (value, x, y, align = "right", size = 30, weight = 400, direction = "rtl", color = LUXURY_COLORS.textDark, maxWidth = Infinity) => {
+    return drawLuxuryText(context, value, x, y, { align, size: Math.round(size * fontScale / 3), weight, color, direction, maxWidth });
   };
+
   const wrapped = (value, x, y, maxWidth, options = {}) => {
     const words = String(value ?? "").split(/\s+/).filter(Boolean);
     const rows = [];
@@ -225,76 +373,156 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
       if (current && context.measureText(next).width > maxWidth) { rows.push(current); current = word; } else current = next;
     });
     if (current || !rows.length) rows.push(current);
-    rows.slice(0, options.maxRows || 3).forEach((row, index) => text(row, x, y + index * (options.lineHeight || 6.5 * mm), options.align || "right", options.size || 22, options.weight || 400, options.direction || "rtl", options.color || "#172e27"));
+    rows.slice(0, options.maxRows || 3).forEach((row, index) => 
+      text(row, x, y + index * (options.lineHeight || 7 * mm), options.align || "right", options.size || 26, options.weight || 400, options.direction || "rtl", options.color || LUXURY_COLORS.textDark)
+    );
     return Math.min(rows.length, options.maxRows || 3);
   };
-  const rule = (y, color = "#1d2925") => { context.strokeStyle = color; context.lineWidth = 2; context.beginPath(); context.moveTo(left, y); context.lineTo(right, y); context.stroke(); };
-  const vline = (x, y1, y2, color = "#1d2925") => { context.strokeStyle = color; context.lineWidth = 1.5; context.beginPath(); context.moveTo(x, y1); context.lineTo(x, y2); context.stroke(); };
-  const box = (top, boxHeight, fill = "#f1f7f3") => { context.fillStyle = fill; context.strokeStyle = "#7f9689"; context.lineWidth = 2; context.beginPath(); context.roundRect(left, top, right - left, boxHeight, 10); context.fill(); context.stroke(); };
-  const pair = (label, value, y, options = {}) => { text(label, right - 5 * mm, y, "right", options.labelSize || 24, options.labelWeight || 600); text(value, left + 5 * mm, y, "left", options.valueSize || 25, options.valueWeight || 700, options.ltr ? "ltr" : "rtl", options.color || "#172e27"); };
 
-  let y = 17 * mm;
-  if (logoImage) drawStoreLogo(context, logoImage, center, y + 8 * mm, 22 * mm);
-  text(storeName || "حسابي", center, y + 24 * mm, "center", 48, 700, "rtl", "#174c3f");
-  drawStoreDetails(context, { storeInfo, right, top: y + 2 * mm, width });
-  text("فاتورة شراء", center, y + 34 * mm, "center", 32, 700, "rtl", "#52645b");
-  text(`رقم الفاتورة: ${purchase.invoiceNumber || "—"}`, left, y + 7 * mm, "left", 25, 700, "ltr", "#172e27");
-  text(formatDateTime(purchase.date), left, y + 17 * mm, "left", 22, 400, "ltr", "#52645b");
-  y += 43 * mm;
+  const rule = (y, color = LUXURY_COLORS.primary) => { 
+    context.strokeStyle = color; 
+    context.lineWidth = 2.5; 
+    context.beginPath(); 
+    context.moveTo(left, y); 
+    context.lineTo(right, y); 
+    context.stroke(); 
+  };
 
+  const vline = (x, y1, y2, color = LUXURY_COLORS.border) => { 
+    context.strokeStyle = color; 
+    context.lineWidth = 1.5; 
+    context.beginPath(); 
+    context.moveTo(x, y1); 
+    context.lineTo(x, y2); 
+    context.stroke(); 
+  };
+
+  const luxuryBox = (top, boxHeight, fill = LUXURY_COLORS.bgCard) => { 
+    drawLuxuryGradientBg(context, left, top, right - left, boxHeight, fill, LUXURY_COLORS.bgLight, 12);
+    drawLuxuryBorder(context, left, top, right - left, boxHeight, LUXURY_COLORS.border, 2, 12);
+  };
+
+  const pair = (label, value, y, options = {}) => { 
+    const maxW = (right - left) / 2 - 10 * mm;
+    text(label, right - 6 * mm, y, "right", options.labelSize || 28, options.labelWeight || 600, "rtl", LUXURY_COLORS.textMuted, maxW); 
+    text(value, left + 6 * mm, y, "left", options.valueSize || 30, options.valueWeight || 700, options.ltr ? "ltr" : "rtl", options.color || LUXURY_COLORS.textDark, maxW); 
+  };
+
+  // ═══ الترويسة الفخمة ═══
+  let y = 20 * mm;
+
+  // خلفية الترويسة المتدرجة
+  drawLuxuryGradientBg(context, left - 4*mm, y - 8*mm, right - left + 8*mm, 50*mm, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 16);
+
+  if (logoImage) drawStoreLogo(context, logoImage, center, y + 6 * mm, 24 * mm);
+
+  // اسم المتجر بخط كبير أبيض
+  drawLuxuryText(context, storeName || "حسابي", center, y + 22 * mm, { align: "center", size: 56, weight: 700, color: "#ffffff" });
+
+  // خط ذهبي تحت الاسم
+  context.strokeStyle = LUXURY_COLORS.accent;
+  context.lineWidth = 3;
+  context.beginPath();
+  context.moveTo(center - 40*mm, y + 28*mm);
+  context.lineTo(center + 40*mm, y + 28*mm);
+  context.stroke();
+
+  // تفاصيل المتجر
+  drawStoreDetails(context, { storeInfo, right: right - 8*mm, top: y + 2 * mm, width: width - 16*mm });
+
+  // عنوان الفاتورة
+  drawLuxuryText(context, "فاتورة شراء", center, y + 38 * mm, { align: "center", size: 36, weight: 700, color: LUXURY_COLORS.accentLight });
+
+  // رقم الفاتورة والتاريخ
+  text(`رقم الفاتورة: ${purchase.invoiceNumber || "—"}`, left + 6*mm, y + 8 * mm, "left", 28, 700, "ltr", "#ffffff");
+  text(formatDateTime(purchase.date), left + 6*mm, y + 18 * mm, "left", 24, 400, "ltr", LUXURY_COLORS.accentLight);
+
+  y += 55 * mm;
+
+  // ═══ بطاقة المورد ═══
   const supplierLines = [
     ["اسم المورد", purchase.supplierName || "بدون مورد", false],
     ["الهاتف", supplier?.phone || purchase.supplierPhone || "غير متوفر", true],
     ["العنوان", supplier?.address || purchase.supplierAddress || "غير متوفر", false],
   ];
   const supplierRows = supplierLines.filter(([, value], index) => index === 0 || value !== "غير متوفر");
-  const supplierBoxHeight = (supplierRows.length * 8 + 10) * mm;
-  box(y, supplierBoxHeight);
-  text("بيانات المورد", right - 5 * mm, y + 8 * mm, "right", 29, 700, "rtl", "#174c3f");
-  y += 16 * mm;
-  supplierRows.forEach(([label, value, ltr]) => { pair(label, value, y, { ltr, valueSize: 23 }); y += lineHeight; });
-  y += 7 * mm;
+  const supplierBoxHeight = (supplierRows.length * 9 + 12) * mm;
+  luxuryBox(y, supplierBoxHeight);
+  text("بيانات المورد", right - 6 * mm, y + 9 * mm, "right", 34, 700, "rtl", LUXURY_COLORS.primary);
+  y += 18 * mm;
+  supplierRows.forEach(([label, value, ltr]) => { pair(label, value, y, { ltr, valueSize: 28 }); y += lineHeight; });
+  y += 8 * mm;
 
+  // ═══ جدول الأصناف الفخم ═══
   const colBounds = [right, 138 * mm, 117 * mm, 85 * mm, 53 * mm, left];
   const tableTop = y;
-  context.fillStyle = "#174c3f";
-  context.fillRect(left, tableTop, right - left, 12 * mm);
-  text("الصنف", right - 5 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
-  text("الكمية", 132 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
-  text("سعر الشراء", 101 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
-  text("سعر البيع", 69 * mm, tableTop + 6 * mm, "right", 24, 700, "rtl", "#ffffff");
-  text("الإجمالي", left + 5 * mm, tableTop + 6 * mm, "left", 24, 700, "rtl", "#ffffff");
-  colBounds.slice(1, -1).forEach((x) => vline(x, tableTop, tableTop + 12 * mm, "rgba(255,255,255,0.45)"));
-  y += 12 * mm;
+
+  // تروس الجدول بتدرج أخضر داكن
+  drawLuxuryGradientBg(context, left, tableTop, right - left, 14 * mm, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 0);
+
+  // نصوص التروس بخط كبير أبيض
+  const headerMaxW = [62*mm, 20*mm, 28*mm, 28*mm, 25*mm];
+  text("الصنف", right - 5 * mm, tableTop + 7 * mm, "right", 28, 700, "rtl", "#ffffff", headerMaxW[0]);
+  text("الكمية", 132 * mm, tableTop + 7 * mm, "right", 28, 700, "rtl", "#ffffff", headerMaxW[1]);
+  text("سعر الشراء", 101 * mm, tableTop + 7 * mm, "right", 28, 700, "rtl", "#ffffff", headerMaxW[2]);
+  text("سعر البيع", 69 * mm, tableTop + 7 * mm, "right", 28, 700, "rtl", "#ffffff", headerMaxW[3]);
+  text("الإجمالي", left + 5 * mm, tableTop + 7 * mm, "left", 28, 700, "rtl", "#ffffff", headerMaxW[4]);
+
+  // خطوط فاصلة بيضاء رفيعة
+  colBounds.slice(1, -1).forEach((x) => vline(x, tableTop, tableTop + 14 * mm, "rgba(255,255,255,0.4)"));
+  y += 14 * mm;
+
+  // صفوف الأصناف
   items.forEach((item, index) => {
-    if (index % 2 === 0) { context.fillStyle = "#f5faf7"; context.fillRect(left, y, right - left, itemHeight); }
+    // تظليل متناوب
+    if (index % 2 === 0) { 
+      context.fillStyle = LUXURY_COLORS.bgLight; 
+      context.fillRect(left, y, right - left, itemHeight); 
+    }
+
+    // اسم الصنف مع التفاف
     context.save();
-    context.font = `700 ${23 * fontScale}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
-    const itemNameRows = wrapped(item.productName || "", right - 5 * mm, y + 7 * mm, 62 * mm, { size: 23, weight: 700, maxRows: 2 });
+    context.font = `700 ${Math.round(26 * fontScale / 3)}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
+    const itemNameRows = wrapped(item.productName || "", right - 5 * mm, y + 8 * mm, 62 * mm, { size: 26, weight: 700, maxRows: 2 });
     context.restore();
-    text(`${formatAmount(item.quantity)} ${item.unit || ""}`, 132 * mm, y + 8 * mm, "right", 22, 600, "rtl");
-    text(formatMoney(item.unitCost), 101 * mm, y + 8 * mm, "right", 22, 600, "ltr");
-    text(formatMoney(item.salePrice ?? 0), 69 * mm, y + 8 * mm, "right", 22, 700, "ltr", "#174c3f");
-    text(formatMoney(item.total), left + 5 * mm, y + 8 * mm, "left", 22, 700, "ltr");
-    let detailY = y + (itemNameRows > 1 ? 18 : 15) * mm;
+
+    // باقي البيانات
+    text(`${formatAmount(item.quantity)} ${item.unit || ""}`, 132 * mm, y + 9 * mm, "right", 25, 600, "rtl", LUXURY_COLORS.textDark, 20*mm);
+    text(formatMoney(item.unitCost), 101 * mm, y + 9 * mm, "right", 25, 600, "ltr", LUXURY_COLORS.textDark, 28*mm);
+    text(formatMoney(item.salePrice ?? 0), 69 * mm, y + 9 * mm, "right", 25, 700, "ltr", LUXURY_COLORS.primary, 28*mm);
+    text(formatMoney(item.total), left + 5 * mm, y + 9 * mm, "left", 25, 700, "ltr", LUXURY_COLORS.textDark, 25*mm);
+
+    // تفاصيل إضافية
+    let detailY = y + (itemNameRows > 1 ? 20 : 16) * mm;
     const purchaseDetails = [
       item.packageQuantity ? `العبوات: ${formatAmount(item.packageQuantity)} ${item.packageUnit || "عبوة"}` : "",
       item.unitsPerPackage ? `الوحدات/العبوة: ${formatAmount(item.unitsPerPackage)}` : "",
       item.packageCost !== undefined ? `سعر العبوة: ${formatMoney(item.packageCost)}` : "",
-
       item.batchNumber ? `التشغيلة: ${item.batchNumber}` : "",
       item.productionDate ? `الإنتاج: ${item.productionDate}` : "",
       item.expiryDate ? `الانتهاء: ${item.expiryDate}` : "",
       toNumber(item.returnedQuantity) ? `المرتجع: ${formatAmount(item.returnedQuantity)}` : "",
     ].filter(Boolean).join(" · ");
-    if (purchaseDetails) { context.font = `400 ${19 * fontScale}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; wrapped(purchaseDetails, right - 5 * mm, detailY, right - left - 10 * mm, { size: 19, maxRows: 2, lineHeight: 7 * mm, color: "#52645b" }); }
-    y += itemHeight;
-    colBounds.slice(1, -1).forEach((x) => vline(x, y - itemHeight, y, "#c4d5cc"));
-    rule(y);
-  });
-  colBounds.forEach((x) => vline(x, tableTop, y));
-  y += 9 * mm;
 
+    if (purchaseDetails) { 
+      context.font = `400 ${Math.round(22 * fontScale / 3)}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; 
+      wrapped(purchaseDetails, right - 5 * mm, detailY, right - left - 10 * mm, { size: 22, maxRows: 2, lineHeight: 8 * mm, color: LUXURY_COLORS.textMuted }); 
+    }
+
+    y += itemHeight;
+    // خطوط فاصلة
+    colBounds.slice(1, -1).forEach((x) => vline(x, y - itemHeight, y, LUXURY_COLORS.border));
+    rule(y, LUXURY_COLORS.border);
+  });
+
+  // إطار الجدول الخارجي
+  colBounds.forEach((x) => vline(x, tableTop, y, LUXURY_COLORS.primaryLight));
+  rule(tableTop, LUXURY_COLORS.primary);
+  rule(y, LUXURY_COLORS.primary);
+
+  y += 10 * mm;
+
+  // ═══ ملخص الفاتورة الفخم ═══
   const summaryTop = y;
   const summaryRows = [
     ["الإجمالي قبل الخصم", formatMoney(purchase.subtotal ?? purchase.total), false],
@@ -307,140 +535,323 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
     ["المبلغ المدفوع", formatMoney(purchase.paidAmount), false],
     ["المتبقي", formatMoney(purchase.remainingAmount), false],
   ];
-  const summaryHeight = (summaryRows.length * 8 + 10) * mm;
-  box(summaryTop, summaryHeight, "#f8fbf9");
-  y += 10 * mm;
-  summaryRows.forEach(([label, value, strong]) => { pair(label, value, y, { bold: strong, labelSize: strong ? 28 : 22, valueSize: strong ? 30 : 23, ltr: !/[ء-ي]/.test(value) }); y += lineHeight; if (strong) rule(y - 4 * mm, "#174c3f"); });
-  y += 5 * mm;
-  if (purchase.notes) { text("ملاحظات", right, y, "right", 24, 700, "rtl", "#174c3f"); y += 7 * mm; context.font = `400 ${21 * fontScale}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; wrapped(purchase.notes, right, y, right - left, { size: 21, maxRows: 3, lineHeight: 7 * mm, color: "#52645b" }); y += 22 * mm; }
-  drawPdfFooter(context, { center, width, height, y: height - 17 * mm });
+  const summaryHeight = (summaryRows.length * 9 + 12) * mm;
+
+  // صندوق الملخص بتدرج فخم
+  luxuryBox(summaryTop, summaryHeight, LUXURY_COLORS.bgCard);
+
+  y += 12 * mm;
+  summaryRows.forEach(([label, value, strong]) => { 
+    pair(label, value, y, { 
+      bold: strong, 
+      labelSize: strong ? 32 : 26, 
+      valueSize: strong ? 34 : 28, 
+      ltr: !/[ء-ي]/.test(value),
+      color: strong ? LUXURY_COLORS.primary : LUXURY_COLORS.textDark
+    }); 
+    y += lineHeight; 
+    if (strong) {
+      // خط ذهبي تحت الإجمالي
+      context.strokeStyle = LUXURY_COLORS.accent;
+      context.lineWidth = 2;
+      context.beginPath();
+      context.moveTo(left + 5*mm, y - 4 * mm);
+      context.lineTo(right - 5*mm, y - 4 * mm);
+      context.stroke();
+    }
+  });
+  y += 6 * mm;
+
+  // الملاحظات
+  if (purchase.notes) { 
+    text("ملاحظات", right, y, "right", 28, 700, "rtl", LUXURY_COLORS.primary); 
+    y += 8 * mm; 
+    context.font = `400 ${Math.round(24 * fontScale / 3)}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; 
+    wrapped(purchase.notes, right, y, right - left, { size: 24, maxRows: 3, lineHeight: 8 * mm, color: LUXURY_COLORS.textMuted }); 
+    y += 24 * mm; 
+  }
+
+  drawPdfFooter(context, { center, width, height, y: height - 18 * mm });
   return canvas;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  كشف حساب العميل - تصميم فخم
+// ═══════════════════════════════════════════════════════════════════════════
 function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, formatMoney, formatDateTime }) {
   const mm = 12;
   const width = 210 * mm;
   const rows = account.transactions || [];
-  const height = Math.max(297 * mm, (140 + Math.max(1, rows.length) * 16) * mm);
+  const height = Math.max(297 * mm, (150 + Math.max(1, rows.length) * 18) * mm);
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
   const context = canvas.getContext("2d");
+
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
-  context.fillStyle = "#172e27";
-  context.direction = "rtl";
   context.textBaseline = "middle";
+
   const right = 196 * mm;
   const left = 14 * mm;
   const center = width / 2;
-  const text = (value, x, y, align = "right", size = 28, weight = 400, direction = "rtl", color = "#172e27") => {
-    context.direction = direction;
-    context.textAlign = align;
-    context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
-    context.fillStyle = color;
-    context.fillText(String(value ?? ""), x, y);
-  };
-  const line = (fromX, fromY, toX, toY, color = "#d9e0d7", widthPx = 2) => { context.strokeStyle = color; context.lineWidth = widthPx; context.beginPath(); context.moveTo(fromX, fromY); context.lineTo(toX, toY); context.stroke(); };
-  let y = 19 * mm;
-  if (logoImage) drawStoreLogo(context, logoImage, center, y + 8 * mm, 22 * mm);
-  text(storeName || "حسابي", center, y + 24 * mm, "center", 56, 700, "rtl", "#174c3f");
-  drawStoreDetails(context, { storeInfo, right, top: y + 2 * mm, width });
-  y += 33 * mm;
-  text("كشف حساب مديونية عميل", center, y, "center", 38, 600, "rtl", "#52645b");
-  y += 10 * mm;
-  text(`تاريخ الإنشاء: ${formatDateTime(new Date().toISOString())}`, right, y, "right", 26, 400, "rtl", "#52645b");
-  y += 11 * mm;
 
+  const text = (value, x, y, align = "right", size = 34, weight = 400, direction = "rtl", color = LUXURY_COLORS.textDark, maxWidth = Infinity) => {
+    return drawLuxuryText(context, value, x, y, { align, size, weight, color, direction, maxWidth });
+  };
+
+  const line = (fromX, fromY, toX, toY, color = LUXURY_COLORS.border, widthPx = 2) => { 
+    context.strokeStyle = color; 
+    context.lineWidth = widthPx; 
+    context.beginPath(); 
+    context.moveTo(fromX, fromY); 
+    context.lineTo(toX, toY); 
+    context.stroke(); 
+  };
+
+  let y = 22 * mm;
+
+  // الترويسة الفخمة
+  drawLuxuryGradientBg(context, left - 4*mm, y - 10*mm, right - left + 8*mm, 45*mm, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 16);
+
+  if (logoImage) drawStoreLogo(context, logoImage, center, y + 5 * mm, 26 * mm);
+
+  drawLuxuryText(context, storeName || "حسابي", center, y + 20 * mm, { align: "center", size: 62, weight: 700, color: "#ffffff" });
+
+  // خط ذهبي
+  context.strokeStyle = LUXURY_COLORS.accent;
+  context.lineWidth = 3;
+  context.beginPath();
+  context.moveTo(center - 45*mm, y + 26*mm);
+  context.lineTo(center + 45*mm, y + 26*mm);
+  context.stroke();
+
+  drawStoreDetails(context, { storeInfo, right: right - 8*mm, top: y + 2 * mm, width: width - 16*mm });
+
+  y += 50 * mm;
+
+  // عنوان التقرير
+  drawLuxuryText(context, "كشف حساب مديونية عميل", center, y, { align: "center", size: 44, weight: 700, color: LUXURY_COLORS.primary });
+  y += 12 * mm;
+  text(`تاريخ الإنشاء: ${formatDateTime(new Date().toISOString())}`, right, y, "right", 28, 400, "rtl", LUXURY_COLORS.textMuted);
+  y += 12 * mm;
+
+  // بطاقة بيانات العميل الفخمة
   const cardTop = y - 6 * mm;
   const hasPhone = Boolean(account.customer?.phone);
   const hasAddress = Boolean(account.customer?.address);
-  const cardHeight = (hasPhone && hasAddress ? 50 : hasPhone || hasAddress ? 39 : 30) * mm;
-  context.fillStyle = "#edf6f0";
-  context.strokeStyle = "#1f6b59";
-  context.lineWidth = 3;
-  context.beginPath();
-  context.roundRect(left, cardTop, right - left, cardHeight, 12);
-  context.fill(); context.stroke();
-  text("بيانات العميل", right - 5 * mm, y + 2 * mm, "right", 38, 700, "rtl", "#174c3f");
-  y += 12 * mm;
-  const detail = (label, value, ltr = false) => { text(label, right - 5 * mm, y, "right", 30, 600, "rtl", "#52645b"); text(value, left + 5 * mm, y, "left", 34, 700, ltr ? "ltr" : "rtl"); y += 10 * mm; };
+  const cardHeight = (hasPhone && hasAddress ? 55 : hasPhone || hasAddress ? 43 : 33) * mm;
+
+  // تدرج أخضر فاتح للبطاقة
+  drawLuxuryGradientBg(context, left, cardTop, right - left, cardHeight, "#e8f5f0", LUXURY_COLORS.bgLight, 14);
+  drawLuxuryBorder(context, left, cardTop, right - left, cardHeight, LUXURY_COLORS.primaryLight, 3, 14);
+
+  // شريط جانبي ذهبي
+  context.fillStyle = LUXURY_COLORS.accent;
+  context.fillRect(right - 3*mm, cardTop + 5*mm, 3*mm, cardHeight - 10*mm);
+
+  text("بيانات العميل", right - 8 * mm, y + 3 * mm, "right", 40, 700, "rtl", LUXURY_COLORS.primary);
+  y += 14 * mm;
+
+  const detail = (label, value, ltr = false) => { 
+    const maxW = (right - left) / 2 - 15 * mm;
+    text(label, right - 8 * mm, y, "right", 32, 600, "rtl", LUXURY_COLORS.textMuted, maxW); 
+    text(value, left + 8 * mm, y, "left", 38, 700, ltr ? "ltr" : "rtl", LUXURY_COLORS.textDark, maxW); 
+    y += 11 * mm; 
+  };
+
   detail("الاسم", account.customer?.name || "");
   if (hasPhone) detail("الهاتف", account.customer.phone, true);
   if (hasAddress) detail("العنوان", account.customer.address);
-  y = cardTop + cardHeight + 13 * mm;
+  y = cardTop + cardHeight + 15 * mm;
 
+  // ═══ ملخص الحساب - ثلاث بطاقات فخمة ═══
   const summary = [
-    ["إجمالي المبيعات الآجلة", formatMoney(account.totalSales), "#f4f6f1", "#172e27"],
-    ["إجمالي المسدد", formatMoney(account.totalPaid), "#f4f6f1", "#172e27"],
-    ["الرصيد المستحق", formatMoney(account.balance), "#1f6b59", "#ffffff"],
+    ["إجمالي المبيعات الآجلة", formatMoney(account.totalSales), LUXURY_COLORS.bgCard, LUXURY_COLORS.textDark, LUXURY_COLORS.border],
+    ["إجمالي المسدد", formatMoney(account.totalPaid), LUXURY_COLORS.bgCard, LUXURY_COLORS.textDark, LUXURY_COLORS.border],
+    ["الرصيد المستحق", formatMoney(account.balance), LUXURY_COLORS.primary, "#ffffff", LUXURY_COLORS.primary],
   ];
-  const boxGap = 4 * mm;
+  const boxGap = 5 * mm;
   const boxWidth = (right - left - boxGap * 2) / 3;
-  summary.forEach(([label, value, background, color], index) => {
+
+  summary.forEach(([label, value, background, color, borderColor], index) => {
     const x = right - (index + 1) * boxWidth - index * boxGap;
-    context.fillStyle = background; context.strokeStyle = background === "#1f6b59" ? "#1f6b59" : "#d9e0d7"; context.lineWidth = 2; context.beginPath(); context.roundRect(x, y, boxWidth, 29 * mm, 10); context.fill(); context.stroke();
-    text(label, x + boxWidth - 4 * mm, y + 9 * mm, "right", 25, 600, "rtl", color);
-    text(value, x + boxWidth - 4 * mm, y + 20 * mm, "right", 34, 700, "rtl", color);
+
+    // ظل ناعم
+    context.shadowColor = "rgba(0,0,0,0.1)";
+    context.shadowBlur = 8;
+    context.shadowOffsetY = 3;
+
+    drawLuxuryGradientBg(context, x, y, boxWidth, 32 * mm, background, background === LUXURY_COLORS.primary ? LUXURY_COLORS.primaryLight : "#ffffff", 12);
+
+    context.shadowColor = "transparent";
+    context.shadowBlur = 0;
+    context.shadowOffsetY = 0;
+
+    drawLuxuryBorder(context, x, y, boxWidth, 32 * mm, borderColor, 2, 12);
+
+    text(label, x + boxWidth - 5 * mm, y + 10 * mm, "right", 26, 600, "rtl", color, boxWidth - 10*mm);
+    text(value, x + boxWidth - 5 * mm, y + 22 * mm, "right", 38, 700, "rtl", color, boxWidth - 10*mm);
   });
-  y += 41 * mm;
-  text("تفاصيل العمليات", right, y, "right", 40, 700, "rtl", "#174c3f");
-  y += 9 * mm;
+  y += 45 * mm;
+
+  // عنوان الجدول
+  drawLuxuryText(context, "تفاصيل العمليات", right, y, "right", 44, 700, "rtl", LUXURY_COLORS.primary);
+  y += 10 * mm;
+
+  // ═══ جدول العمليات الفخم ═══
   const columns = [right, 151 * mm, 105 * mm, 59 * mm, left];
   const colBoundsAcct = [right + 2 * mm, 165 * mm, 130 * mm, 85 * mm, 40 * mm, left - 2 * mm];
   const tableTopAcct = y - 8 * mm;
-  const rowHeightAcct = 12 * mm;
-  context.fillStyle = "#e7efe9"; context.fillRect(left, tableTopAcct, right - left, rowHeightAcct);
-  ["العملية", "التاريخ", "المرجع", "القيمة", "الرصيد بعد العملية"].forEach((label, index) => text(label, columns[index] - (index ? 3 * mm : 0), y, index === 4 ? "left" : "right", 26, 700, "rtl", "#172e27"));
-  colBoundsAcct.slice(1, -1).forEach((x) => line(x, tableTopAcct, x, tableTopAcct + rowHeightAcct, "#8fa89a", 1.5));
+  const rowHeightAcct = 14 * mm;
+
+  // تروس الجدول
+  drawLuxuryGradientBg(context, left, tableTopAcct, right - left, rowHeightAcct, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 0);
+
+  const acctHeaders = ["العملية", "التاريخ", "المرجع", "القيمة", "الرصيد بعد العملية"];
+  const acctMaxW = [35*mm, 30*mm, 25*mm, 25*mm, 30*mm];
+  acctHeaders.forEach((label, index) => 
+    text(label, columns[index] - (index ? 3 * mm : 0), tableTopAcct + rowHeightAcct/2, index === 4 ? "left" : "right", 28, 700, "rtl", "#ffffff", acctMaxW[index])
+  );
+
+  colBoundsAcct.slice(1, -1).forEach((x) => line(x, tableTopAcct, x, tableTopAcct + rowHeightAcct, "rgba(255,255,255,0.4)", 1.5));
   y = tableTopAcct + rowHeightAcct;
-  if (!rows.length) { text("لا توجد عمليات مسجلة.", right, y + 8 * mm, "right", 30, 400, "rtl", "#52645b"); y += 20 * mm; }
+
+  if (!rows.length) { 
+    text("لا توجد عمليات مسجلة.", right, y + 10 * mm, "right", 34, 400, "rtl", LUXURY_COLORS.textMuted); 
+    y += 22 * mm; 
+  }
+
   rows.forEach((transaction, index) => {
     const rowTop = y;
-    if (index % 2 === 1) { context.fillStyle = "#f7f9f7"; context.fillRect(left, rowTop, right - left, rowHeightAcct); }
+    if (index % 2 === 1) { 
+      context.fillStyle = LUXURY_COLORS.bgLight; 
+      context.fillRect(left, rowTop, right - left, rowHeightAcct); 
+    }
     const textY = rowTop + rowHeightAcct / 2;
-    text(transaction.typeLabel || transaction.type || "", columns[0], textY, "right", 28, 700);
-    text(formatDateTime(transaction.date), columns[1], textY, "right", 23, 400, "rtl", "#52645b");
-    text(transaction.invoiceNumber || "—", columns[2], textY, "right", 25, 600, "ltr", "#52645b");
-    text(formatMoney(transaction.amount), columns[3], textY, "right", 27, 700, "ltr", Number(transaction.amount) < 0 ? "#a74340" : "#172e27");
-    text(formatMoney(transaction.remainingAmount), columns[4], textY, "left", 27, 700, "ltr");
+    const maxCellW = 28 * mm;
+
+    text(transaction.typeLabel || transaction.type || "", columns[0], textY, "right", 30, 700, "rtl", LUXURY_COLORS.textDark, maxCellW);
+    text(formatDateTime(transaction.date), columns[1], textY, "right", 26, 400, "rtl", LUXURY_COLORS.textMuted, maxCellW);
+    text(transaction.invoiceNumber || "—", columns[2], textY, "right", 28, 600, "ltr", LUXURY_COLORS.textMuted, maxCellW);
+    text(formatMoney(transaction.amount), columns[3], textY, "right", 30, 700, "ltr", Number(transaction.amount) < 0 ? LUXURY_COLORS.red : LUXURY_COLORS.textDark, maxCellW);
+    text(formatMoney(transaction.remainingAmount), columns[4], textY, "left", 30, 700, "ltr", LUXURY_COLORS.textDark, maxCellW);
+
     y += rowHeightAcct;
-    line(left, y, right, y, "#c7d3cb", 1.5);
+    line(left, y, right, y, LUXURY_COLORS.border, 1.5);
   });
-  colBoundsAcct.forEach((x) => line(x, tableTopAcct, x, y, "#7f9689", 1.5));
-  line(left, tableTopAcct, right, tableTopAcct, "#1f6b59", 2);
-  y += 7 * mm;
-  drawPdfFooter(context, { center: width / 2, width, height, y: height - 17 * mm });
+
+  // إطار الجدول
+  colBoundsAcct.forEach((x) => line(x, tableTopAcct, x, y, LUXURY_COLORS.primaryLight, 2));
+  line(left, tableTopAcct, right, tableTopAcct, LUXURY_COLORS.primary, 2.5);
+  line(left, y, right, y, LUXURY_COLORS.primary, 2.5);
+
+  y += 8 * mm;
+  drawPdfFooter(context, { center: width / 2, width, height, y: height - 18 * mm });
   return canvas;
 }
 
+// ═══════════════════════════════════════════════════════════════════════════
+//  التقارير المالية - تصميم فخم مع منع خروج النصوص
+// ═══════════════════════════════════════════════════════════════════════════
 function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
   const mm = 12, wide = rows[0]?.length > 6, width = (wide ? 297 : 210) * mm, pageHeight = (wide ? 210 : 297) * mm, left = 14 * mm, right = width - left, center = width / 2;
-  const headerHeight = (wide ? 55 : 72) * mm, footerHeight = 18 * mm, rowHeight = (wide ? 24 : 21) * mm;
-  const tableFont = wide ? 24 : 40, bodyFont = wide ? 22 : 38;
+  const headerHeight = (wide ? 60 : 78) * mm, footerHeight = 20 * mm, rowHeight = (wide ? 26 : 24) * mm;
+  const tableFont = wide ? 28 : 46, bodyFont = wide ? 26 : 44;
   const rowsPerPage = Math.max(8, Math.floor((pageHeight - headerHeight - footerHeight) / rowHeight));
   const bodyRows = rows.slice(1), pageCount = Math.max(1, Math.ceil(bodyRows.length / rowsPerPage));
-  const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = pageCount * pageHeight;
-  const context = canvas.getContext('2d'); context.fillStyle = '#fff'; context.fillRect(0, 0, width, canvas.height); context.textBaseline = 'middle';
-  const text = (value, x, y, align='right', size=29, weight=400, color='#172e27', direction='rtl', maxWidth=Infinity) => {
-    context.save(); context.direction = direction; context.textAlign = align; context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`; context.fillStyle = color;
-    let output = String(value ?? ''); if (Number.isFinite(maxWidth) && context.measureText(output).width > maxWidth) { const suffix = '…'; while (output.length && context.measureText(output + suffix).width > maxWidth) output = output.slice(0, -1); output += suffix; } context.fillText(output, x, y); context.restore();
+  const canvas = document.createElement('canvas'); 
+  canvas.width = width; 
+  canvas.height = pageCount * pageHeight;
+  const context = canvas.getContext('2d'); 
+  context.fillStyle = '#fff'; 
+  context.fillRect(0, 0, width, canvas.height); 
+  context.textBaseline = 'middle';
+
+  const text = (value, x, y, align='right', size=34, weight=400, color=LUXURY_COLORS.textDark, direction='rtl', maxWidth=Infinity) => {
+    return drawLuxuryText(context, value, x, y, { align, size, weight, color, direction, maxWidth });
   };
-  const line = (x1,y1,x2,y2,color='#1d2925',w=1.5) => { context.strokeStyle=color; context.lineWidth=w; context.beginPath(); context.moveTo(x1,y1); context.lineTo(x2,y2); context.stroke(); };
+
+  const line = (x1,y1,x2,y2,color=LUXURY_COLORS.primary,w=2) => { 
+    context.strokeStyle=color; 
+    context.lineWidth=w; 
+    context.beginPath(); 
+    context.moveTo(x1,y1); 
+    context.lineTo(x2,y2); 
+    context.stroke(); 
+  };
+
   const xFor = count => Array.from({length: Math.max(2,count)}, (_,i) => right - 5*mm - i*((right-left-10*mm)/Math.max(1,count-1)));
+
   const drawHeader = (page, xs) => {
-    const top = page * pageHeight; context.strokeStyle='#1d2925'; context.lineWidth=1.5; context.strokeRect(left,top+8*mm,right-left,31*mm);
-    if (logoImage) drawStoreLogo(context,logoImage,center,top+20*mm,21*mm);
-    text(storeName || 'حسابي',right-5*mm,top+15*mm,'right',34,700,'#174c3f','rtl',62*mm); text('تقرير مالي وتحليلي',right-5*mm,top+25*mm,'right',25,600,'#52645b','rtl',62*mm);
-    text('Hesabi · Store Report',left+5*mm,top+15*mm,'left',28,700,'#174c3f','ltr',62*mm); text(`${from||'بداية السجل'} - ${to||'اليوم'}`,left+5*mm,top+25*mm,'left',23,500,'#52645b','ltr',62*mm);
-    line(left,top+43*mm,right,top+43*mm); text(`الفترة: ${from||'بداية السجل'} إلى ${to||'اليوم'}`,center,top+50*mm,'center',30,700,'#172e27','rtl',170*mm); text(`صفحة ${page+1} من ${pageCount}`,center,top+60*mm,'center',21,400,'#52645b','rtl',170*mm);
-    const tableTop=top+headerHeight, count=xs.length, bounds=[left,...xs.slice(1).map((x,i)=>(x+xs[i])/2),right]; context.fillStyle='#e1e4e2'; context.fillRect(left,tableTop,right-left,rowHeight); line(left,tableTop,right,tableTop); line(left,tableTop+rowHeight,right,tableTop+rowHeight);
-    rows[0].forEach((value,i)=>{ const cellLeft=bounds[count-1-i], cellRight=bounds[count-i]; text(value,xs[i],tableTop+rowHeight/2,i===0?'right':'center',tableFont,700,'#172e27',i===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); if(i) line(cellLeft,tableTop,cellLeft,tableTop+rowHeight,'#1d2925',1.5); });
-    return { y: tableTop+rowHeight, bounds };
+    const top = page * pageHeight; 
+
+    // إطار الترويسة الفخم
+    drawLuxuryGradientBg(context, left, top + 8*mm, right - left, 35*mm, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 14);
+    drawLuxuryBorder(context, left, top + 8*mm, right - left, 35*mm, LUXURY_COLORS.accent, 2.5, 14);
+
+    if (logoImage) drawStoreLogo(context, logoImage, center, top + 22*mm, 22*mm);
+
+    // اسم المتجر والتقرير
+    text(storeName || 'حسابي', right - 8*mm, top + 16*mm, 'right', 40, 700, '#ffffff', 'rtl', 65*mm); 
+    text('تقرير مالي وتحليلي', right - 8*mm, top + 27*mm, 'right', 28, 600, LUXURY_COLORS.accentLight, 'rtl', 65*mm);
+
+    text('Hesabi · Store Report', left + 8*mm, top + 16*mm, 'left', 32, 700, '#ffffff', 'ltr', 65*mm); 
+    text(`${from||'بداية السجل'} - ${to||'اليوم'}`, left + 8*mm, top + 27*mm, 'left', 26, 500, LUXURY_COLORS.accentLight, 'ltr', 65*mm);
+
+    // خط الفترة
+    line(left, top + 48*mm, right, top + 48*mm, LUXURY_COLORS.accent, 2);
+    text(`الفترة: ${from||'بداية السجل'} إلى ${to||'اليوم'}`, center, top + 55*mm, 'center', 34, 700, LUXURY_COLORS.primary, 'rtl', 170*mm); 
+    text(`صفحة ${page+1} من ${pageCount}`, center, top + 66*mm, 'center', 24, 400, LUXURY_COLORS.textMuted, 'rtl', 170*mm);
+
+    // تروس الجدول
+    const tableTop = top + headerHeight, count = xs.length, bounds = [left, ...xs.slice(1).map((x,i)=>(x+xs[i])/2), right];
+    drawLuxuryGradientBg(context, left, tableTop, right - left, rowHeight, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 0);
+
+    rows[0].forEach((value, i) => { 
+      const cellLeft = bounds[count-1-i], cellRight = bounds[count-i];
+      const cellMaxW = Math.max(20, cellRight - cellLeft - 10*mm);
+      text(value, xs[i], tableTop + rowHeight/2, i === 0 ? 'right' : 'center', tableFont, 700, '#ffffff', i === 0 ? 'rtl' : 'ltr', cellMaxW); 
+      if (i) line(cellLeft, tableTop, cellLeft, tableTop + rowHeight, 'rgba(255,255,255,0.4)', 1.5); 
+    });
+
+    return { y: tableTop + rowHeight, bounds };
   };
-  for (let page=0; page<pageCount; page++) { const xs=xFor(rows[0].length), header=drawHeader(page,xs); let y=header.y; const bodyTop=y; const pageRows=bodyRows.slice(page*rowsPerPage,(page+1)*rowsPerPage); pageRows.forEach((row,i)=>{ const count=xs.length; if(i%2) { context.fillStyle='#f2f4f2'; context.fillRect(left,y,right-left,rowHeight); } line(left,y,right,y,'#1d2925',1.5); row.forEach((value,col)=>{ const cellLeft=header.bounds[count-1-col], cellRight=header.bounds[count-col]; text(value,xs[col],y+rowHeight/2,col===0?'right':'center',bodyFont,col===0?600:700,/^[-−]/.test(String(value))?'#a74340':'#172e27',col===0?'rtl':'ltr',Math.max(20,cellRight-cellLeft-8*mm)); }); y+=rowHeight; }); line(left,y,right,y,'#1d2925',2); header.bounds.forEach((x)=>line(x,bodyTop,x,y,'#1d2925',1.5)); line(left,page*pageHeight+headerHeight,left,y,'#1d2925',2); line(right,page*pageHeight+headerHeight,right,y,'#1d2925',2); drawPdfFooter(context,{center,width,height:canvas.height,y:(page+1)*pageHeight-14*mm}); }
+
+  for (let page = 0; page < pageCount; page++) { 
+    const xs = xFor(rows[0].length), header = drawHeader(page, xs); 
+    let y = header.y; 
+    const bodyTop = y; 
+    const pageRows = bodyRows.slice(page * rowsPerPage, (page + 1) * rowsPerPage); 
+
+    pageRows.forEach((row, i) => { 
+      const count = xs.length; 
+      if (i % 2) { 
+        context.fillStyle = LUXURY_COLORS.bgLight; 
+        context.fillRect(left, y, right - left, rowHeight); 
+      } 
+      line(left, y, right, y, LUXURY_COLORS.border, 1.5); 
+
+      row.forEach((value, col) => { 
+        const cellLeft = header.bounds[count-1-col], cellRight = header.bounds[count-col];
+        const cellMaxW = Math.max(20, cellRight - cellLeft - 10*mm);
+        text(value, xs[col], y + rowHeight/2, col === 0 ? 'right' : 'center', bodyFont, col === 0 ? 600 : 700, /^[-−]/.test(String(value)) ? LUXURY_COLORS.red : LUXURY_COLORS.textDark, col === 0 ? 'rtl' : 'ltr', cellMaxW); 
+      }); 
+      y += rowHeight; 
+    }); 
+
+    // إطار الجدول
+    line(left, y, right, y, LUXURY_COLORS.primary, 2.5); 
+    header.bounds.forEach((x) => line(x, bodyTop, x, y, LUXURY_COLORS.primaryLight, 1.5)); 
+    line(left, page * pageHeight + headerHeight, left, y, LUXURY_COLORS.primary, 2); 
+    line(right, page * pageHeight + headerHeight, right, y, LUXURY_COLORS.primary, 2); 
+
+    drawPdfFooter(context, { center, width, height: canvas.height, y: (page + 1) * pageHeight - 15 * mm }); 
+  }
+
   return canvas;
 }
+
 function createA4PdfFromCanvas(canvas, orientation = "portrait") {
   const pdf = new jsPDF({ unit: "mm", format: "a4", orientation, compress: true });
   const pageWidth = pdf.internal.pageSize.getWidth();
@@ -482,7 +893,7 @@ export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
   }
 }
 
-const escapePdfValue = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '\"': "&quot;", "'": "&#39;" }[character]));
+const escapePdfValue = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 
 export async function createThermalInvoicePdfFile({ invoice, customer, storeName, storeInfo, logoDataUrl, formatMoney, formatAmount, formatDateTime, paymentLabel, filename }) {
   await loadCanvasArabicFont();
@@ -549,4 +960,4 @@ export function printHtmlDocument({ html, target, features }) {
   popup.focus();
   window.setTimeout(() => popup.print(), 180);
   return true;
-                }
+}
