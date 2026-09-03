@@ -715,3 +715,13 @@ label { font-size:15px; }
 .report-preview-scroll .report-wrap-toggle { display:inline-flex; }
 .report-preview-scroll .report-preview-actions { margin-bottom:4px; }
 @media(max-width:599px){.report-preview-scroll{max-height:calc(100dvh - 150px);}}
+
+/* توحيد أزرار بطاقات الانتقال الجديدة مع الوضع الداكن. */
+[data-theme="dark"] .sales-bottom-action { background:linear-gradient(135deg,#173d31,#245542); border-color:#5f987c; box-shadow:0 10px 26px rgba(0,0,0,.28); }
+[data-theme="dark"] .sales-bottom-action .button { color:#eafff1; background:#21463a; border:1px solid #78b99b; box-shadow:0 7px 16px rgba(0,0,0,.3); }
+[data-theme="dark"] .sales-bottom-action .button:hover { color:#fff; background:#2b5748; }
+[data-theme="dark"] .reports-bottom-action { background:linear-gradient(135deg,#1d3d32,#172a24); border-color:#5f987c; box-shadow:0 10px 26px rgba(0,0,0,.24); }
+[data-theme="dark"] .reports-bottom-action strong { color:#d8f7e2; }
+[data-theme="dark"] .reports-bottom-action small { color:#b7cfc3; }
+[data-theme="dark"] .reports-bottom-action .button { color:#eafff1; background:#21463a; border-color:#78b99b; box-shadow:0 7px 16px rgba(0,0,0,.3); }
+[data-theme="dark"] .reports-bottom-action .button:hover { color:#fff; background:#2b5748; }
