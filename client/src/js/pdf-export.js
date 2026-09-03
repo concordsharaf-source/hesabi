@@ -377,6 +377,11 @@ export async function createReportPdfFile({ rows, storeName, logoDataUrl, from, 
 export async function shareOrDownloadPdf({ html, filename, title, page = "a4" }) { return fileOrDownload(await createPdfFileFromHtml({ html, filename, page }), title); }
 export async function shareOrDownloadInvoicePdf(options) { return fileOrDownload(await createThermalInvoicePdfFile(options), options.title); }
 export async function shareOrDownloadCustomerAccountPdf(options) { return fileOrDownload(await createCustomerAccountPdfFile(options), options.title); }
+export async function shareOrDownloadReportPdf(options) { return fileOrDownload(await createReportPdfFile(options), options.title); }
+export async function shareOrDownloadPurchaseInvoicePdf(options) {
+  const purchase = options.purchase || {};
+  return fileOrDownload(await createThermalInvoicePdfFile({ ...options, invoice: { ...purchase, invoiceNumber: purchase.invoiceNumber || purchase.number || "PURCHASE", items: purchase.items || [], total: purchase.total || purchase.grandTotal || 0, subtotal: purchase.subtotal || purchase.total || 0, discount: purchase.discount || 0, paidAmount: purchase.paidAmount || 0, paymentType: purchase.paymentType || "نقدي", customerName: options.supplier?.name || "" }, paymentLabel: options.paymentLabel || "كاش" }), options.title);
+}
 
 export function printHtmlDocument({ html, target, features }) {
   const popup = window.open("", target, features);
