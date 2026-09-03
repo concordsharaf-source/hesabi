@@ -269,7 +269,7 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
   y += 10 * mm;
 
   // عنوان الفاتورة
-  drawLuxuryText(context, "فاتورة بيع", right - 2*mm, y, { align: "right", size: Math.round(36 * thermalFontScale), weight: 700, color: LUXURY_COLORS.accent });
+  drawLuxuryText(context, "فاتورة بيع", right - 2*mm, y, { align: "right", size: Math.round(36 * thermalFontScale), weight: 700, color: LUXURY_COLORS.primary });
   drawLuxuryText(context, invoice.invoiceNumber, left + 2*mm, y, { align: "left", size: Math.round(32 * thermalFontScale), weight: 700, color: LUXURY_COLORS.textDark, direction: "ltr" });
   y += 7 * mm;
 
