@@ -1,4 +1,3 @@
-import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 
 const PDF_ARABIC_FONT_URL = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage/NotoNaskhArabic-Regular_2c8d8205.ttf";
@@ -15,25 +14,6 @@ async function loadCanvasArabicFont() {
     canvasArabicFontPromise = waitWithTimeout(loadFont);
   }
   return canvasArabicFontPromise;
-}
-
-function createPdfStage(html, page) {
-  const parsed = new DOMParser().parseFromString(html, "text/html");
-  const stage = document.createElement("article");
-  stage.dir = parsed.documentElement.dir || "rtl";
-  stage.lang = parsed.documentElement.lang || "ar";
-  stage.dataset.pdfStage = "true";
-  stage.style.cssText = `position:fixed;top:0;left:0;width:${page === "thermal" ? "80mm" : "210mm"};min-height:20mm;padding:0;background:#fff;color:#111;z-index:2147483647;pointer-events:none;overflow:visible;`;
-  stage.innerHTML = `${[...parsed.head.querySelectorAll("style")].map((style) => style.outerHTML).join("")}${parsed.body.innerHTML}`;
-  document.body.appendChild(stage);
-  return stage;
-}
-
-async function waitForPdfStage(stage) {
-  if (!stage.textContent.trim()) throw new Error("لا يوجد محتوى صالح لإنشاء ملف PDF.");
-  if (document.fonts?.ready) await waitWithTimeout(document.fonts.ready);
-  await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  if (stage.getBoundingClientRect().height < 1 || stage.scrollHeight < 1) throw new Error("تعذر تجهيز محتوى الفاتورة للطباعة.");
 }
 
 function downloadPdfFile(file) {
@@ -442,30 +422,6 @@ function createA4PdfFromCanvas(canvas) {
   return pdf;
 }
 
-export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
-  const stage = createPdfStage(html, page);
-  try {
-    await waitForPdfStage(stage);
-    const canvas = await html2canvas(stage, { scale: Math.max(3, window.devicePixelRatio || 1), useCORS: true, backgroundColor: "#ffffff", logging: false, windowWidth: stage.scrollWidth, windowHeight: stage.scrollHeight });
-    if (canvas.width < 2 || canvas.height < 2) throw new Error("تعذر رسم محتوى الفاتورة لملف PDF.");
-    const thermalWidth = 80;
-    const thermalHeight = Math.max(40, (canvas.height * thermalWidth) / canvas.width);
-    const pdf = new jsPDF({ unit: "mm", format: page === "thermal" ? [thermalWidth, thermalHeight] : "a4", orientation: "portrait", compress: true });
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const pixelsPerMm = canvas.width / pageWidth;
-    const pageHeightPx = Math.max(1, Math.floor(pageHeight * pixelsPerMm));
-    const addSlice = (offsetY, sliceHeight) => { const slice = document.createElement("canvas"); slice.width = canvas.width; slice.height = sliceHeight; slice.getContext("2d").drawImage(canvas, 0, offsetY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight); pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, pageWidth, sliceHeight / pixelsPerMm, undefined, "FAST"); };
-    if (page === "thermal") addSlice(0, canvas.height);
-    else for (let offsetY = 0; offsetY < canvas.height; offsetY += pageHeightPx) { if (offsetY) pdf.addPage(); addSlice(offsetY, Math.min(pageHeightPx, canvas.height - offsetY)); }
-    const blob = pdf.output("blob");
-    if (!blob || blob.size < 800) throw new Error("تعذر إنشاء ملف PDF كامل المحتوى.");
-    return new File([blob], filename, { type: "application/pdf" });
-  } finally {
-    stage.remove();
-  }
-}
-
 const escapePdfValue = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '\"': "&quot;", "'": "&#39;" }[character]));
 
 export async function createThermalInvoicePdfFile({ invoice, customer, storeName, storeInfo, logoDataUrl, formatMoney, formatAmount, formatDateTime, paymentLabel, filename }) {
@@ -508,7 +464,6 @@ export async function createReportPdfFile({ rows, storeName, storeInfo, logoData
   return new File([blob], filename, { type: "application/pdf" });
 }
 
-export async function shareOrDownloadPdf({ html, filename, title, page = "a4" }) { return fileOrDownload(await createPdfFileFromHtml({ html, filename, page }), title); }
 export async function shareOrDownloadReportPdf(options) { return fileOrDownload(await createReportPdfFile(options), options.title); }
 export async function shareOrDownloadInvoicePdf(options) { return fileOrDownload(await createThermalInvoicePdfFile(options), options.title); }
 export async function shareOrDownloadPurchaseInvoicePdf(options) { return fileOrDownload(await createPurchaseInvoicePdfFile(options), options.title); }
