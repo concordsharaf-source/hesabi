@@ -109,7 +109,7 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, logoImage, for
   const text = (value, x, align = "right", size = 28, weight = 400, direction = "rtl") => {
     context.direction = direction;
     context.textAlign = align;
-    context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
+    context.font = `${weight} ${Math.round(size * 1.08)}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
     context.fillText(fitCanvasText(context, value, 68 * mm), x, y);
   };
   const divider = () => {
@@ -181,8 +181,8 @@ function drawCustomerAccountCanvas({ account, storeName, logoImage, formatMoney,
   const text = (value, x, y, align = "right", size = 28, weight = 400, direction = "rtl", color = "#172e27") => {
     context.direction = direction;
     context.textAlign = align;
-    context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
-    context.fillStyle = color;
+    context.font = `${weight} ${Math.round(size * 1.12)}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
+    context.fillStyle = "#000000";
     context.fillText(String(value ?? ""), x, y);
   };
   const line = (fromX, fromY, toX, toY, color = "#d9e0d7", widthPx = 2) => { context.strokeStyle = color; context.lineWidth = widthPx; context.beginPath(); context.moveTo(fromX, fromY); context.lineTo(toX, toY); context.stroke(); };
@@ -269,8 +269,8 @@ function drawReportCanvas({ rows, storeName, logoImage, from, to }) {
   const text = (value, x, y, align = "right", size = 28, weight = 400, color = "#172e27", direction = "rtl") => {
     context.direction = direction;
     context.textAlign = align;
-    context.font = `${weight} ${size}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
-    context.fillStyle = color;
+    context.font = `${weight} ${Math.round(size * 1.12)}px "HesabiArabicPdf", Tahoma, Arial, sans-serif`;
+    context.fillStyle = "#000000";
     context.fillText(String(value ?? ""), x, y);
   };
   let y = 20 * mm;
