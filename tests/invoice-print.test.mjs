@@ -43,7 +43,8 @@ test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الد
   assert.match(pdfExport, /createReportPdfFile/);
   assert.match(pdfExport, /shareOrDownloadInvoicePdf/);
   assert.match(app, /await db\.getCustomer\(invoice\.customerId\)/);
-  assert.match(app, /createReportPdfFile\(/);
+  assert.match(app, /createPdfFileFromHtml\(\{ html: reportPreviewHtml\(type\)/);
+  assert.match(app, /shareOrDownloadPdf\(\{ html: reportPreviewHtml\(type\)/);
   assert.match(app, /logoDataUrl: storeLogoDataUrl\(\)/);
   assert.match(app, /cashierName: state\.currentUser\?\.name \|\| "الأدمن"/);
   assert.match(app, /invoice\.cashierName \|\| "الأدمن"/);
@@ -686,6 +687,7 @@ test("يثبت أزرار معاينة التقرير ويجعل الجدول و
   assert.match(app, /data-preview-print/);
   assert.match(app, /data-preview-download/);
   assert.match(app, /data-preview-excel/);
+  assert.match(app, /downloadReportPdf\(type\)/);
   assert.match(app, /class="dialog__actions report-preview-actions"/);
   assert.match(css, /\.dialog:has\(\.report-preview\) \{ display:flex; flex-direction:column/);
   assert.match(css, /\.dialog:has\(\.report-preview\) \.report-preview \{ flex:1 1 auto; min-height:0; max-height:none; overflow:auto; \}/);
