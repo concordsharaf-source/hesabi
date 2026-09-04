@@ -747,9 +747,9 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
 // ═══════════════════════════════════════════════════════════════════════════
 function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
   const mm = 12, wide = rows[0]?.length > 6, width = (wide ? 297 : 210) * mm, pageHeight = (wide ? 210 : 297) * mm, left = 14 * mm, right = width - left, center = width / 2;
-  const headerHeight = (wide ? 60 : 78) * mm, footerHeight = 20 * mm, rowHeight = (wide ? 26 : 24) * mm;
+  const headerHeight = (wide ? 72 : 78) * mm, footerHeight = 20 * mm, rowHeight = (wide ? 26 : 24) * mm;
   const tableFont = wide ? 28 : 46, bodyFont = wide ? 26 : 44;
-  const rowsPerPage = Math.max(8, Math.floor((pageHeight - headerHeight - footerHeight) / rowHeight));
+  const rowsPerPage = Math.max(1, Math.floor((pageHeight - headerHeight - footerHeight) / rowHeight));
   const bodyRows = rows.slice(1), pageCount = Math.max(1, Math.ceil(bodyRows.length / rowsPerPage));
   const canvas = document.createElement('canvas'); 
   canvas.width = width; 
