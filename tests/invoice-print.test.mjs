@@ -36,20 +36,13 @@ test("يخصص PDF الفاتورة لرسم عربي مباشر عالي الد
     readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
   ]);
-  assert.match(pdfExport, /HesabiArabicPdf/);
-  assert.match(pdfExport, /weight: "100 900"/);
-  assert.match(pdfExport, /drawThermalInvoiceCanvas/);
-  assert.match(pdfExport, /drawCustomerAccountCanvas/);
-  assert.match(pdfExport, /drawReportCanvas/);
-  assert.match(pdfExport, /loadStoreLogoImage/);
-  assert.match(pdfExport, /drawStoreLogo/);
+  assert.match(pdfExport, /import \{ renderThermalInvoiceHtml \} from "\.\/invoice-print\.js"/);
+  assert.match(pdfExport, /renderThermalInvoiceHtml\(\{ invoice, customer, storeName, logoDataUrl/);
+  assert.match(pdfExport, /return createPdfFileFromHtml\(\{ html, filename, page: "thermal" \}\)/);
+  assert.match(pdfExport, /createCustomerAccountPdfFile/);
   assert.match(pdfExport, /createReportPdfFile/);
-  assert.match(pdfExport, /shareOrDownloadCustomerAccountPdf/);
-  assert.match(pdfExport, /context\.direction = "rtl"/);
-  assert.match(app, /shareOrDownloadInvoicePdf/);
-  assert.match(app, /shareInvoice\(invoice\)/);
+  assert.match(pdfExport, /shareOrDownloadInvoicePdf/);
   assert.match(app, /await db\.getCustomer\(invoice\.customerId\)/);
-  assert.match(app, /shareOrDownloadCustomerAccountPdf\(/);
   assert.match(app, /createReportPdfFile\(/);
   assert.match(app, /logoDataUrl: storeLogoDataUrl\(\)/);
   assert.match(app, /cashierName: state\.currentUser\?\.name \|\| "الأدمن"/);
@@ -675,4 +668,26 @@ test("توحد بيانات الفاتورة في التفاصيل والطبا�
   assert.match(pdf, /حالة السداد/);
   assert.match(pdf, /بيانات العميل/);
   assert.match(css, /\.invoice-customer-card/);
+});
+
+test("يحوّل PDF الفاتورة من قالب الطباعة الحرارية نفسه", async () => {
+  const pdfExport = await readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8");
+  assert.match(pdfExport, /import \{ renderThermalInvoiceHtml \} from "\.\/invoice-print\.js"/);
+  assert.match(pdfExport, /renderThermalInvoiceHtml\(\{ invoice, customer, storeName, logoDataUrl/);
+  assert.match(pdfExport, /return createPdfFileFromHtml\(\{ html, filename, page: "thermal" \}\)/);
+});
+
+test("يثبت أزرار معاينة التقرير ويجعل الجدول وحده قابلًا للتمرير", async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /data-preview-share/);
+  assert.match(app, /data-preview-print/);
+  assert.match(app, /data-preview-download/);
+  assert.match(app, /data-preview-excel/);
+  assert.match(app, /class="dialog__actions report-preview-actions"/);
+  assert.match(css, /\.dialog:has\(\.report-preview\) \{ display:flex; flex-direction:column/);
+  assert.match(css, /\.dialog:has\(\.report-preview\) \.report-preview \{ flex:1 1 auto; min-height:0; max-height:none; overflow:auto; \}/);
+  assert.match(css, /\.report-preview-actions \{ position:sticky; bottom:0; z-index:3/);
 });

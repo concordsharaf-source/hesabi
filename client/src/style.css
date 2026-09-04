@@ -255,7 +255,12 @@ label { font-size:15px; }
 .report-card__final strong.is-negative { color:var(--danger) !important; }
 .metric-card.is-negative strong { color:#fff !important; }
 .expense-period-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }.expense-period-grid .entity-list { margin:0; }.expense-period-grid .panel__head small { color:var(--muted); font-size:10px; }
-.report-preview { max-height: min(62vh, 680px); overflow: auto; padding: 14px; background: #eef3ef; border: 1px solid #c7d8cc; border-radius: 14px; direction: rtl; } .report-preview header { display:flex; align-items:center; gap:14px; padding:14px; margin-bottom:14px; background:#f5faf7; border:2px solid #174c3f; border-radius:10px; } .report-preview header img { width:58px; height:58px; object-fit:contain; background:#fff; border:1px solid #b7cdbf; border-radius:8px; } .report-preview h1 { margin:0 0 5px; font-size:20px; color:#174c3f; } .report-preview h2 { margin:0 0 4px; font-size:16px; } .report-preview p { margin:0; color:#52645b; font-size:12px; } .report-preview table { width:100%; border-collapse:collapse; table-layout:fixed; background:#fff; font-size:14px; } .report-preview th,.report-preview td { padding:9px 8px; border:1px solid #52645b; text-align:right; overflow-wrap:anywhere; line-height:1.45; } .report-preview th { background:#dfece4; font-weight:800; } .report-preview td:not(:first-child),.report-preview th:not(:first-child) { text-align:center; } .report-preview-actions { margin-top:12px; }
+.dialog:has(.report-preview) { display:flex; flex-direction:column; max-height:min(92dvh,900px); overflow:hidden; }
+.dialog:has(.report-preview) .report-preview { flex:1 1 auto; min-height:0; max-height:none; overflow:auto; }
+.report-preview { max-height: min(62vh, 680px); overflow: auto; padding: 14px; background: #eef3ef; border: 1px solid #c7d8cc; border-radius: 14px; direction: rtl; } .report-preview header { display:flex; align-items:center; gap:14px; padding:14px; margin-bottom:14px; background:#f5faf7; border:2px solid #174c3f; border-radius:10px; } .report-preview header img { width:58px; height:58px; object-fit:contain; background:#fff; border:1px solid #b7cdbf; border-radius:8px; } .report-preview h1 { margin:0 0 5px; font-size:20px; color:#174c3f; } .report-preview h2 { margin:0 0 4px; font-size:16px; } .report-preview p { margin:0; color:#52645b; font-size:12px; } .report-preview table { width:100%; border-collapse:collapse; table-layout:fixed; background:#fff; font-size:14px; } .report-preview th,.report-preview td { padding:9px 8px; border:1px solid #52645b; text-align:right; overflow-wrap:anywhere; line-height:1.45; } .report-preview th { background:#dfece4; font-weight:800; } .report-preview td:not(:first-child),.report-preview th:not(:first-child) { text-align:center; } .report-preview-actions { position:sticky; bottom:0; z-index:3; display:flex; flex:0 0 auto; align-items:stretch; gap:8px; margin:0 -18px -18px; padding:12px 18px calc(12px + env(safe-area-inset-bottom)); background:var(--surface); border-top:1px solid var(--line); box-shadow:0 -8px 20px rgba(11,48,35,.12); }
+.report-preview-actions .button { flex:1 1 0; min-width:0; white-space:nowrap; }
+[data-theme="dark"] .report-preview-actions { background:#162820; box-shadow:0 -8px 20px rgba(0,0,0,.28); }
+@media (max-width:599px) { .dialog:has(.report-preview) { max-height:calc(100dvh - 20px); }.report-preview-actions { margin-inline:-14px; padding-inline:14px; }.report-preview-actions .button { min-height:46px; padding-inline:5px; font-size:12px; } }
 .report-export-options { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:9px; }
 .reports-bottom-action { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:18px; padding:18px; border:1px solid rgba(31,107,89,.22); border-radius:14px; background:linear-gradient(135deg, var(--green-pale), #fff); box-shadow:0 8px 24px rgba(31,107,89,.08); }
 .reports-bottom-action strong,.reports-bottom-action small { display:block; }
@@ -710,11 +715,13 @@ label { font-size:15px; }
 @media(max-width:680px){.sales-bottom-action{align-items:stretch; flex-direction:column; gap:12px; padding:16px}.sales-bottom-action .button{width:100%; min-height:56px}}
 
 /* تمرير موحّد لمعاينة التقرير حتى تظهر أدوات الإجراء في نهاية الجدول. */
-.dialog-backdrop--report-preview .dialog { overflow:hidden; }
-.report-preview-scroll { max-height:calc(min(90vh, 780px) - 88px); overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-gutter:stable; padding-inline-end:3px; }
-.report-preview-scroll .report-wrap-toggle { display:inline-flex; }
-.report-preview-scroll .report-preview-actions { margin-bottom:4px; }
-@media(max-width:599px){.report-preview-scroll{max-height:calc(100dvh - 150px);}}
+.dialog-backdrop--report-preview .dialog { display:flex; flex-direction:column; overflow:hidden; max-height:min(92dvh,900px); }
+.report-preview-scroll { display:flex; flex:1 1 auto; min-height:0; flex-direction:column; max-height:calc(min(90vh, 780px) - 88px); overflow:hidden; overscroll-behavior:contain; scrollbar-gutter:stable; padding-inline-end:3px; }
+.report-preview-scroll .report-wrap-toggle { display:inline-flex; flex:0 0 auto; }
+.report-preview-scroll .report-preview { flex:1 1 auto; min-height:0; max-height:none; overflow:auto; }
+.report-preview-scroll .report-preview-actions { position:sticky; bottom:0; z-index:4; flex:0 0 auto; margin-bottom:4px; background:var(--surface); box-shadow:0 -8px 20px rgba(11,48,35,.12); }
+[data-theme="dark"] .report-preview-scroll .report-preview-actions { background:#162820; box-shadow:0 -8px 20px rgba(0,0,0,.3); }
+@media(max-width:599px){.dialog-backdrop--report-preview .dialog{max-height:calc(100dvh - 20px)}.report-preview-scroll{max-height:calc(100dvh - 150px)}.report-preview-scroll .report-preview-actions{position:sticky;bottom:0;}}
 
 /* توحيد أزرار بطاقات الانتقال الجديدة مع الوضع الداكن. */
 [data-theme="dark"] .sales-bottom-action { background:linear-gradient(135deg,#173d31,#245542); border-color:#5f987c; box-shadow:0 10px 26px rgba(0,0,0,.28); }

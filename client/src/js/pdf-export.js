@@ -1,5 +1,6 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { renderThermalInvoiceHtml } from "./invoice-print.js";
 
 const PDF_ARABIC_FONT_URL = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage/NotoNaskhArabic-Regular_2c8d8205.ttf";
 const toNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
@@ -887,16 +888,9 @@ export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
 const escapePdfValue = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 
 export async function createThermalInvoicePdfFile({ invoice, customer, storeName, storeInfo, logoDataUrl, formatMoney, formatAmount, formatDateTime, paymentLabel, filename }) {
-  await loadCanvasArabicFont();
-  const logoImage = await loadStoreLogoImage(logoDataUrl);
-  const canvas = drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, logoImage, formatMoney, formatAmount, formatDateTime, paymentLabel });
-  const thermalWidth = 80;
-  const thermalHeight = (canvas.height * thermalWidth) / canvas.width;
-  const pdf = new jsPDF({ unit: "mm", format: [thermalWidth, thermalHeight], orientation: "portrait", compress: true });
-  pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, thermalWidth, thermalHeight, undefined, "FAST");
-  const blob = pdf.output("blob");
-  if (!blob || blob.size < 800) throw new Error("تعذر إنشاء ملف PDF واضح للفواتير.");
-  return new File([blob], filename, { type: "application/pdf" });
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[character]));
+  const html = renderThermalInvoiceHtml({ invoice, customer, storeName, logoDataUrl, formatMoney, formatAmount, formatDateTime, escapeHtml, paymentLabel });
+  return createPdfFileFromHtml({ html, filename, page: "thermal" });
 }
 
 export async function createPurchaseInvoicePdfFile({ purchase, supplier, storeName, storeInfo, logoDataUrl, formatMoney, formatAmount, formatDateTime, filename }) {
