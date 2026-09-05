@@ -721,6 +721,7 @@ label { font-size:15px; }
 .report-preview-scroll .report-preview { flex:1 1 auto; min-height:0; max-height:none; overflow:auto; }
 .report-preview-scroll .report-preview-actions { position:sticky; bottom:0; z-index:4; flex:0 0 auto; margin-bottom:4px; background:var(--surface); box-shadow:0 -8px 20px rgba(11,48,35,.12); }
 [data-theme="dark"] .report-preview-scroll .report-preview-actions { background:#162820; box-shadow:0 -8px 20px rgba(0,0,0,.3); }
+@media(min-width:600px){.dialog-backdrop--report-preview{padding:20px}.dialog-backdrop--report-preview .dialog{width:min(96vw,1280px);max-width:1280px;max-height:calc(100dvh - 40px);padding:24px}.dialog-backdrop--report-preview .dialog__head{flex:0 0 auto}.dialog-backdrop--report-preview .report-preview-scroll{max-height:calc(100dvh - 174px);padding-inline-end:5px}.dialog-backdrop--report-preview .report-preview{width:100%;padding:0 2px}.dialog-backdrop--report-preview .report-preview-actions{min-height:58px;padding-top:12px;gap:10px}.dialog-backdrop--report-preview .report-preview-actions .button{min-width:140px}}
 @media(max-width:599px){.dialog-backdrop--report-preview .dialog{max-height:calc(100dvh - 20px)}.report-preview-scroll{max-height:calc(100dvh - 150px)}.report-preview-scroll .report-preview-actions{position:sticky;bottom:0;}}
 
 /* توحيد أزرار بطاقات الانتقال الجديدة مع الوضع الداكن. */

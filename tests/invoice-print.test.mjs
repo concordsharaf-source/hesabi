@@ -702,4 +702,8 @@ test("يثبت أزرار معاينة التقرير ويجعل الجدول و
   assert.match(css, /\.dialog:has\(\.report-preview\) \{ display:flex; flex-direction:column/);
   assert.match(css, /\.dialog:has\(\.report-preview\) \.report-preview \{ flex:1 1 auto; min-height:0; max-height:none; overflow:auto; \}/);
   assert.match(css, /\.report-preview-actions \{ position:sticky; bottom:0; z-index:3/);
+  assert.match(css, /@media\(min-width:600px\)\{\.dialog-backdrop--report-preview/);
+  assert.match(css, /width:min\(96vw,1280px\)/);
+  assert.match(css, /max-height:calc\(100dvh - 40px\)/);
+  assert.match(css, /\.dialog-backdrop--report-preview \.report-preview-scroll\{max-height:calc\(100dvh - 174px\)/);
 });
