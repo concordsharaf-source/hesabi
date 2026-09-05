@@ -22,5 +22,5 @@ test("يضم غلاف Android نسخة الويب المبنية مع عامل �
   const worker = await read("android/app/src/main/assets/public/service-worker.js");
   assert.match(shell, /<script[^>]+src=/);
   assert.match(shell, /\/assets\/[^"']+\.js/);
-  assert.match(worker, /hesabi-pwa-v21/);
+  assert.match(worker, /hesabi-pwa-v28/);
 });

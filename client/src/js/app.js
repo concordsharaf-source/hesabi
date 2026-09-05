@@ -17,6 +17,7 @@ import { createBarcodeWorkbook, createPurchaseWorkbook, parseBarcodeFile } from 
 import { createReportWorkbook, reportWorkbookMimeType } from "./report-file.js";
 import { APK_REPORT_TYPES, getApkReportRows } from "./apk-report-catalog.js";
 import { CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isDesktopBarcodeWedge, isNewContinuousBarcode, shouldAcceptDesktopBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
+import { addNativeScannerListeners, getNativeContacts, getNativeFiles, getNativeScanner, isNativeAndroid, nativeExitApp, nativePickContacts, nativePrintHtml, nativeSaveFile, nativeShareFile, nativeShareText } from "./native-bridge.js";
 import { installDesktopIntegration } from "./desktop.js";
 
 const icon = (name, size = 20) => {
@@ -117,10 +118,23 @@ const phoneCallButton = (phone, name) => {
   const href = phoneHref(phone);
   return href ? `<a class="icon-button icon-button--call" href="${href}" aria-label="اتصال بـ ${escapeHtml(name)}" title="اتصال">${icon("phone", 18)}</a>` : "";
 };
-const canPickContacts = () => typeof navigator !== "undefined" && typeof navigator.contacts?.select === "function";
+const canPickContacts = () => (isNativeAndroid() && Boolean(getNativeContacts())) || (typeof navigator !== "undefined" && typeof navigator.contacts?.select === "function");
 const phoneFieldMarkup = (inputId, value = "") => `<label>رقم الهاتف<div class="phone-field__control"><input id="${inputId}" name="phone" type="tel" inputmode="tel" dir="ltr" value="${escapeHtml(value)}" />${canPickContacts() ? `<button id="${inputId}-contact-picker" class="button button--secondary phone-field__picker" type="button">${icon("users", 17)}<span>جهات الاتصال</span></button>` : ""}</div><small class="phone-field__hint">${canPickContacts() ? "اختر رقمًا من جهات اتصال الجهاز أو أدخله يدويًا." : "أدخل الرقم يدويًا؛ اختيار جهات الاتصال غير مدعوم في هذا الجهاز."}</small></label>`;
 async function pickContactPhone(phoneInput, nameInput) {
   if (!canPickContacts()) { showToast("اختيار جهات الاتصال غير مدعوم في هذا الجهاز. أدخل الرقم يدويًا.", "error"); phoneInput.focus(); return; }
+  if (isNativeAndroid() && getNativeContacts()) {
+    try {
+      const [contact] = await nativePickContacts({ props: ["name", "tel"], multiple: false });
+      if (!contact) return;
+      const phone = contact.tel?.find(Boolean);
+      if (!phone) { showToast("جهة الاتصال المختارة لا تحتوي على رقم هاتف.", "error"); return; }
+      phoneInput.value = phone;
+      phoneInput.dispatchEvent(new Event("input", { bubbles: true }));
+      if (!nameInput.value.trim() && contact.name) nameInput.value = contact.name;
+      showToast("تم إدخال رقم جهة الاتصال.");
+    } catch { showToast("تعذر فتح جهات الاتصال. يمكنك إدخال الرقم يدويًا.", "error"); }
+    return;
+  }
   try {
     const [contact] = await navigator.contacts.select(["name", "tel"], { multiple: false });
     const phone = contact?.tel?.find(Boolean);
@@ -141,7 +155,7 @@ function bindContactPicker(overlay, phoneInputId, nameInputName = "name") {
   picker.addEventListener("click", () => void pickContactPhone(phoneInput, nameInput));
 }
 const paymentChannelLabel = (invoice) => invoice?.paymentType === "آجل" ? "دين" : invoice?.paymentMethod === "تحويل" ? "تحويل" : "كاش";
-const assetBaseUrl = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage";
+const assetBaseUrl = "/images";
 const emptyImage = `${assetBaseUrl}/hesabi-empty-inventory_96623fe2.png`;
 const markImage = `${assetBaseUrl}/hesabi-mark_5cb0429a.png`;
 const LOCAL_STORE_LOGO_PATTERN = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+={0,2}$/i;
@@ -221,9 +235,10 @@ function installExitGuard() {
 function openExitConfirmDialog() {
   if (document.querySelector("#exit-confirm-dialog")) return;
   const overlay = openDialog(`<div id="exit-confirm-dialog" class="confirm-dialog"><div class="dialog__head"><div><span class="eyebrow">تأكيد الخروج</span><h2>هل تريد الخروج من حسابي؟</h2><p class="dialog__subtext">ستبقى بيانات المتجر محفوظة على هذا الجهاز.</p></div><button class="icon-button" data-dialog-close aria-label="إلغاء">${icon("close", 20)}</button></div><div class="dialog__actions"><button class="button button--secondary" type="button" data-dialog-close>البقاء في التطبيق</button><button id="confirm-app-exit" class="button button--danger" type="button">نعم، خروج</button></div></div>`);
-  overlay.querySelector("#confirm-app-exit").addEventListener("click", () => {
+  overlay.querySelector("#confirm-app-exit").addEventListener("click", async () => {
     exitAllowed = true;
     closeDialog();
+    if (isNativeAndroid() && await nativeExitApp()) return;
     leaveAfterExitConfirmation(
       (steps) => history.go(steps),
       -exitGuardEntries,
@@ -469,7 +484,7 @@ function openReorderDialog() {
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelectorAll("[data-reorder-supplier]").forEach((button) => button.addEventListener("click", () => { closeDialog(); openSupplierAccountDialog(button.dataset.reorderSupplier); }));
   overlay.querySelectorAll("[data-reorder-product]").forEach((button) => button.addEventListener("click", () => { closeDialog(); openProductDialog(state.products.find((product) => product.id === button.dataset.reorderProduct)); }));
-  overlay.querySelectorAll("[data-share-reorder]").forEach((button) => button.addEventListener("click", async () => { const group = groups.get(button.dataset.shareReorder); const text = groupText(group); try { if (navigator.share) await navigator.share({ title: "قائمة إعادة طلب — حسابي", text }); else { await navigator.clipboard.writeText(text); showToast("تم نسخ قائمة إعادة الطلب للمشاركة"); } } catch (error) { if (error?.name !== "AbortError") showToast("تعذرت مشاركة قائمة إعادة الطلب.", "error"); } }));
+  overlay.querySelectorAll("[data-share-reorder]").forEach((button) => button.addEventListener("click", async () => { const group = groups.get(button.dataset.shareReorder); const text = groupText(group); try { if (isNativeAndroid()) await nativeShareText({ text, title: "قائمة إعادة طلب — حسابي" }); else if (navigator.share) await navigator.share({ title: "قائمة إعادة طلب — حسابي", text }); else { await navigator.clipboard.writeText(text); showToast("تم نسخ قائمة إعادة الطلب للمشاركة"); } } catch (error) { if (error?.name !== "AbortError") showToast("تعذرت مشاركة قائمة إعادة الطلب.", "error"); } }));
 }
 
 function inventoryMarkup() {
@@ -1409,12 +1424,12 @@ async function saveSettings(event) { event.preventDefault(); try { const values 
 async function handleStoreLogoFile(event) { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return; try { const dataUrl = await prepareStoreLogoDataUrl(file); await db.saveStoreLogoDataUrl(dataUrl); state.settings = await db.getSettings(); await refresh(); render(); showToast("تم حفظ شعار المتجر محليًا ويظهر في النسخة الاحتياطية وPDF."); } catch (error) { showToast(error.message || "تعذر حفظ شعار المتجر.", "error"); } }
 async function clearStoreLogo() { try { await db.saveStoreLogoDataUrl(""); state.settings = await db.getSettings(); await refresh(); render(); showToast("تمت استعادة شعار حسابي الافتراضي."); } catch (error) { showToast(error.message || "تعذر استعادة الشعار الافتراضي.", "error"); } }
 
-function downloadBackupPayload(backup, suffix = dateKey()) { const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = `hesabi-backup-${suffix}.json`; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); }
+async function downloadBackupPayload(backup, suffix = dateKey()) { const payload = JSON.stringify(backup, null, 2); const filename = `hesabi-backup-${suffix}.json`; if (isNativeAndroid()) { try { await nativeSaveFile({ data: payload, filename, mimeType: "application/json" }); return; } catch { /* falls back to the web download */ } } const blob = new Blob([payload], { type: "application/json" }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; document.body.appendChild(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url); }
 
-function downloadBinaryFile(content, filename, type = "application/octet-stream") { const blob = new Blob([content], { type }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; document.body.appendChild(anchor); anchor.click(); anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 60_000); }
+async function downloadBinaryFile(content, filename, type = "application/octet-stream") { if (isNativeAndroid()) { try { await nativeSaveFile({ data: content, filename, mimeType: type }); return; } catch { /* falls back to the web download */ } } const blob = new Blob([content], { type }); const url = URL.createObjectURL(blob); const anchor = document.createElement("a"); anchor.href = url; anchor.download = filename; document.body.appendChild(anchor); anchor.click(); anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 60_000); }
 function taskProgressMarkup(title) { const node = document.createElement("div"); node.className = "task-progress"; node.dataset.layer = "import-progress"; node.setAttribute("role", "status"); node.innerHTML = `<div class="task-progress__card"><div class="task-progress__head"><strong>${escapeHtml(title)}</strong><span data-task-percent>0%</span></div><div class="task-progress__track"><span data-task-bar></span></div><p data-task-message>جاري تجهيز المهمة...</p></div>`; document.body.appendChild(node); return { update(percent, message) { const value = Math.max(0, Math.min(100, Math.round(percent))); node.querySelector("[data-task-percent]").textContent = `${value}%`; node.querySelector("[data-task-bar]").style.width = `${value}%`; if (message) node.querySelector("[data-task-message]").textContent = message; }, complete(message) { this.update(100, message); node.classList.add("is-complete"); window.setTimeout(() => node.remove(), 1800); } }; }
 function confirmImportReplacement(product, index, total) { return new Promise((resolve) => { const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تأكيد الاستيراد · ${index} من ${total}</span><h2>المنتج موجود مسبقًا</h2><p class="dialog__subtext"><strong>${escapeHtml(product.name)}</strong><br />توجد بيانات مختلفة في الملف. اختر الإجراء المناسب.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="import-confirm-choice"><button type="button" class="import-choice-button" data-import-replace-one><strong>استبدال الحالي</strong><span>استبدال هذا المنتج فقط.</span></button><button type="button" class="import-choice-button" data-import-replace-all><strong>استبدال الكل</strong><span>استبدال هذا وكل المنتجات المتعارضة التالية.</span></button><button type="button" class="import-choice-button" data-import-skip-one><strong>تخطي الحالي</strong><span>الحفاظ على هذا المنتج والانتقال للذي بعده.</span></button><button type="button" class="import-choice-button" data-import-skip-all><strong>تخطي الكل</strong><span>الحفاظ على كل المنتجات الموجودة.</span></button></div>`); overlay.classList.add("dialog-backdrop--priority"); overlay.dataset.layer = "import-confirmation"; overlay.style.zIndex = "2000"; const finish = (value) => { closeDialog(); resolve(value); }; overlay.querySelector("[data-import-replace-one]").addEventListener("click", () => finish("replace-one")); overlay.querySelector("[data-import-replace-all]").addEventListener("click", () => finish("replace-all")); overlay.querySelector("[data-import-skip-one]").addEventListener("click", () => finish("skip-one")); overlay.querySelector("[data-import-skip-all]").addEventListener("click", () => finish("skip-all")); overlay.addEventListener("click", (event) => { if (event.target === overlay) finish("skip-all"); }); }); }
-async function exportBarcodesFile() { const progress = taskProgressMarkup("تصدير ملف الباركودات"); try { progress.update(35, "جاري تجهيز بيانات المنتجات..."); await new Promise((resolve) => requestAnimationFrame(resolve)); const content = createBarcodeWorkbook(state.products); progress.update(75, "جاري إنشاء ملف Excel..."); await new Promise((resolve) => requestAnimationFrame(resolve)); downloadBinaryFile(content, `hesabi-barcodes-${dateKey()}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); progress.complete(`اكتمل التصدير: ${state.products.length} منتج.`); showToast("اكتمل تصدير ملف الباركودات."); } catch (error) { progress.complete("تعذر إكمال التصدير."); showToast(error.message || "تعذر تصدير ملف الباركودات.", "error"); } }
+async function exportBarcodesFile() { const progress = taskProgressMarkup("تصدير ملف الباركودات"); try { progress.update(35, "جاري تجهيز بيانات المنتجات..."); await new Promise((resolve) => requestAnimationFrame(resolve)); const content = createBarcodeWorkbook(state.products); progress.update(75, "جاري إنشاء ملف Excel..."); await new Promise((resolve) => requestAnimationFrame(resolve)); await downloadBinaryFile(content, `hesabi-barcodes-${dateKey()}.xlsx`, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"); progress.complete(`اكتمل التصدير: ${state.products.length} منتج.`); showToast("اكتمل تصدير ملف الباركودات."); } catch (error) { progress.complete("تعذر إكمال التصدير."); showToast(error.message || "تعذر تصدير ملف الباركودات.", "error"); } }
 async function importBarcodeFile(event) {
   const input = event.currentTarget; const file = input.files?.[0]; if (!file) return;
   try {
@@ -1475,7 +1490,7 @@ function installAutomaticBackups() {
   window.addEventListener("online", () => { void runAutomaticBackups(); }, { passive: true });
 }
 
-async function downloadBackup() { try { downloadBackupPayload(await db.exportBackup()); showToast("تم تصدير النسخة الاحتياطية"); } catch (error) { showToast(error.message || "تعذر تصدير النسخة الاحتياطية.", "error"); } }
+async function downloadBackup() { try { await downloadBackupPayload(await db.exportBackup()); showToast("تم تصدير النسخة الاحتياطية"); } catch (error) { showToast(error.message || "تعذر تصدير النسخة الاحتياطية.", "error"); } }
 
 async function refreshCloudBackups({ quiet = false } = {}) {
   if (!isAdmin(state.currentUser) || !state.cloud.user) return;
@@ -1515,7 +1530,7 @@ async function restoreCloudBackup(backupId) {
   state.cloud.busy = "restore"; state.cloud.error = ""; render();
   try {
     const safetyBackup = await db.exportBackup();
-    downloadBackupPayload(safetyBackup, `before-cloud-restore-${dateKey()}`);
+    await downloadBackupPayload(safetyBackup, `before-cloud-restore-${dateKey()}`);
     const { payload } = await readCloudBackup(backupId);
     db.validateBackup(payload);
     const sessionBeforeRestore = state.currentUser;
@@ -1640,12 +1655,12 @@ function financialReportRowsRaw(type = "summary") {
 }
 function reportExportRows() { const data = state.analytics || { sales: {}, purchases: {}, expenses: {}, profit: {} }; return [["البند", "القيمة"], ["من", state.reportFrom || "بداية السجل"], ["إلى", state.reportTo || "اليوم"], ["إجمالي المبيعات", money(data.sales.total || 0)], ["مرتجع البيع", money(data.sales.returns || 0)], ["صافي المبيعات", money(data.profit.netSales || 0)], ["تكلفة البضاعة", money(data.profit.netCostOfGoods || 0)], ["إجمالي المشتريات", money(data.purchases.total || 0)], ["مرتجع الشراء", money(data.purchases.returns || 0)], ["إجمالي المصروفات", money(data.expenses.total || 0)], ["صافي الربح", money(data.profit.netProfit || 0)], ["ديون العملاء الحالية", money(state.customers.reduce((sum, customer) => sum + toNumber(customer.balance), 0))], ["مستحقات الموردين الحالية", money(state.suppliers.reduce((sum, supplier) => sum + toNumber(supplier.balance), 0))]]; }
 function reportExportHtml() { const rows = reportExportRows(); const headers = rows[0] || []; const cell = (value, header = false) => `<${header ? "th" : "td"}>${escapeHtml(value ?? "")}</${header ? "th" : "td"}>`; return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8" /><style>@page{size:A4;margin:12mm}*{box-sizing:border-box}body{font-family:Tahoma,Arial,sans-serif;color:#172e27;background:#fff;direction:rtl;margin:0;font-size:18px}header{border:2px solid #172e27;padding:20px 24px;margin-bottom:22px;text-align:center}h1{margin:0 0 10px;font-size:30px;color:#174c3f}p{margin:0;color:#52645b;font-size:18px}table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:18px;direction:rtl}th,td{padding:12px 10px;border:1.5px solid #26332e;text-align:center;vertical-align:middle;overflow-wrap:anywhere;word-break:normal;line-height:1.45}th{background:#dfe4e1;color:#172e27;font-size:19px;font-weight:800}td:first-child,th:first-child{text-align:right;width:42%}td:not(:first-child),th:not(:first-child){width:29%}tr:nth-child(even){background:#f7f8f7}.negative{color:#a74340;font-weight:800}.total td{font-weight:800;background:#e7f1eb;border-top:2px solid #174c3f}</style></head><body><header><h1>${escapeHtml(storeDisplayName())}</h1><p>التقرير التشغيلي العام — من ${escapeHtml(state.reportFrom || "بداية السجل")} إلى ${escapeHtml(state.reportTo || "اليوم")}</p></header><table><thead><tr>${headers.map((value) => cell(value, true)).join("")}</tr></thead><tbody>${rows.slice(1).map((row) => `<tr class="${row.some((value) => String(value).startsWith("-") || String(value).startsWith("−")) ? "negative" : ""}">${row.map((value) => cell(value)).join("")}</tr>`).join("")}</tbody></table></body></html>`; }
-function downloadGeneratedFile(file) { const url = URL.createObjectURL(file); const anchor = Object.assign(document.createElement("a"), { href: url, download: file.name }); document.body.appendChild(anchor); anchor.click(); anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 0); }
-function downloadReportCsv() { try { const rows = reportExportRows(); const escapeCsv = (value) => `"${String(value).replaceAll('"', '""')}"`; downloadGeneratedFile(new File([`\uFEFF${rows.map((row) => row.map(escapeCsv).join(",")).join("\n")}`], `hesabi-report-${dateKey()}.csv`, { type: "text/csv;charset=utf-8" })); showToast("تم تصدير تقرير CSV"); } catch (error) { showToast(error.message || "تعذر تصدير التقرير.", "error"); } }
-function downloadReportXlsx(type = "summary") { try { const content = createReportWorkbook(financialReportRows(type), { storeName: storeDisplayName(), reportTitle: reportTitle(type), from: state.reportFrom || "بداية السجل", to: state.reportTo || "اليوم" }); downloadGeneratedFile(new File([content], `hesabi-${type}-report-${dateKey()}.xlsx`, { type: reportWorkbookMimeType() })); showToast("تم تصدير تقرير Excel"); } catch (error) { showToast(error.message || "تعذر إنشاء تقرير Excel.", "error"); } }
+async function downloadGeneratedFile(file) { if (isNativeAndroid()) { try { await nativeSaveFile({ data: file, filename: file.name, mimeType: file.type || "application/octet-stream" }); return; } catch { /* falls back to the web download */ } } const url = URL.createObjectURL(file); const anchor = Object.assign(document.createElement("a"), { href: url, download: file.name }); document.body.appendChild(anchor); anchor.click(); anchor.remove(); window.setTimeout(() => URL.revokeObjectURL(url), 0); }
+async function downloadReportCsv() { try { const rows = reportExportRows(); const escapeCsv = (value) => `"${String(value).replaceAll('"', '""')}"`; await downloadGeneratedFile(new File([`\uFEFF${rows.map((row) => row.map(escapeCsv).join(",")).join("\n")}`], `hesabi-report-${dateKey()}.csv`, { type: "text/csv;charset=utf-8" })); showToast("تم تصدير تقرير CSV"); } catch (error) { showToast(error.message || "تعذر تصدير التقرير.", "error"); } }
+async function downloadReportXlsx(type = "summary") { try { const content = createReportWorkbook(financialReportRows(type), { storeName: storeDisplayName(), reportTitle: reportTitle(type), from: state.reportFrom || "بداية السجل", to: state.reportTo || "اليوم" }); await downloadGeneratedFile(new File([content], `hesabi-${type}-report-${dateKey()}.xlsx`, { type: reportWorkbookMimeType() })); showToast("تم تصدير تقرير Excel"); } catch (error) { showToast(error.message || "تعذر إنشاء تقرير Excel.", "error"); } }
 const reportTitle = (type = "summary") => ({ cash: "تقرير تحليلي شامل لحركة الصندوق", income: "قائمة الدخل", balance: "المركز المالي", trial: "ميزان المراجعة", customers: "تقرير ديون العملاء", suppliers: "تقرير مستحقات الموردين", expenses: "تقرير المصروفات حسب النوع", inventory: "تقرير المخزون والتكلفة", itemBalance: "أرصدة المخزون", itemMovement: "حركة الأصناف", revenueItem: "المبيعات حسب الصنف", revenueCustomer: "المبيعات حسب العميل", dailyDocuments: "الوثائق اليومية", dailyTransactions: "العمليات اليومية", moneyBalance: "حركة الصندوق", accountsTotal: "إجمالي الحسابات", accountBalance: "أرصدة الحسابات", currency: "حركة العملات والتحويلات", summary: "التقرير التشغيلي العام" }[type] || "التقرير المالي");
 function reportPreviewHtml(type = "summary") { const rows = financialReportRows(type); const title = reportTitle(type); const wide = (rows[0] || []).length > 6; const cell = (value, header = false) => `<${header ? "th" : "td"}>${escapeHtml(value ?? "")}</${header ? "th" : "td"}>`; return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><style>@page{size:${wide ? "A4 landscape" : "A4"};margin:10mm}*{box-sizing:border-box}body{font-family:"HesabiArabicPdf","Noto Naskh Arabic",Tahoma,Arial,sans-serif;color:#172e27;background:#fff;direction:rtl;margin:0;font-size:${wide ? 11 : 16}px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}header{display:grid;grid-template-columns:minmax(0,1fr) 74px;grid-template-rows:auto;align-items:center;column-gap:18px;direction:rtl;border:2px solid #174c3f;border-radius:10px;padding:16px 20px;margin-bottom:18px;background:#f5faf7;overflow:visible}header img{grid-column:2;grid-row:1;width:74px;height:74px;object-fit:contain;background:#fff;border:1px solid #b7cdbf;border-radius:8px}header div{grid-column:1;grid-row:1;min-width:0;width:100%;text-align:right;direction:rtl;unicode-bidi:plaintext;overflow:visible}h1,h2,p{max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:normal;unicode-bidi:plaintext}h1{margin:0 0 8px;font-size:25px;line-height:1.35}h2{margin:0 0 5px;font-size:20px;line-height:1.4}p{margin:0;color:#52645b;font-size:14px;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:${wide ? 11 : 16}px}th,td{padding:${wide ? "7px 6px" : "11px 10px"};border:1.5px solid #52645b;text-align:right;vertical-align:middle;overflow-wrap:anywhere;line-height:1.5}th{background:#dfece4;font-size:${wide ? 12 : 17}px;font-weight:800}td:not(:first-child),th:not(:first-child){text-align:center}tr:nth-child(even){background:#f8fbf9}</style></head><body><header><img src="${escapeHtml(storeLogoUrl())}" alt="شعار المتجر"><div><h1>${escapeHtml(storeDisplayName())}</h1><h2>${escapeHtml(title)}</h2><p>من ${escapeHtml(state.reportFrom || "بداية السجل")} إلى ${escapeHtml(state.reportTo || "اليوم")}</p></div></header><table><thead><tr>${(rows[0] || []).map((value) => cell(value, true)).join("")}</tr></thead><tbody>${rows.slice(1).map((row) => `<tr>${row.map((value) => cell(value)).join("")}</tr>`).join("")}</tbody></table></body></html>`; }
-async function downloadReportPdf(type = "summary") { try { const file = await createPdfFileFromHtml({ html: reportPreviewHtml(type), filename: `hesabi-${type}-report-${dateKey()}.pdf`, page: "a4" }); downloadGeneratedFile(file); showToast("تم تصدير التقرير PDF"); } catch (error) { showToast(error.message || "تعذر إنشاء تقرير PDF.", "error"); } }
+async function downloadReportPdf(type = "summary") { try { const file = await createPdfFileFromHtml({ html: reportPreviewHtml(type), filename: `hesabi-${type}-report-${dateKey()}.pdf`, page: "a4" }); await downloadGeneratedFile(file); showToast("تم تصدير التقرير PDF"); } catch (error) { showToast(error.message || "تعذر إنشاء تقرير PDF.", "error"); } }
 async function shareReportPdf(type = "summary") { return shareOrDownloadPdf({ html: reportPreviewHtml(type), filename: `hesabi-${type}-report-${dateKey()}.pdf`, title: reportTitle(type), page: "a4" }); }
 function openReportPreview(type = "summary") {
   const html = reportPreviewHtml(type);
@@ -1669,7 +1684,7 @@ function openReportPreview(type = "summary") {
   overlay.querySelector("[data-preview-print]").addEventListener("click", () => { printHtmlDocument({ html, target: `hesabi-${type}-report` }); showToast("تم إرسال التقرير للطباعة"); });
 }
 
-function downloadReportDoc() { try { downloadGeneratedFile(new File([`\uFEFF${reportExportHtml()}`], `hesabi-report-${dateKey()}.doc`, { type: "application/msword" })); showToast("تم تصدير تقرير DOC"); } catch (error) { showToast(error.message || "تعذر إنشاء تقرير DOC.", "error"); } }
+async function downloadReportDoc() { try { await downloadGeneratedFile(new File([`\uFEFF${reportExportHtml()}`], `hesabi-report-${dateKey()}.doc`, { type: "application/msword" })); showToast("تم تصدير تقرير DOC"); } catch (error) { showToast(error.message || "تعذر إنشاء تقرير DOC.", "error"); } }
 function openReportExportDialog() { const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">التقارير المالية</span><h2>اختر التقرير المطلوب</h2><p class="dialog__subtext">تُنشأ التقارير من بيانات المتجر ونطاق التاريخ الحالي.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="report-export-options"><button class="button button--primary" data-financial-report="cash">تقرير تحليلي شامل لحركة الصندوق</button><button class="button button--secondary" data-financial-report="income">قائمة الدخل</button><button class="button button--secondary" data-financial-report="balance">المركز المالي</button><button class="button button--secondary" data-financial-report="trial">ميزان المراجعة</button><button class="button button--secondary" data-financial-report="customers">ديون العملاء</button><button class="button button--secondary" data-financial-report="suppliers">تقرير الموردين</button><button class="button button--secondary" data-financial-report="expenses">تقرير المصروفات</button><button class="button button--secondary" data-financial-report="inventory">تقرير المخزون</button>${APK_REPORT_TYPES.map(([type, label]) => `<button class="button button--secondary" data-financial-report="${type}">${label}</button>`).join("")}<button class="button button--secondary" data-report-export="pdf">التقرير التشغيلي العام PDF</button><button class="button button--secondary" data-report-export="xlsx">Excel منظم للجداول</button><button class="button button--secondary" data-report-export="csv">CSV للجداول</button></div>`); overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); overlay.querySelectorAll("[data-financial-report]").forEach((button) => button.addEventListener("click", async () => { openReportPreview(button.dataset.financialReport); })); overlay.querySelectorAll("[data-report-export]").forEach((button) => button.addEventListener("click", async () => { if (button.dataset.reportExport === "csv") { downloadReportCsv(); closeDialog(); } else if (button.dataset.reportExport === "xlsx") { downloadReportXlsx(); closeDialog(); } else openReportPreview(); })); }
 
 async function restoreBackupFromFile(event) {
@@ -1801,8 +1816,15 @@ async function openSupplierPaymentDialog(supplierId = "") {
   paymentForm.addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); const payment = await db.registerSupplierPayment({ supplierId: values.supplierId || selectedId, ...values }); await refresh(); closeDialog(); openSupplierPaymentReceipt(payment); } catch (error) { showToast(error.message, "error"); } });
 }
 
+function printPaymentReceiptNatively(overlay, sectionId) {
+  const section = overlay.querySelector(sectionId);
+  if (!section) return;
+  if (!(isNativeAndroid() && getNativeFiles())) { window.print(); return; }
+  const html = `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8" /><title>حسابي — إيصال دفعة</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box}body{font-family:"HesabiArabicPdf","Noto Naskh Arabic",Tahoma,Arial,sans-serif;color:#172e27;background:#fff;direction:rtl;margin:0;font-size:16px}h2{font-size:20px;text-align:center;margin:0 0 14px;color:#174c3f}.payment-receipt{display:grid;gap:0;padding:0 2px;max-width:520px;margin:0 auto}.payment-receipt div{display:flex;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid #d7dcd8;font-size:14px}.payment-receipt span{color:#52645b}.payment-receipt strong{color:#174c3f}</style></head><body><h2>${escapeHtml(storeDisplayName())}</h2><section class="payment-receipt">${section.innerHTML}</section></body></html>`;
+  nativePrintHtml({ html, jobName: "إيصال دفعة" }).then(() => showToast("تم إرسال الإيصال إلى الطباعة.")).catch(() => { window.print(); });
+}
 function openSupplierPaymentReceipt(payment) {
-  const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">إيصال دفعة مورد</span><h2>${escapeHtml(storeDisplayName())}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="supplier-payment-receipt" class="payment-receipt"><div><span>المورد</span><strong>${escapeHtml(payment.supplierName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>طريقة الدفع</span><strong>${escapeHtml(payment.paymentMethod)}</strong></div></section><div class="dialog__actions"><button id="print-supplier-receipt" class="button button--primary">طباعة الإيصال</button></div>`); overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); overlay.querySelector("#print-supplier-receipt").addEventListener("click", () => window.print());
+  const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">إيصال دفعة مورد</span><h2>${escapeHtml(storeDisplayName())}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="supplier-payment-receipt" class="payment-receipt"><div><span>المورد</span><strong>${escapeHtml(payment.supplierName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>طريقة الدفع</span><strong>${escapeHtml(payment.paymentMethod)}</strong></div></section><div class="dialog__actions"><button id="print-supplier-receipt" class="button button--primary">طباعة الإيصال</button></div>`); overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); overlay.querySelector("#print-supplier-receipt").addEventListener("click", () => printPaymentReceiptNatively(overlay, "#supplier-payment-receipt"));
 }
 
 function openCustomerDialog(customer = null) {
@@ -1834,8 +1856,8 @@ async function openCustomerPaymentDialog(customerId) {
 function openPaymentReceipt(payment) {
   const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">إيصال دفعة</span><h2>${escapeHtml(storeDisplayName())}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="payment-receipt" class="payment-receipt"><div><span>العميل</span><strong>${escapeHtml(payment.customerName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>طريقة التحصيل</span><strong>${payment.paymentMethod === "تحويل" ? "تحويل" : "كاش"}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>العملة</span><strong>${escapeHtml(state.settings?.currency || "YER")}</strong></div></section><div class="dialog__actions"><button id="share-receipt" class="button button--secondary">مشاركة الإيصال</button><button id="print-receipt" class="button button--primary">طباعة إيصال</button></div>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
-  overlay.querySelector("#print-receipt").addEventListener("click", () => window.print());
-  overlay.querySelector("#share-receipt").addEventListener("click", async () => { const text = `${storeDisplayName()}\nإيصال دفعة\nالعميل: ${payment.customerName}\nالمبلغ: ${money(payment.amount)}\nالرصيد بعد الدفع: ${money(payment.balanceAfter)}`; try { if (navigator.share) await navigator.share({ title: "إيصال دفعة", text }); else { await copyTextForSharing(text); showToast("تم نسخ الإيصال للمشاركة"); } } catch { showToast("تعذرت مشاركة الإيصال الآن.", "error"); } });
+  overlay.querySelector("#print-receipt").addEventListener("click", () => printPaymentReceiptNatively(overlay, "#payment-receipt"));
+  overlay.querySelector("#share-receipt").addEventListener("click", async () => { const text = `${storeDisplayName()}\nإيصال دفعة\nالعميل: ${payment.customerName}\nالمبلغ: ${money(payment.amount)}\nالرصيد بعد الدفع: ${money(payment.balanceAfter)}`; try { if (isNativeAndroid()) await nativeShareText({ text, title: "إيصال دفعة" }); else if (navigator.share) await navigator.share({ title: "إيصال دفعة", text }); else { await copyTextForSharing(text); showToast("تم نسخ الإيصال للمشاركة"); } } catch { showToast("تعذرت مشاركة الإيصال الآن.", "error"); } });
 }
 
 async function settleStaffSalary(accountId) {
@@ -1926,12 +1948,16 @@ function openPurchaseProductDialog(draft) {
 }
 
 async function shareOrDownloadFile(file, title) {
+  if (isNativeAndroid()) {
+    try { await nativeShareFile({ data: file, filename: file.name, mimeType: file.type || "application/octet-stream", title }); return "shared"; }
+    catch (error) { if (error?.name === "AbortError") throw error; }
+  }
   if (typeof navigator.share === "function") {
     try {
       if (typeof navigator.canShare !== "function" || navigator.canShare({ files: [file] })) { await navigator.share({ title, files: [file] }); return "shared"; }
     } catch (error) { if (error?.name === "AbortError") throw error; }
   }
-  downloadBinaryFile(file, file.name, file.type);
+  await downloadBinaryFile(file, file.name, file.type);
   return "downloaded";
 }
 
@@ -2027,6 +2053,7 @@ function notifyBarcodeRead() {
 }
 
 function hasBarcodeScannerSupport() {
+  if (isNativeAndroid() && getNativeScanner()) return true;
   return "BarcodeDetector" in window && typeof window.BarcodeDetector === "function" && Boolean(navigator.mediaDevices?.getUserMedia);
 }
 
@@ -2161,9 +2188,93 @@ function addScannerCameraAssist(content, session, video) {
   video.addEventListener("click", () => { if (assist.canUseContinuousFocus && !session.manualFocus) applyScannerTrackConstraint(session, { focusMode: "continuous" }); });
 }
 
+async function startNativeScanner(overlay, onDetected, manualMode, onManualEntry, continuous) {
+  const scanner = getNativeScanner();
+  if (!scanner) { renderUnsupportedScanner(overlay, "ماسح الباركود غير مدعوم على هذا الجهاز.", manualMode, onManualEntry); return; }
+  // Status shim: existing onDetected callbacks write into #scanner-status like
+  // the web camera path; we mirror that text onto the native overlay.
+  const content = overlay.querySelector("#scanner-content");
+  if (content && !content.querySelector("#scanner-status")) {
+    content.innerHTML = `<div id="scanner-status" class="scanner-status">${icon("scan", 16)}<span>وجّه الكاميرا نحو الباركود</span></div>`;
+  }
+  const session = { native: true, overlay, continuous, reading: false, listeners: null, manualRequested: false };
+  const setNativeStatus = (message, isError = false) => { try { void scanner.setStatus({ message, isError }); } catch { /* native overlay gone */ } };
+  const mirrorStatus = () => {
+    const status = overlay.querySelector("#scanner-status");
+    const text = status?.textContent?.trim();
+    if (text) setNativeStatus(text, status?.dataset?.tone === "error");
+  };
+  const renderManualForm = () => {
+    if (!manualMode || !content) return;
+    content.innerHTML = `<div id="scanner-status" class="scanner-status">${icon("scan", 16)}<span>الإدخال اليدوي للكود الداخلي</span></div><form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" /><button class="button button--primary" type="submit">ابحث</button></form>`;
+    const form = content.querySelector("#manual-barcode-form");
+    form?.addEventListener("submit", (event) => { event.preventDefault(); findInternalCode(new FormData(event.currentTarget).get("internalCode"), manualMode, { keepScannerOpen: true }); });
+    form?.querySelector("input")?.focus();
+  };
+  const closeNativeAndClear = () => {
+    try { void scanner.closeScanner(); } catch { /* already closed */ }
+    session.listeners?.remove?.();
+    if (state.scanner === session) state.scanner = null;
+  };
+  state.scanner = session;
+  session.listeners = addNativeScannerListeners({
+    onBarcode: async (event) => {
+      const code = String(event?.barcode ?? event?.code ?? "").trim();
+      if (!code || session.reading) return;
+      session.reading = true;
+      let closeAfterRead = true;
+      try { closeAfterRead = await onDetected(code, overlay, { continuous }); }
+      catch (error) {
+        console.warn("تعذر معالجة الباركود الممسوح", error);
+        setNativeStatus("حدث خطأ أثناء معالجة المسح. أعد المحاولة.", true);
+        session.reading = false;
+        return;
+      }
+      if (closeAfterRead === false) {
+        // Continuous mode: keep the native scanner running; mirror the web
+        // status message (added product / stock limit) onto the native view.
+        mirrorStatus();
+        session.reading = false;
+        return;
+      }
+      closeNativeAndClear();
+      closeScannerDialog();
+    },
+    onManualEntry: () => {
+      session.manualRequested = true;
+      try { void scanner.closeScanner(); } catch { /* already closed */ }
+      session.listeners?.remove?.();
+      if (state.scanner === session) state.scanner = null;
+      renderManualForm();
+      if (typeof onManualEntry === "function") { try { onManualEntry(); } catch { /* focus helper unavailable */ } }
+    },
+    onClosed: () => {
+      session.listeners?.remove?.();
+      if (state.scanner === session) state.scanner = null;
+      if (session.manualRequested) return;
+      closeScannerDialog();
+    },
+    onPermissionDenied: () => {
+      session.listeners?.remove?.();
+      if (state.scanner === session) state.scanner = null;
+      closeScannerDialog();
+      showToast("يتكون المسح بباركود فقط بعد إذن الكاميرا. أعد المحاولة بعد منحه.", "error");
+    },
+  });
+  try {
+    await scanner.openScanner({ mode: continuous ? "continuous" : "single", showTorch: true, beep: true, vibrate: true, showManualEntry: Boolean(manualMode) });
+  } catch (error) {
+    session.listeners?.remove?.();
+    if (state.scanner === session) state.scanner = null;
+    closeScannerDialog();
+    renderUnsupportedScanner(overlay, error?.message || "تعذر فتح ماسح الباركود الأصلي.", manualMode, onManualEntry);
+  }
+}
+
 async function startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry = null, continuous = false) {
   if (!hasBarcodeScannerSupport()) { renderUnsupportedScanner(overlay, unsupportedMessage, manualMode, onManualEntry); return; }
   stopScanner();
+  if (isNativeAndroid() && getNativeScanner()) { await startNativeScanner(overlay, onDetected, manualMode, onManualEntry, continuous); return; }
   const content = overlay.querySelector("#scanner-content");
   const retry = overlay.querySelector("#scanner-retry");
   retry.hidden = false;
@@ -2274,6 +2385,7 @@ function openScanner(mode) {
 
 function stopScanner() {
   if (!state.scanner) return;
+  if (state.scanner.native) { try { void getNativeScanner()?.closeScanner?.(); } catch { /* native scanner already closed */ } state.scanner.listeners?.remove?.(); state.scanner = null; return; }
   if (state.scanner.frame) cancelAnimationFrame(state.scanner.frame);
   state.scanner.stream?.getTracks().forEach((track) => track.stop());
   state.scanner = null;

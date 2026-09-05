@@ -15,7 +15,7 @@ test("يتضمن ملف PWA هوية ونطاقًا وأيقونات صالحة 
 test("لا يربط عامل الخدمة تخزينه الابتدائي بمسار خاص بنطاق Manus", async () => {
   const worker = await readFile(new URL("../client/public/service-worker.js", import.meta.url), "utf8");
   const main = await readFile(new URL("../client/src/main.js", import.meta.url), "utf8");
-  assert.match(worker, /hesabi-pwa-v25/);
+  assert.match(worker, /hesabi-pwa-v28/);
   assert.doesNotMatch(worker, /https:\/\/hesabipwa-2r9mmdzn\.manus\.space/);
   assert.match(worker, /event\.request\.mode === "navigate"/);
   assert.match(worker, /fetch\(event\.request\)/);
@@ -33,7 +33,7 @@ test("لا يربط عامل الخدمة تخزينه الابتدائي بمس
 
 test("يستمر التطبيق محليًا بعد أول تحميل عبر كاش الواجهة والأصول", async () => {
   const worker = await readFile(new URL("../client/public/service-worker.js", import.meta.url), "utf8");
-  assert.match(worker, /const APP_SHELL = \[SCOPE_PATH, `\$\{SCOPE_PATH\}manifest\.json`, `\$\{SCOPE_PATH\}service-worker\.js`\]/);
+  assert.match(worker, /const APP_SHELL = \[SCOPE_PATH, `\$\{SCOPE_PATH\}manifest\.json`, `\$\{SCOPE_PATH\}service-worker\.js`, `\$\{SCOPE_PATH\}fonts\/NotoNaskhArabic-Regular\.ttf`/);
   assert.match(worker, /pendingUrls\.push\(\.\.\.discoveredUrls/);
   assert.match(worker, /if \(event\.request\.mode === "navigate"\)/);
   assert.match(worker, /fetch\(event\.request, \{ cache: "no-store" \}\)/);

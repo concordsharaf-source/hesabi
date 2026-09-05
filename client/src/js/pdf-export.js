@@ -1,8 +1,9 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
+import { isNativeAndroid, nativePrintHtml, nativeSaveFile, nativeShareFile } from "./native-bridge.js";
 
-const PDF_ARABIC_FONT_URL = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage/NotoNaskhArabic-Regular_2c8d8205.ttf";
+const PDF_ARABIC_FONT_URL = "/fonts/NotoNaskhArabic-Regular.ttf";
 const toNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 let canvasArabicFontPromise;
 const waitWithTimeout = (promise, timeout = 3_000) => Promise.race([promise, new Promise((resolve) => window.setTimeout(resolve, timeout))]);
@@ -60,6 +61,15 @@ function canSharePdfFile(file) {
 }
 
 async function fileOrDownload(file, title) {
+  if (isNativeAndroid()) {
+    try {
+      await nativeShareFile({ data: file, filename: file.name, mimeType: file.type || "application/pdf", title });
+      return "shared";
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      try { await nativeSaveFile({ data: file, filename: file.name, mimeType: file.type || "application/pdf" }); return "downloaded"; } catch { /* falls back to the web path below */ }
+    }
+  }
   if (canSharePdfFile(file)) {
     try {
       await navigator.share({ title, files: [file] });
@@ -939,6 +949,25 @@ export async function shareOrDownloadPurchaseInvoicePdf(options) { return fileOr
 export async function shareOrDownloadCustomerAccountPdf(options) { return fileOrDownload(await createCustomerAccountPdfFile(options), options.title); }
 
 export function printHtmlDocument({ html, target, features }) {
+  if (isNativeAndroid()) {
+    void (async () => {
+      try {
+        let payload = html;
+        const assetUrls = [...new Set([...html.matchAll(/(?:src|href)\s*=\s*["'](\/[^"']+)["']/g)].map((match) => match[1]))];
+        const dataUrls = await Promise.all(assetUrls.map(async (url) => {
+          try {
+            const response = await fetch(url);
+            if (!response.ok) return "";
+            const blob = await response.blob();
+            return await new Promise((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "")); reader.onerror = () => resolve(""); reader.readAsDataURL(blob); });
+          } catch { return ""; }
+        }));
+        assetUrls.forEach((url, index) => { if (dataUrls[index]) payload = payload.replaceAll(`"${url}"`, `"${dataUrls[index]}"`).replaceAll(`'${url}'`, `'${dataUrls[index]}'`); });
+        await nativePrintHtml({ html: payload, jobName: target || "حسابي" });
+      } catch (error) { console.warn("native print unavailable", error); }
+    })();
+    return true;
+  }
   if (window.__TAURI_INTERNALS__ || window.__TAURI__) {
     const frame = document.createElement("iframe");
     frame.title = target || "print";

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -37,5 +38,25 @@
 
     <!-- Permissions -->
 
+    <!-- Network access for the app shell and optional cloud backup -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Barcode scanner (CameraX + ML Kit) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.flash" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+
+    <!-- Contact picker (system picker) and contact data read -->
+    <uses-permission android:name="android.permission.READ_CONTACTS" />
+
+    <!-- Scan feedback vibration -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Legacy Downloads saving on Android 9 and older -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28"
+        tools:ignore="ScopedStorage"
+        xmlns:tools="http://schemas.android.com/tools" />
 </manifest>
