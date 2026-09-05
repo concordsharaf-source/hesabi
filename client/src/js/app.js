@@ -1583,10 +1583,15 @@ function reportCellNumber(value) {
   return Number.isFinite(number) ? number : null;
 }
 function isMoneyReportHeader(header) {
-  return /مبلغ|القيمة|المبلغ|الرصيد|المستحق|التكلفة|المبيعات|المشتريات|المصروف|الربح|الإيراد|الأصول|الخصوم|الالتزامات|النقد|الصندوق|مدين|دائن|قيمة|إجمالي|صافي/.test(String(header || ""));
+  return /مبلغ|القيمة|المبلغ|الرصيد|المستحق|التكلفة|المبيعات|المشتريات|المصروف|الربح|الإيراد|الأصول|الخصوم|الالتزامات|النقد|الصندوق|مدين|دائن|قيمة|إجمالي|صافي|سعر|تكلفة|دخل|دفع|تحصيل/.test(String(header || ""));
 }
-function isNonTotalReportHeader(header) {
-  return /باركود|تاريخ|الهاتف|رقم|فاتورة|الفواتير|عدد|كمية|الكمية|وحدة|البيان|العميل|المورد|المنتج|الحساب|نوع|اسم/.test(String(header || ""));
+function isNonSummableReportHeader(header) {
+  const text = String(header || "").trim();
+  return /باركود|تاريخ|وقت|الهاتف|جوال|رقم\s*(?:الفاتورة|المستند|المرجع|الحساب|العميل|المورد)|الفاتورة\s*رقم|المعرف|معرف|كود|رمز|تسلسل|سيريال|سنة|شهر|نسبة|الكمية\s*المباعة|عدد\s*الفواتير/.test(text);
+}
+function reportTotalValue(header, value) {
+  if (isNonSummableReportHeader(header)) return null;
+  return reportCellNumber(value);
 }
 function ensureReportTotal(rows) {
   if (!Array.isArray(rows) || rows.length < 2) return rows;
@@ -1597,15 +1602,14 @@ function ensureReportTotal(rows) {
   const found = Array(totals.length).fill(false);
   rows.slice(1).forEach((row) => {
     const label = row.map((value) => String(value ?? "")).join(" ");
-    if (/الإجمالي|المجموع|الرصيد الختامي|حقوق الملكية/.test(label)) return;
+    if (/^\s*الإجمالي\s*$|المجموع|الرصيد الختامي|حقوق الملكية/.test(label)) return;
     row.slice(1).forEach((value, index) => {
       const header = headers[index + 1];
-      if (!isMoneyReportHeader(header) || isNonTotalReportHeader(header)) return;
-      const number = reportCellNumber(value);
+      const number = reportTotalValue(header, value);
       if (number !== null) { totals[index] += number; found[index] = true; }
     });
   });
-  return [...rows, ["الإجمالي", ...totals.map((value, index) => found[index] ? money(value) : "")]];
+  return [...rows, ["الإجمالي", ...totals.map((value, index) => found[index] ? (isMoneyReportHeader(headers[index + 1]) ? money(value) : amount(value)) : "")]];
 }
 function financialReportRows(type = "summary") { return ensureReportTotal(financialReportRowsRaw(type)); }
 function financialReportRowsRaw(type = "summary") {
