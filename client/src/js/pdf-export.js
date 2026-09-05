@@ -25,7 +25,14 @@ function createPdfStage(html, page) {
   stage.lang = parsed.documentElement.lang || "ar";
   stage.dataset.pdfStage = "true";
   stage.style.cssText = `position:fixed;top:0;left:0;width:${page === "thermal" ? "80mm" : "210mm"};min-height:20mm;padding:0;background:#fff;color:#111;z-index:2147483647;pointer-events:none;overflow:visible;`;
-  stage.innerHTML = `${[...parsed.head.querySelectorAll("style")].map((style) => style.outerHTML).join("")}${parsed.body.innerHTML}`;
+  const printStyles = [...parsed.head.querySelectorAll("style")].map((style) => style.outerHTML).join("");
+  const pdfSafetyStyles = `<style data-pdf-safety>
+    @font-face{font-family:"HesabiArabicPdf";src:url("${PDF_ARABIC_FONT_URL}") format("truetype");font-style:normal;font-weight:100 900;font-display:block}
+    [data-pdf-stage], [data-pdf-stage] *{box-sizing:border-box}
+    [data-pdf-stage] table{table-layout:fixed;max-width:100%}
+    [data-pdf-stage] th,[data-pdf-stage] td{overflow-wrap:anywhere;word-break:break-word;white-space:normal;line-height:1.55!important;vertical-align:middle}
+  </style>`;
+  stage.innerHTML = `${printStyles}${pdfSafetyStyles}${parsed.body.innerHTML}`;
   document.body.appendChild(stage);
   return stage;
 }
@@ -862,6 +869,7 @@ function createA4PdfFromCanvas(canvas, orientation = "portrait") {
 }
 
 export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
+  await loadCanvasArabicFont();
   const stage = createPdfStage(html, page);
   try {
     await waitForPdfStage(stage);
