@@ -1582,16 +1582,29 @@ function reportCellNumber(value) {
   const number = Number(normalized);
   return Number.isFinite(number) ? number : null;
 }
+function isMoneyReportHeader(header) {
+  return /مبلغ|القيمة|المبلغ|الرصيد|المستحق|التكلفة|المبيعات|المشتريات|المصروف|الربح|الإيراد|الأصول|الخصوم|الالتزامات|النقد|الصندوق|مدين|دائن|قيمة|إجمالي|صافي/.test(String(header || ""));
+}
+function isNonTotalReportHeader(header) {
+  return /باركود|تاريخ|الهاتف|رقم|فاتورة|الفواتير|عدد|كمية|الكمية|وحدة|البيان|العميل|المورد|المنتج|الحساب|نوع|اسم/.test(String(header || ""));
+}
 function ensureReportTotal(rows) {
   if (!Array.isArray(rows) || rows.length < 2) return rows;
   const last = rows[rows.length - 1] || [];
   if (String(last[0] ?? "").trim() === "الإجمالي") return rows;
-  const totals = Array(Math.max(0, (rows[0]?.length || 1) - 1)).fill(0);
+  const headers = rows[0] || [];
+  const totals = Array(Math.max(0, headers.length - 1)).fill(0);
   const found = Array(totals.length).fill(false);
-  rows.slice(1).forEach((row) => row.slice(1).forEach((value, index) => {
-    const number = reportCellNumber(value);
-    if (number !== null) { totals[index] += number; found[index] = true; }
-  }));
+  rows.slice(1).forEach((row) => {
+    const label = row.map((value) => String(value ?? "")).join(" ");
+    if (/الإجمالي|المجموع|الرصيد الختامي|حقوق الملكية/.test(label)) return;
+    row.slice(1).forEach((value, index) => {
+      const header = headers[index + 1];
+      if (!isMoneyReportHeader(header) || isNonTotalReportHeader(header)) return;
+      const number = reportCellNumber(value);
+      if (number !== null) { totals[index] += number; found[index] = true; }
+    });
+  });
   return [...rows, ["الإجمالي", ...totals.map((value, index) => found[index] ? money(value) : "")]];
 }
 function financialReportRows(type = "summary") { return ensureReportTotal(financialReportRowsRaw(type)); }

@@ -29,8 +29,6 @@ function createPdfStage(html, page) {
   const pdfSafetyStyles = `<style data-pdf-safety>
     @font-face{font-family:"HesabiArabicPdf";src:url("${PDF_ARABIC_FONT_URL}") format("truetype");font-style:normal;font-weight:100 900;font-display:block}
     [data-pdf-stage], [data-pdf-stage] *{box-sizing:border-box}
-    [data-pdf-stage] table{table-layout:fixed;max-width:100%}
-    [data-pdf-stage] th,[data-pdf-stage] td{overflow-wrap:anywhere;word-break:break-word;white-space:normal;line-height:1.55!important;vertical-align:middle}
   </style>`;
   stage.innerHTML = `${printStyles}${pdfSafetyStyles}${parsed.body.innerHTML}`;
   document.body.appendChild(stage);
