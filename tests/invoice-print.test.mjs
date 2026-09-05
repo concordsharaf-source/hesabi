@@ -676,6 +676,9 @@ test("يحوّل PDF الفاتورة من قالب الطباعة الحرار�
   assert.match(pdfExport, /import \{ renderThermalInvoiceHtml \} from "\.\/invoice-print\.js"/);
   assert.match(pdfExport, /renderThermalInvoiceHtml\(\{ invoice, customer, storeName, logoDataUrl/);
   assert.match(pdfExport, /return createPdfFileFromHtml\(\{ html, filename, page: "thermal" \}\)/);
+  assert.match(pdfExport, /dataset\.pdfOrientation = isLandscape \? "landscape" : "portrait"/);
+  assert.match(pdfExport, /width:\$\{isThermal \? "80mm" : isLandscape \? "297mm" : "210mm"\}/);
+  assert.match(pdfExport, /orientation: isLandscape \? "landscape" : "portrait"/);
 });
 
 test("يثبت أزرار معاينة التقرير ويجعل الجدول وحده قابلًا للتمرير", async () => {
