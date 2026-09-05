@@ -902,7 +902,8 @@ export async function createPurchaseInvoicePdfFile({ purchase, supplier, storeNa
   return new File([blob], filename, { type: "application/pdf" });
 }
 
-export async function createCustomerAccountPdfFile({ account, storeName, storeInfo, logoDataUrl, formatMoney, formatDateTime, filename }) {
+export async function createCustomerAccountPdfFile({ account, storeName, storeInfo, logoDataUrl, formatMoney, formatDateTime, filename, html }) {
+  if (html) return createPdfFileFromHtml({ html, filename, page: "a4" });
   await loadCanvasArabicFont();
   const logoImage = await loadStoreLogoImage(logoDataUrl);
   const pdf = createA4PdfFromCanvas(drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, formatMoney, formatDateTime }));

@@ -1698,7 +1698,7 @@ async function shareInvoice(invoice) {
   try {
     const customer = invoice.customerId ? state.customers.find((entry) => entry.id === invoice.customerId) || await db.getCustomer(invoice.customerId) : null;
     const invoiceWithCustomer = customer && !invoice.customerName ? { ...invoice, customerName: customer.name } : invoice;
-    const result = await shareOrDownloadInvoicePdf({ invoice: invoiceWithCustomer, customer, storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, paymentLabel: paymentChannelLabel(invoiceWithCustomer), filename: `${invoice.invoiceNumber}.pdf`, title: `فاتورة ${invoice.invoiceNumber}` });
+    const result = await shareOrDownloadInvoicePdf({ invoice: invoiceWithCustomer, customer, html: await thermalInvoiceHtml(invoiceWithCustomer), storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, paymentLabel: paymentChannelLabel(invoiceWithCustomer), filename: `${invoice.invoiceNumber}.pdf`, title: `فاتورة ${invoice.invoiceNumber}` });
     showToast(result === "shared" ? "تمت مشاركة ملف الفاتورة PDF" : "تم تنزيل ملف الفاتورة PDF للمشاركة");
   } catch (error) { if (error?.name !== "AbortError") showToast("تعذر إنشاء ملف PDF للفواتير الآن.", "error"); }
 }
@@ -1765,7 +1765,7 @@ async function openCustomerAccountDialog(customerId) {
   overlay.querySelector("#record-customer-payment")?.addEventListener("click", () => { closeDialog(); openCustomerPaymentDialog(account.customer.id); });
   const accountHtml = () => renderCustomerAccountHtml({ account: printAccount, storeName: storeDisplayName(), formatMoney: money, formatDateTime: dateTime, escapeHtml });
   overlay.querySelector("#print-customer-account").addEventListener("click", () => { if (!printHtmlDocument({ html: accountHtml(), target: "hesabi-customer-account", features: "width=900,height=760" })) showToast("السماح بالنوافذ المنبثقة مطلوب للطباعة.", "error"); });
-  overlay.querySelector("#share-customer-account").addEventListener("click", async () => { try { const result = await shareOrDownloadCustomerAccountPdf({ account: printAccount, storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatDateTime: dateTime, filename: `كشف-حساب-${account.customer.name}.pdf`, title: `كشف حساب ${account.customer.name}` }); showToast(result === "shared" ? "تمت مشاركة كشف الحساب PDF" : "تم تنزيل كشف الحساب PDF للمشاركة"); } catch (error) { if (error?.name !== "AbortError") showToast("تعذر إنشاء PDF لكشف الحساب.", "error"); } });
+  overlay.querySelector("#share-customer-account").addEventListener("click", async () => { try { const result = await shareOrDownloadCustomerAccountPdf({ account: printAccount, html: accountHtml(), storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatDateTime: dateTime, filename: `كشف-حساب-${account.customer.name}.pdf`, title: `كشف حساب ${account.customer.name}` }); showToast(result === "shared" ? "تمت مشاركة كشف الحساب PDF" : "تم تنزيل كشف الحساب PDF للمشاركة"); } catch (error) { if (error?.name !== "AbortError") showToast("تعذر إنشاء PDF لكشف الحساب.", "error"); } });
 }
 
 async function openCustomerPaymentDialog(customerId) {
