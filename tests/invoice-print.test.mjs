@@ -672,13 +672,20 @@ test("توحد بيانات الفاتورة في التفاصيل والطبا�
 });
 
 test("يحوّل PDF الفاتورة من قالب الطباعة الحرارية نفسه", async () => {
-  const pdfExport = await readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8");
+  const [pdfExport, app] = await Promise.all([
+    readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+  ]);
   assert.match(pdfExport, /import \{ renderThermalInvoiceHtml \} from "\.\/invoice-print\.js"/);
   assert.match(pdfExport, /renderThermalInvoiceHtml\(\{ invoice, customer, storeName, logoDataUrl/);
   assert.match(pdfExport, /return createPdfFileFromHtml\(\{ html, filename, page: "thermal" \}\)/);
   assert.match(pdfExport, /dataset\.pdfOrientation = isLandscape \? "landscape" : "portrait"/);
   assert.match(pdfExport, /width:\$\{isThermal \? "80mm" : isLandscape \? "297mm" : "210mm"\}/);
   assert.match(pdfExport, /orientation: isLandscape \? "landscape" : "portrait"/);
+  assert.match(app, /font-family:\"HesabiArabicPdf\",\"Noto Naskh Arabic\",Tahoma,Arial,sans-serif/);
+  assert.match(app, /grid-template-columns:minmax\(0,1fr\) 74px/);
+  assert.match(app, /unicode-bidi:plaintext/);
+  assert.match(app, /overflow-wrap:anywhere/);
 });
 
 test("يثبت أزرار معاينة التقرير ويجعل الجدول وحده قابلًا للتمرير", async () => {
