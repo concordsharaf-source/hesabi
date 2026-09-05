@@ -1574,7 +1574,28 @@ function openPairingRedeemDialog() {
 }
 
 function reportDateInRange(value, from = "", to = "") { const key = dateKey(value); return (!from || key >= from) && (!to || key <= to); }
-function financialReportRows(type = "summary") {
+function reportCellNumber(value) {
+  const text = String(value ?? "").trim();
+  if (!text || /[/:]/.test(text)) return null;
+  const normalized = text.replace(/,/g, "").replace(/[^\d.-]/g, "");
+  if (!normalized || normalized === "-" || normalized === ".") return null;
+  const number = Number(normalized);
+  return Number.isFinite(number) ? number : null;
+}
+function ensureReportTotal(rows) {
+  if (!Array.isArray(rows) || rows.length < 2) return rows;
+  const last = rows[rows.length - 1] || [];
+  if (String(last[0] ?? "").trim() === "الإجمالي") return rows;
+  const totals = Array(Math.max(0, (rows[0]?.length || 1) - 1)).fill(0);
+  const found = Array(totals.length).fill(false);
+  rows.slice(1).forEach((row) => row.slice(1).forEach((value, index) => {
+    const number = reportCellNumber(value);
+    if (number !== null) { totals[index] += number; found[index] = true; }
+  }));
+  return [...rows, ["الإجمالي", ...totals.map((value, index) => found[index] ? money(value) : "")]];
+}
+function financialReportRows(type = "summary") { return ensureReportTotal(financialReportRowsRaw(type)); }
+function financialReportRowsRaw(type = "summary") {
   const apkRows = getApkReportRows(type, state, { amount, money, dateTime, stockStatus });
   if (apkRows) return apkRows;
   const data = state.analytics || { sales: {}, purchases: {}, expenses: {}, profit: {} };
