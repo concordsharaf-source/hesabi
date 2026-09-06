@@ -12,6 +12,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.media.AudioManager;
 import android.media.ToneGenerator;
 import android.os.Build;
+import android.os.Looper;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.TypedValue;
@@ -527,11 +528,32 @@ public class HesabiScannerPlugin extends Plugin {
 
     @PluginMethod
     public void closeScanner(PluginCall call) {
+        if (!scannerOpen) {
+            // Idempotent: closing an already-closed scanner must never crash.
+            call.resolve();
+            return;
+        }
         closeScannerUi("closed-from-web");
         call.resolve();
     }
 
     private void closeScannerUi(String reason) {
+        AppCompatActivity activity = getActivity();
+        if (activity == null) {
+            releaseCameraQuietly();
+            return;
+        }
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            // Plugin methods run on the Capacitor bridge thread; Android views
+            // and CameraX unbind MUST run on the main/UI thread or the app
+            // crashes (CalledFromWrongThreadException / CameraX assertion).
+            activity.runOnUiThread(() -> closeScannerUi(reason));
+            return;
+        }
+        if (!scannerOpen) {
+            // Already closed (or teardown already ran): never emit or rebuild.
+            return;
+        }
         notifyListeners("scannerClosed", new JSObject().put("reason", reason));
         releaseCameraQuietly();
         dismissScannerUi();

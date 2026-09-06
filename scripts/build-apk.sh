@@ -17,8 +17,8 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
 # Locate toolchain: prefer /opt installs, fall back to system tools
-detect_java() { for d in /opt/jdk "$JAVA_HOME" /usr/lib/jvm/*; do [[ -x "$d/bin/java" ]] && echo "$d" && return; done; }
-detect_android() { for d in /opt/android-sdk "$ANDROID_HOME" "$HOME/Android/Sdk" /usr/local/android-sdk; do [[ -d "$d/platforms" ]] && echo "$d" && return; done; }
+detect_java() { for d in /opt/jdk "${JAVA_HOME:-}" /usr/lib/jvm/*; do [[ -x "$d/bin/java" ]] && echo "$d" && return; done; }
+detect_android() { for d in /opt/android-sdk "${ANDROID_HOME:-}" "$HOME/Android/Sdk" /usr/local/android-sdk; do [[ -d "$d/platforms" ]] && echo "$d" && return; done; }
 detect_node() { for d in /opt/node22 "$(dirname "$(dirname "$(command -v node)")")"; do "$d/bin/node" --version 2>/dev/null | grep -qE "v(2[2-9]|[3-9][0-9])" && echo "$d" && return; done; }
 
 JAVA_HOME="$(detect_java)"
