@@ -509,6 +509,18 @@ test("يخفي نموذج التسجيل حتى الضغط على تسجيل ج�
   assert.match(app, /button\.hidden = true/);
   assert.match(styles, /\[hidden\] \{ display:none !important; \}/);
 });
+test("يلون خانة الرصيد المستحق بالقرمزي في حساب العميل والمورد لوضوح النص", async () => {
+  const [app, styles] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /<div class="account-summary__balance"><span>الرصيد المستحق<\/span>/);
+  assert.match(app, /<div class="account-summary__balance"><span>المستحق للمورد<\/span>/);
+  assert.match(styles, /\.account-summary__balance \{ color:#fff !important; background:linear-gradient\(145deg,#c42a47,#84132b\) !important; border-color:#f28a9c !important; \}/);
+  assert.match(styles, /\.account-summary__balance span,\.account-summary__balance strong \{ color:#fff !important; \}/);
+  assert.match(styles, /\[data-theme="dark"\] \.account-summary__balance \{ border-color:#ff9eb0 !important; \}/);
+  assert.doesNotMatch(styles, /\.account-summary__balance \{[^}]*var\(--green\)[^}]*\}/);
+});
 test("يعرض الماسح أدوات مساعدة للكاميرا الضعيفة ويخفف تكرار تحليل الإطارات", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
