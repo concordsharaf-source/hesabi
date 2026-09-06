@@ -4,17 +4,22 @@ import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { isNativeAndroid, nativePrintHtml, nativeSaveFile, nativeShareFile } from "./native-bridge.js";
 
 const PDF_ARABIC_FONT_URL = "/fonts/NotoNaskhArabic-Regular.ttf";
+const PDF_ARABIC_BOLD_FONT_URL = "/fonts/NotoNaskhArabic-Bold.ttf";
 const toNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
 let canvasArabicFontPromise;
 const waitWithTimeout = (promise, timeout = 3_000) => Promise.race([promise, new Promise((resolve) => window.setTimeout(resolve, timeout))]);
 
 async function loadCanvasArabicFont() {
   if (!canvasArabicFontPromise) {
-    const loadFont = new FontFace("HesabiArabicPdf", `url(${PDF_ARABIC_FONT_URL})`, { style: "normal", weight: "100 900", display: "block" }).load().then((font) => {
-      document.fonts.add(font);
-      return font;
-    }).catch(() => null);
-    canvasArabicFontPromise = waitWithTimeout(loadFont);
+    // Load BOTH weights: the single bundled TTF is Regular (400) only, while
+    // the luxury canvas styles request 500/600/700. Without a real Bold face
+    // the browser synthesized bold by smearing glyphs, which visually
+    // overlapped Arabic letters. A distinct family name for Bold lets
+    // `font-weight:600/700` resolve to the real (non-synthetic) face.
+    const regular = new FontFace("HesabiArabicPdf", `url(${PDF_ARABIC_FONT_URL})`, { style: "normal", weight: "100 500", display: "block" }).load().then((font) => { document.fonts.add(font); return font; }).catch(() => null);
+    const boldSameFamily = new FontFace("HesabiArabicPdf", `url(${PDF_ARABIC_BOLD_FONT_URL})`, { style: "normal", weight: "600 900", display: "block" }).load().then((font) => { document.fonts.add(font); return font; }).catch(() => null);
+    const boldAlias = new FontFace("HesabiArabicPdfBold", `url(${PDF_ARABIC_BOLD_FONT_URL})`, { style: "normal", weight: "600 900", display: "block" }).load().then((font) => { document.fonts.add(font); return font; }).catch(() => null);
+    canvasArabicFontPromise = waitWithTimeout(Promise.all([regular, boldSameFamily, boldAlias]));
   }
   return canvasArabicFontPromise;
 }
@@ -31,7 +36,9 @@ function createPdfStage(html, page) {
   stage.style.cssText = `position:fixed;top:0;left:0;width:${isThermal ? "80mm" : isLandscape ? "297mm" : "210mm"};min-height:20mm;padding:0;background:#fff;color:#111;z-index:2147483647;pointer-events:none;overflow:visible;`;
   const printStyles = [...parsed.head.querySelectorAll("style")].map((style) => style.outerHTML).join("");
   const pdfSafetyStyles = `<style data-pdf-safety>
-    @font-face{font-family:"HesabiArabicPdf";src:url("${PDF_ARABIC_FONT_URL}") format("truetype");font-style:normal;font-weight:100 900;font-display:block}
+    @font-face{font-family:"HesabiArabicPdf";src:url("${PDF_ARABIC_FONT_URL}") format("truetype");font-style:normal;font-weight:100 500;font-display:block}
+    @font-face{font-family:"HesabiArabicPdf";src:url("${PDF_ARABIC_BOLD_FONT_URL}") format("truetype");font-style:normal;font-weight:600 900;font-display:block}
+    @font-face{font-family:"HesabiArabicPdfBold";src:url("${PDF_ARABIC_BOLD_FONT_URL}") format("truetype");font-style:normal;font-weight:600 900;font-display:block}
     [data-pdf-stage], [data-pdf-stage] *{box-sizing:border-box}
   </style>`;
   stage.innerHTML = `${printStyles}${pdfSafetyStyles}${parsed.body.innerHTML}`;
@@ -123,6 +130,11 @@ const PDF_FOOTER_TITLE = "تم إصدار هذه الفاتورة من حساب�
 const PDF_FOOTER_DESIGN = "تصميم شرف غالب قحطان · الجمهورية اليمنية · +967770388100";
 const PDF_FOOTER_EMAIL = "concordsharaf@gmail.com";
 
+// Canvas cannot resolve `font-weight` across two @font-face families; route
+// heavy weights (>=600) to the real Bold face explicitly.
+const pdfFontStack = (weight, extra = "\"Noto Naskh Arabic\", ") =>
+  `${weight >= 600 ? "\"HesabiArabicPdfBold\", " : "\"HesabiArabicPdf\", "}${extra}Tahoma, Arial, sans-serif`;
+
 function drawStoreDetails(context, { storeInfo = {}, right, top, width = 210 * 12 }) {
   const details = [
     storeInfo.storePhone ? `هاتف: ${storeInfo.storePhone}` : "",
@@ -133,8 +145,19 @@ function drawStoreDetails(context, { storeInfo = {}, right, top, width = 210 * 1
   if (!details.length) return;
   context.save();
   context.direction = "rtl"; context.textAlign = "right"; context.textBaseline = "middle"; context.fillStyle = LUXURY_COLORS.textMuted;
-  context.font = '600 22px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
-  details.slice(0, 4).forEach((value, index) => context.fillText(value, right, top + index * 8 * 12, width - 30 * 12));
+  context.font = `600 22px ${pdfFontStack(600, "")}`;
+  // Measure and truncate with an ellipsis instead of fillText's maxWidth
+  // parameter, which horizontally SQUEEZES Arabic letters into each other.
+  const maxWidth = width - 30 * 12;
+  details.slice(0, 4).forEach((value, index) => {
+    let output = String(value);
+    if (context.measureText(output).width > maxWidth) {
+      const suffix = "…";
+      while (output.length > 1 && context.measureText(output + suffix).width > maxWidth) output = output.slice(0, -1);
+      output += suffix;
+    }
+    context.fillText(output, right, top + index * 8 * 12);
+  });
   context.restore();
 }
 
@@ -154,13 +177,13 @@ function drawPdfFooter(context, { center, width, height, y = height - 22 * 12 })
 
   context.direction = "rtl"; context.textAlign = "center"; context.textBaseline = "middle";
   context.fillStyle = LUXURY_COLORS.primary;
-  context.font = '700 26px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
+  context.font = `700 26px ${pdfFontStack(700, "")}`;
   context.fillText(PDF_FOOTER_TITLE, center, footerY - 7 * 12);
   context.fillStyle = LUXURY_COLORS.textMuted;
-  context.font = '500 20px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
+  context.font = `500 20px ${pdfFontStack(500, "")}`;
   context.fillText(PDF_FOOTER_DESIGN, center, footerY);
   context.direction = "ltr";
-  context.font = '500 18px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
+  context.font = `500 18px ${pdfFontStack(500, "")}`;
   context.fillText(PDF_FOOTER_EMAIL, center, footerY + 6 * 12);
   context.restore();
 }
@@ -183,7 +206,11 @@ function drawLuxuryText(context, value, x, y, options = {}) {
   context.direction = direction;
   context.textAlign = align;
   context.textBaseline = "middle";
-  context.font = `${weight} ${size}px ${fontFamily}`;
+  // Route >=600 weights to the real Bold face (avoids synthetic-bold smearing).
+  const effectiveFamily = weight >= 600
+    ? fontFamily.replace(/"HesabiArabicPdf"/, '"HesabiArabicPdfBold"')
+    : fontFamily;
+  context.font = `${weight} ${size}px ${effectiveFamily}`;
   context.fillStyle = color;
 
   let output = String(value ?? "");
@@ -501,7 +528,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
 
     // اسم الصنف مع التفاف
     context.save();
-    context.font = `700 ${Math.round(26 * fontScale / 3)}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
+    context.font = `700 ${Math.round(26 * fontScale / 3)}px ${pdfFontStack(700)}`;
     const itemNameRows = wrapped(item.productName || "", right - 5 * mm, y + 8 * mm, 62 * mm, { size: 26, weight: 700, maxRows: 2 });
     context.restore();
 
@@ -524,7 +551,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
     ].filter(Boolean).join(" · ");
 
     if (purchaseDetails) { 
-      context.font = `400 ${Math.round(22 * fontScale / 3)}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; 
+      context.font = `400 ${Math.round(22 * fontScale / 3)}px ${pdfFontStack(400)}`; 
       wrapped(purchaseDetails, right - 5 * mm, detailY, right - left - 10 * mm, { size: 22, maxRows: 2, lineHeight: 8 * mm, color: LUXURY_COLORS.textMuted }); 
     }
 
@@ -585,7 +612,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
   if (purchase.notes) { 
     text("ملاحظات", right, y, "right", 28, 700, "rtl", LUXURY_COLORS.primary); 
     y += 8 * mm; 
-    context.font = `400 ${Math.round(24 * fontScale / 3)}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`; 
+    context.font = `400 ${Math.round(24 * fontScale / 3)}px ${pdfFontStack(400)}`; 
     wrapped(purchase.notes, right, y, right - left, { size: 24, maxRows: 3, lineHeight: 8 * mm, color: LUXURY_COLORS.textMuted }); 
     y += 24 * mm; 
   }
@@ -953,7 +980,7 @@ export function printHtmlDocument({ html, target, features }) {
     void (async () => {
       try {
         let payload = html;
-        const assetUrls = [...new Set([...html.matchAll(/(?:src|href)\s*=\s*["'](\/[^"']+)["']/g)].map((match) => match[1]))];
+        const assetUrls = [...new Set([...html.matchAll(/(?:src|href)\s*=\s*["'](\/[^"']+)["']|url\(\s*["']?(\/[^"')\s]+)["']?\s*\)/g)].map((match) => match[1] || match[2]))];
         const dataUrls = await Promise.all(assetUrls.map(async (url) => {
           try {
             const response = await fetch(url);
@@ -962,7 +989,7 @@ export function printHtmlDocument({ html, target, features }) {
             return await new Promise((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result || "")); reader.onerror = () => resolve(""); reader.readAsDataURL(blob); });
           } catch { return ""; }
         }));
-        assetUrls.forEach((url, index) => { if (dataUrls[index]) payload = payload.replaceAll(`"${url}"`, `"${dataUrls[index]}"`).replaceAll(`'${url}'`, `'${dataUrls[index]}'`); });
+        assetUrls.forEach((url, index) => { if (dataUrls[index]) payload = payload.replaceAll(`"${url}"`, `"${dataUrls[index]}"`).replaceAll(`'${url}'`, `'${dataUrls[index]}'`).replaceAll(`url(${url})`, `url(${dataUrls[index]})`); });
         await nativePrintHtml({ html: payload, jobName: target || "حسابي" });
       } catch (error) { console.warn("native print unavailable", error); }
     })();

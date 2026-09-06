@@ -1,6 +1,6 @@
-const CACHE_NAME = "hesabi-pwa-v28";
+const CACHE_NAME = "hesabi-pwa-v29";
 const SCOPE_PATH = new URL(self.registration.scope).pathname;
-const APP_SHELL = [SCOPE_PATH, `${SCOPE_PATH}manifest.json`, `${SCOPE_PATH}service-worker.js`, `${SCOPE_PATH}fonts/NotoNaskhArabic-Regular.ttf`, `${SCOPE_PATH}images/hesabi-mark_5cb0429a.png`, `${SCOPE_PATH}images/hesabi-empty-inventory_96623fe2.png`, `${SCOPE_PATH}images/hesabi-setup-ledger_a7b0fae4.png`];
+const APP_SHELL = [SCOPE_PATH, `${SCOPE_PATH}manifest.json`, `${SCOPE_PATH}service-worker.js`, `${SCOPE_PATH}fonts/NotoNaskhArabic-Regular.ttf`, `${SCOPE_PATH}fonts/NotoNaskhArabic-Bold.ttf`, `${SCOPE_PATH}fonts/cairo.css`, `${SCOPE_PATH}fonts/cairo-arabic.woff2`, `${SCOPE_PATH}fonts/cairo-latin.woff2`, `${SCOPE_PATH}images/hesabi-mark_5cb0429a.png`, `${SCOPE_PATH}images/hesabi-empty-inventory_96623fe2.png`, `${SCOPE_PATH}images/hesabi-setup-ledger_a7b0fae4.png`];
 const isSameOrigin = (request) => new URL(request.url).origin === self.location.origin;
 
 const referencedAssetUrls = (content) => [...content.matchAll(/(?:src|href)\s*(?:=|:)\s*["']([^"']+)["']|url\(\s*["']?([^"')\s]+)["']?\s*\)|["'](\/(?:assets|manus-storage)\/[^"'\s)]+)["']/g)]

@@ -532,7 +532,7 @@ test("يضع كشف حساب العميل بياناته في بطاقة واض�
   assert.match(html, /777123456/);
   assert.match(html, /صنعاء/);
   assert.match(html, /customer-card/);
-  assert.match(html, /family=Cairo/);
+  assert.match(html, /@font-face\{font-family:"Cairo";src:url\("\/fonts\/cairo-arabic\.woff2"\)/);
 });
 
 test("تظهر خدمة التوصيل وخيار تحميلها على العميل أو المحل في مراجعة البيع والفاتورة", async () => {

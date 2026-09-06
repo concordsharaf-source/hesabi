@@ -219,45 +219,66 @@ public class HesabiFilesPlugin extends Plugin {
             call.reject("html is required");
             return;
         }
-        try {
-            android.webkit.WebView printWebView = new android.webkit.WebView(getContext());
-            printWebView.getSettings().setJavaScriptEnabled(false);
-            printWebView.getSettings().setTextZoom(100);
-            printWebView.setWebViewClient(new android.webkit.WebViewClient() {
-                private boolean printed = false;
-
-                @Override
-                public void onPageFinished(android.webkit.WebView view, String url) {
-                    if (printed) return;
-                    printed = true;
-                    try {
-                        android.print.PrintAttributes attrs =
-                            new android.print.PrintAttributes.Builder()
-                                .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
-                                .build();
-                        android.print.PrintManager printManager =
-                            (android.print.PrintManager) getContext()
-                                .getSystemService(Context.PRINT_SERVICE);
-                        if (printManager == null) {
-                            call.reject("Print service unavailable on this device");
-                            return;
-                        }
-                        android.print.PrintDocumentAdapter adapter =
-                            view.createPrintDocumentAdapter(jobName);
-                        printManager.print(jobName, adapter, attrs);
-                        JSObject ret = new JSObject();
-                        ret.put("started", true);
-                        call.resolve(ret);
-                    } catch (Exception e) {
-                        call.reject("فشل بدء الطباعة: " + message(e));
-                    }
-                }
-            });
-            String baseUrl = getBridge().getWebView().getUrl();
-            printWebView.loadDataWithBaseURL(baseUrl, html, "text/html", "utf-8", null);
-        } catch (Exception e) {
-            call.reject("فشل بدء الطباعة: " + message(e));
+        // Plugin methods run on the Capacitor bridge thread, but WebView
+        // creation AND PrintManager MUST run on the UI/main thread — doing
+        // this off-thread crashes with CalledFromWrongThreadException.
+        android.app.Activity activity = getActivity();
+        if (activity == null) {
+            call.reject("فشل بدء الطباعة: النشاط غير متاح");
+            return;
         }
+        activity.runOnUiThread(() -> {
+            try {
+                android.webkit.WebView printWebView = new android.webkit.WebView(getContext());
+                printWebView.getSettings().setJavaScriptEnabled(false);
+                printWebView.getSettings().setTextZoom(100);
+                printWebView.setWebViewClient(new android.webkit.WebViewClient() {
+                    private boolean printed = false;
+
+                    @Override
+                    public void onPageFinished(android.webkit.WebView view, String url) {
+                        if (printed) return;
+                        printed = true;
+                        try {
+                            android.print.PrintAttributes attrs =
+                                new android.print.PrintAttributes.Builder()
+                                    .setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4)
+                                    .build();
+                            android.print.PrintManager printManager =
+                                (android.print.PrintManager) getContext()
+                                    .getSystemService(Context.PRINT_SERVICE);
+                            if (printManager == null) {
+                                call.reject("Print service unavailable on this device");
+                                return;
+                            }
+                            android.print.PrintDocumentAdapter adapter =
+                                view.createPrintDocumentAdapter(jobName);
+                            printManager.print(jobName, adapter, attrs);
+                            JSObject ret = new JSObject();
+                            ret.put("started", true);
+                            call.resolve(ret);
+                        } catch (Exception e) {
+                            call.reject("فشل بدء الطباعة: " + message(e));
+                        } finally {
+                            // Release the offscreen WebView once printing starts;
+                            // the print adapter snapshots the page itself.
+                            view.postDelayed(() -> {
+                                try {
+                                    ((android.view.ViewGroup) view.getParent()).removeView(view);
+                                    view.destroy();
+                                } catch (Exception ignored) {
+                                    // Already detached — nothing to clean up.
+                                }
+                            }, 60000L);
+                        }
+                    }
+                });
+                String baseUrl = getBridge().getWebView().getUrl();
+                printWebView.loadDataWithBaseURL(baseUrl, html, "text/html", "utf-8", null);
+            } catch (Exception e) {
+                call.reject("فشل بدء الطباعة: " + message(e));
+            }
+        });
     }
 
     /**
