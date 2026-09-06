@@ -1,0 +1,9 @@
+{store_name}
+فاتورة #: {invoice.number}
+التاريخ: {invoice.createdAt}
+----------------------------
+العناصر...
+المجموع: {invoice.total}
+----------------------------
+اسم الكاشير: {invoice.cashierName}
+شكراً لزيارتكم
