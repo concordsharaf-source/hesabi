@@ -300,11 +300,16 @@ test("تظهر صلاحية الشراء في المخزون بتحذير برت
   assert.match(app, /const datePartsFormatter = new Intl\.DateTimeFormat\("en-GB-u-ca-gregory-nu-latn", \{ day: "2-digit", month: "2-digit", year: "numeric" \}\)/);
   assert.match(app, /const dateOnly = \(value\) => \{/);
   assert.match(reportFile, /generatedAt = ""/);
+  assert.match(reportFile, /from = "البداية"/);
+  assert.match(reportFile, /to = "غير محدد"/);
   assert.match(reportFile, /تاريخ ووقت الإنشاء: \$\{generatedAt\}/);
   assert.match(app, /const dateTime = \(value\) => \{/);
   assert.match(app, /const formatDate = \(value\) => dateOnly\(value\)/);
+  assert.match(app, /const reportRange = \(\) => \(\{ from: state\.reportFrom \|\| "البداية", to: state\.reportTo \|\| dateTime\(new Date\(\)\) \}\)/);
   assert.match(app, /تاريخ ووقت الإنشاء: \$\{escapeHtml\(dateTime\(new Date\(\)\)\)\}/);
-  assert.match(app, /\[\["التقرير التشغيلي العام"\], \[`تاريخ ووقت الإنشاء:/);
+  assert.match(app, /reportRange\(\)\.from/);
+  assert.match(app, /reportRange\(\)\.to/);
+  assert.match(app, /const rows = \[\["التقرير التشغيلي العام"\], \[`من \$\{reportRange\(\)\.from\} إلى \$\{reportRange\(\)\.to\}`/);
   assert.match(app, /generatedAt: dateTime\(new Date\(\)\)/);
   assert.match(reportFile, /تاريخ ووقت الإنشاء: \$\{generatedAt\}/);
   assert.doesNotMatch(app, /dateStyle: "medium"/);

@@ -60,7 +60,7 @@ function styleReportSheet(sheet, rows, columnCount, headerRowIndex) {
   }
 }
 
-export function createReportWorkbook(rows, { storeName = "حسابي", reportTitle = "التقرير المالي", from = "بداية السجل", to = "اليوم", generatedAt = "" } = {}) {
+export function createReportWorkbook(rows, { storeName = "حسابي", reportTitle = "التقرير المالي", from = "البداية", to = "غير محدد", generatedAt = "" } = {}) {
   const sourceRows = Array.isArray(rows) && rows.length ? rows : [["البند", "القيمة"]];
   const columnCount = Math.max(1, ...sourceRows.map((row) => Array.isArray(row) ? row.length : 0));
   const normalizedRows = sourceRows.map((row) => Array.from({ length: columnCount }, (_, index) => normalizeValue(row?.[index])));
