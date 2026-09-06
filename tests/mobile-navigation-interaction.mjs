@@ -52,6 +52,8 @@ try {
     throw new Error(`لم يختف العنصر ${selector}.`);
   };
   await command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+  await waitFor('[data-action="open-setup-form"]');
+  await evaluate(`(() => document.querySelector('[data-action="open-setup-form"]').click())()`);
   await waitFor("#setup-form");
   await evaluate(`(() => { const form = document.querySelector('#setup-form'); form.elements.storeName.value = 'متجر اختبار'; form.requestSubmit(); })()`);
   await waitFor("#login-form");
