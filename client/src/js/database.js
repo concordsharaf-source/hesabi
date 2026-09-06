@@ -65,7 +65,7 @@ const normalizeStoreLogoDataUrl = (value) => {
   return dataUrl;
 };
 const normalizeUsername = (value) => normalize(value).toLocaleLowerCase("ar");
-const validatePin = (value) => /^\d{4,12}$/.test(String(value || ""));
+const validatePin = (value) => /^[^\s]{4,64}$/.test(String(value || ""));
 const secureCrypto = () => {
   if (!globalThis.crypto?.getRandomValues || !globalThis.crypto?.subtle?.digest) throw new Error("هذا الجهاز لا يدعم الحماية المطلوبة لرمز الدخول. افتح حسابي من متصفح حديث أو حدّث التطبيق.");
   return globalThis.crypto;
@@ -219,6 +219,25 @@ export const db = {
   },
 
   async getSettings() { const database = await this.open(); return requestAsPromise(database.transaction("settings", "readonly").objectStore("settings").get("app")); },
+  async configureInitialAdmin({ username, pin, name }) {
+    const normalized = normalizeUsername(username);
+    const accountName = normalize(name);
+    if (!normalized || normalized.length < 3 || normalized.length > 30) throw new Error("اسم المستخدم يجب أن يتكون من 3 إلى 30 حرفًا أو رقمًا.");
+    if (!accountName) throw new Error("اسم صاحب الحساب مطلوب.");
+    if (!validatePin(pin)) throw new Error("كلمة المرور يجب أن تتكون من 4 إلى 64 حرفًا أو رقمًا دون مسافات.");
+    const database = await this.open();
+    const transaction = database.transaction("accounts", "readwrite");
+    const accounts = transaction.objectStore("accounts");
+    const admins = (await requestAsPromise(accounts.getAll())).filter((account) => account.role === "admin");
+    const current = admins[0];
+    if (!current) throw new Error("تعذر العثور على حساب المدير الأول.");
+    const duplicate = await requestAsPromise(accounts.index("username").get(normalized));
+    if (duplicate && duplicate.id !== current.id) throw new Error("اسم المستخدم مستخدم بالفعل.");
+    const pinSalt = makeSalt();
+    const pinHash = await hashPin(pin, pinSalt);
+    accounts.put({ ...current, username: normalized, name: accountName, pinSalt, pinHash, mustChangePin: false, isActive: true, updatedAt: nowIso() });
+    await transactionDone(transaction);
+  },
   async saveSettings(values) { const database = await this.open(); const transaction = database.transaction("settings", "readwrite"); const store = transaction.objectStore("settings"); const current = await requestAsPromise(store.get("app")); const nextValues = { ...values }; if (Object.prototype.hasOwnProperty.call(nextValues, "cashierDiscountLimitPercent")) nextValues.cashierDiscountLimitPercent = normalizeCashierDiscountLimit(nextValues.cashierDiscountLimitPercent); store.put({ ...current, id: "app", ...nextValues, cashierDiscountLimitPercent: normalizeCashierDiscountLimit(nextValues.cashierDiscountLimitPercent ?? current?.cashierDiscountLimitPercent, 10), setupCompleted: true, updatedAt: nowIso() }); await transactionDone(transaction); },
   async saveStoreLogoDataUrl(dataUrl) { await this.saveSettings({ storeLogoDataUrl: normalizeStoreLogoDataUrl(dataUrl) }); },
 
