@@ -5,6 +5,7 @@ const config: CapacitorConfig = {
   appName: "حسابي",
   webDir: "dist/public",
   bundledWebRuntime: false,
+  backgroundColor: "#101D18",
   server: {
     androidScheme: "https",
   },

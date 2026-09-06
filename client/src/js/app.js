@@ -383,8 +383,8 @@ async function resetMobileNavigationOrder() {
   showToast("تمت استعادة ترتيب شريط الهاتف الافتراضي.");
 }
 
-function applyTheme() { document.documentElement.dataset.theme = state.settings?.theme === "dark" ? "dark" : "light"; }
-function themeToggleMarkup() { const dark = state.settings?.theme === "dark"; return `<button class="icon-button theme-toggle" data-action="toggle-theme" aria-label="${dark ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن"}" title="${dark ? "الوضع الفاتح" : "الوضع الداكن"}">${icon(dark ? "sun" : "moon", 19)}</button>`; }
+function applyTheme() { document.documentElement.dataset.theme = state.settings?.theme === "light" ? "light" : "dark"; }
+function themeToggleMarkup() { const dark = state.settings?.theme !== "light"; return `<button class="icon-button theme-toggle" data-action="toggle-theme" aria-label="${dark ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن"}" title="${dark ? "الوضع الفاتح" : "الوضع الداكن"}">${icon(dark ? "sun" : "moon", 19)}</button>`; }
 function salesScannerFabMarkup() { return `<button class="sales-scanner-fab" data-action="open-sales-scanner" data-mode="sale" aria-label="فتح المبيعات ومسح الباركود" title="بيع ومسح باركود">${icon("cart", 22)}<span>بيع</span></button>`; }
 
 function topbarMarkup(title, description, action = "", modifierClass = "") {
@@ -1717,7 +1717,7 @@ async function restoreBackupFromFile(event) {
 }
 async function resetAllData() { if (!window.confirm("سيُمسح كل السجل المحلي على هذا الجهاز. صدّر نسخة احتياطية أولًا. هل تريد المتابعة؟")) return; if (!window.confirm("تأكيد نهائي: لا يمكن التراجع من داخل التطبيق. هل تمضي في المسح؟")) return; try { await db.resetAllData(); state.settings = null; state.cart = []; state.view = "dashboard"; await refresh(); render(); showToast("مُسحت البيانات المحلية. يمكنك بدء سجل متجر جديد."); } catch (error) { showToast(error.message, "error"); } }
 
-async function toggleTheme() { try { const theme = state.settings?.theme === "dark" ? "light" : "dark"; await db.saveSettings({ ...state.settings, theme }); state.settings = await db.getSettings(); applyTheme(); render(); showToast(theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح"); } catch (error) { showToast(error.message, "error"); } }
+async function toggleTheme() { try { const theme = state.settings?.theme === "light" ? "dark" : "light"; await db.saveSettings({ ...state.settings, theme }); state.settings = await db.getSettings(); applyTheme(); render(); showToast(theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح"); } catch (error) { showToast(error.message, "error"); } }
 
 async function deleteAllProducts() { const count = state.products.length; if (!count) { showToast("لا توجد منتجات لحذفها."); return; } if (!window.confirm(`تنبيه: سيتم حذف ${count} منتجًا من قوائم المنتجات والمخزون. ستبقى الفواتير والسجلات المالية محفوظة. هل تريد المتابعة؟`)) return; if (!window.confirm("تأكيد نهائي: سيتم إخفاء جميع المنتجات الحالية من القوائم لتتمكن من استيراد قائمة جديدة. هل تؤكد الحذف؟")) return; try { const deleted = await db.softDeleteAllProducts(); state.cart = []; await refresh(); render(); showToast(`تم حذف ${deleted} منتجًا من القوائم مع الحفاظ على السجلات.`); } catch (error) { showToast(error.message || "تعذر حذف المنتجات.", "error"); } }
 
