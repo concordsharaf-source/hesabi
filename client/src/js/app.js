@@ -407,10 +407,10 @@ function dashboardMarkup() {
     ${metricCard("المنتجات", amountLatin(dashboard.productCount), "package", "منتجات فعّالة")}
     ${metricCard("قيمة المخزون", money(dashboard.inventoryValue), "layers", "وفق سعر الشراء")}
     ${metricCard("فواتير اليوم", amountLatin(dashboard.todayInvoiceCount), "receipt", "عملية بيع محفوظة")}
-    ${metricCard("ديون العملاء", money(dashboard.customerDebt), "users", "رصيد مستحق")}
+    ${metricCard("ديون العملاء", money(dashboard.customerDebt), "users", "رصيد مستحق", 0, true)}
     ${metricCard("تحويلات اليوم", money(transfers.total), "transfer", transfers.count ? `${amount(transfers.count)} تحصيل بتحويل` : "لا توجد تحويلات اليوم", transfers.total)}
     ${metricCard("دفعات اليوم", money(dashboard.todayCustomerPayments), "wallet", "تسديد ديون سابقة")}
-    ${metricCard("مستحقات الموردين", money(dashboard.supplierDebt), "truck", "شراء آجل غير مسدد")}
+    ${metricCard("مستحقات الموردين", money(dashboard.supplierDebt), "truck", "شراء آجل غير مسدد", 0, true)}
     ${metricCard("الداخل للصندوق", money(dashboard.todayCashIn), "wallet", "نقد وارد اليوم فقط", dashboard.todayCashIn)}
   </section>
   <section class="dashboard-split">
@@ -423,8 +423,8 @@ function dashboardMarkup() {
   </section>`;
 }
 
-function metricCard(label, value, iconName, helper, rawValue = 0) {
-  return `<article class="metric-card ${toNumber(rawValue) < 0 ? "is-negative" : ""}"><div class="metric-card__icon">${icon(iconName, 19)}</div><div><small>${label}</small><strong>${value}</strong><span>${helper}</span></div></article>`;
+function metricCard(label, value, iconName, helper, rawValue = 0, forceNegative = false) {
+  return `<article class="metric-card ${toNumber(rawValue) < 0 || forceNegative ? "is-negative" : ""}"><div class="metric-card__icon">${icon(iconName, 19)}</div><div><small>${label}</small><strong>${value}</strong><span>${helper}</span></div></article>`;
 }
 function packageFieldLabels(packageUnit, stockUnit = "حبة") { const labels = { "حبة": "الحبات", "علبة": "العلب", "كرتون": "الكراتين", "كيس": "الأكياس", "حزمة": "الحزم", "ربطة": "الربطات", "صندوق": "الصناديق", "شريط": "الشرائط", "عبوة": "العبوات", "دزينة": "الدزينات", "قطعة": "القطع", "طقم": "الأطقم", "جهاز": "الأجهزة" }; const label = labels[packageUnit] || "العبوات"; return { quantity: `عدد ${label}`, units: `${stockUnit}/${packageUnit}`, cost: `سعر ${packageUnit}` }; }
 
