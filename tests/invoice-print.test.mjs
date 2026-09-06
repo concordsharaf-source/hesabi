@@ -290,16 +290,23 @@ test("يعرض تنبيه المخزون المنخفض أو النافد بلو
 });
 
 test("تظهر صلاحية الشراء في المخزون بتحذير برتقالي قبل ثلاثة أشهر وأحمر خلال شهر", async () => {
-  const [app, database, styles] = await Promise.all([
+  const [app, database, styles, reportFile] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/js/report-file.js", import.meta.url), "utf8"),
   ]);
   assert.match(app, /function expiryStatus\(product, today = dateKey\(\)\)/);
   assert.match(app, /const datePartsFormatter = new Intl\.DateTimeFormat\("en-GB-u-ca-gregory-nu-latn", \{ day: "2-digit", month: "2-digit", year: "numeric" \}\)/);
   assert.match(app, /const dateOnly = \(value\) => \{/);
+  assert.match(reportFile, /generatedAt = ""/);
+  assert.match(reportFile, /تاريخ ووقت الإنشاء: \$\{generatedAt\}/);
   assert.match(app, /const dateTime = \(value\) => \{/);
   assert.match(app, /const formatDate = \(value\) => dateOnly\(value\)/);
+  assert.match(app, /تاريخ ووقت الإنشاء: \$\{escapeHtml\(dateTime\(new Date\(\)\)\)\}/);
+  assert.match(app, /\[\["التقرير التشغيلي العام"\], \[`تاريخ ووقت الإنشاء:/);
+  assert.match(app, /generatedAt: dateTime\(new Date\(\)\)/);
+  assert.match(reportFile, /تاريخ ووقت الإنشاء: \$\{generatedAt\}/);
   assert.doesNotMatch(app, /dateStyle: "medium"/);
   assert.match(app, /days <= 30 \? "danger" : "warning"/);
   assert.match(app, /تنبيه انتهاء الصلاحية/);

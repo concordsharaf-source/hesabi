@@ -28,6 +28,7 @@ function styleReportSheet(sheet, rows, columnCount, headerRowIndex) {
     { s: { r: 0, c: 0 }, e: { r: 0, c: columnCount - 1 } },
     { s: { r: 1, c: 0 }, e: { r: 1, c: columnCount - 1 } },
     { s: { r: 2, c: 0 }, e: { r: 2, c: columnCount - 1 } },
+    { s: { r: 3, c: 0 }, e: { r: 3, c: columnCount - 1 } },
   ];
   for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
     for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
@@ -36,16 +37,17 @@ function styleReportSheet(sheet, rows, columnCount, headerRowIndex) {
       const isTitle = rowIndex === 0;
       const isSubtitle = rowIndex === 1;
       const isPeriod = rowIndex === 2;
+      const isGeneratedAt = rowIndex === 3;
       const isHeader = rowIndex === headerRowIndex;
       const isBody = rowIndex > headerRowIndex;
       cell.s = {
         alignment: {
-          horizontal: isTitle || isSubtitle || isPeriod ? "center" : columnIndex === 0 ? "right" : "center",
+          horizontal: isTitle || isSubtitle || isPeriod || isGeneratedAt ? "center" : columnIndex === 0 ? "right" : "center",
           vertical: "center",
           wrapText: true,
           shrinkToFit: false,
         },
-        font: { name: "Arial", sz: isTitle ? 16 : isHeader ? 12 : 11, bold: isTitle || isHeader, color: isTitle ? "174C3F" : "172E27" },
+        font: { name: "Arial", sz: isTitle ? 16 : isHeader ? 12 : 11, bold: isTitle || isHeader, color: isTitle ? "174C3F" : isGeneratedAt ? "52645B" : "172E27" },
         fill: isHeader ? { patternType: "solid", fgColor: { rgb: "DFE9E1" } } : isBody && rowIndex % 2 === 0 ? { patternType: "solid", fgColor: { rgb: "F7FAF8" } } : undefined,
         border: isHeader || isBody ? {
           top: { style: "thin", color: { rgb: "52645B" } },
@@ -58,7 +60,7 @@ function styleReportSheet(sheet, rows, columnCount, headerRowIndex) {
   }
 }
 
-export function createReportWorkbook(rows, { storeName = "حسابي", reportTitle = "التقرير المالي", from = "بداية السجل", to = "اليوم" } = {}) {
+export function createReportWorkbook(rows, { storeName = "حسابي", reportTitle = "التقرير المالي", from = "بداية السجل", to = "اليوم", generatedAt = "" } = {}) {
   const sourceRows = Array.isArray(rows) && rows.length ? rows : [["البند", "القيمة"]];
   const columnCount = Math.max(1, ...sourceRows.map((row) => Array.isArray(row) ? row.length : 0));
   const normalizedRows = sourceRows.map((row) => Array.from({ length: columnCount }, (_, index) => normalizeValue(row?.[index])));
@@ -66,10 +68,11 @@ export function createReportWorkbook(rows, { storeName = "حسابي", reportTit
     [storeName, ...Array(columnCount - 1).fill("")],
     [reportTitle, ...Array(columnCount - 1).fill("")],
     [`الفترة: ${from} إلى ${to}`, ...Array(columnCount - 1).fill("")],
+    [`تاريخ ووقت الإنشاء: ${generatedAt}`, ...Array(columnCount - 1).fill("")],
     ...normalizedRows,
   ];
   const sheet = XLSX.utils.aoa_to_sheet(sheetRows);
-  styleReportSheet(sheet, sheetRows, columnCount, 3);
+  styleReportSheet(sheet, sheetRows, columnCount, 4);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, "التقرير");
   return XLSX.write(workbook, { bookType: "xlsx", type: "array", bookSST: true, cellStyles: true });
