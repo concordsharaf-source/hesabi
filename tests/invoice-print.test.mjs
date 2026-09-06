@@ -506,7 +506,8 @@ test("يخفي نموذج التسجيل حتى الضغط على تسجيل ج�
   assert.match(app, /data-action="open-setup-form"/);
   assert.match(app, /<form id="setup-form" hidden>/);
   assert.match(app, /form\.hidden = false/);
-  assert.match(styles, /\.setup-form\[hidden\] \{ display:none !important; \}/);
+  assert.match(app, /button\.hidden = true/);
+  assert.match(styles, /\[hidden\] \{ display:none !important; \}/);
 });
 test("يعرض الماسح أدوات مساعدة للكاميرا الضعيفة ويخفف تكرار تحليل الإطارات", async () => {
   const [app, styles] = await Promise.all([
