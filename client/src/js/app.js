@@ -8,6 +8,7 @@ import { approveAssistantRequest, createPairingInvite, createStoreWorkspace, get
 import { installSyncCoordinator } from "./sync-coordinator.js";
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { renderCustomerAccountHtml } from "./customer-account-print.js";
+import { renderPurchaseInvoiceHtml } from "./purchase-invoice-print.js";
 import { getExitGuardAction, leaveAfterExitConfirmation, primeExitGuardHistory } from "./navigation-guard.js";
 import { randomId } from "./ids.js";
 import { createPdfFileFromHtml, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf, shareOrDownloadPurchaseInvoicePdf } from "./pdf-export.js";
@@ -1970,8 +1971,18 @@ async function sharePurchasePdf(purchase) {
   const supplier = state.suppliers.find((item) => item.id === purchase.supplierId) || null;
   const normalizedPurchase = normalizePurchaseSalePrices(purchase);
   const purchaseForPdf = { ...normalizedPurchase, supplierPhone: supplier?.phone || "", supplierAddress: supplier?.address || "" };
-  const result = await shareOrDownloadPurchaseInvoicePdf({ purchase: purchaseForPdf, supplier, storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, filename: `${purchase.invoiceNumber}.pdf`, title: `فاتورة شراء ${purchase.invoiceNumber}` });
+  const html = renderPurchaseInvoiceHtml({ purchase: purchaseForPdf, supplier, storeName: storeDisplayName(), logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml });
+  const result = await shareOrDownloadPurchaseInvoicePdf({ purchase: purchaseForPdf, supplier, html, storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, filename: `${purchase.invoiceNumber}.pdf`, title: `فاتورة شراء ${purchase.invoiceNumber}` });
   showToast(result === "shared" ? "تمت مشاركة فاتورة الشراء PDF." : "تم تنزيل فاتورة الشراء PDF.");
+}
+
+function printPurchaseInvoice(purchase) {
+  const supplier = state.suppliers.find((item) => item.id === purchase.supplierId) || null;
+  const normalizedPurchase = normalizePurchaseSalePrices(purchase);
+  const purchaseForPrint = { ...normalizedPurchase, supplierPhone: supplier?.phone || "", supplierAddress: supplier?.address || "" };
+  const html = renderPurchaseInvoiceHtml({ purchase: purchaseForPrint, supplier, storeName: storeDisplayName(), logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml });
+  if (!printHtmlDocument({ html, target: "hesabi-purchase-invoice", features: "width=900,height=760" })) showToast("السماح بالنوافذ المنبثقة مطلوب للطباعة.", "error");
+  else showToast("تم إرسال فاتورة الشراء للطباعة.");
 }
 
 async function exportPurchaseExcel(purchase) {
@@ -1987,8 +1998,9 @@ async function exportPurchaseExcel(purchase) {
 function openPurchaseDetail(purchase) {
   if (!purchase) return;
   const displayPurchase = normalizePurchaseSalePrices(purchase);
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">فاتورة شراء محفوظة</span><h2>${displayPurchase.invoiceNumber}</h2><p class="dialog__subtext">${escapeHtml(displayPurchase.supplierName)} · ${dateTime(displayPurchase.date)}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="invoice-detail">${displayPurchase.items.map((item) => `<div><span><strong>${escapeHtml(item.productName)}</strong><small>${item.packageQuantity ? `${amount(item.packageQuantity)} ${escapeHtml(item.packageUnit || "عبوة")} × ${money(item.packageCost)} · ` : ""}${amount(item.quantity)} ${escapeHtml(item.unit)} · سعر الحبة ${money(item.unitCost)} · سعر البيع ${money(item.salePrice)}${item.batchNumber ? ` · التشغيلة ${escapeHtml(item.batchNumber)}` : ""}${toNumber(item.returnedQuantity) ? ` · مرتجع ${amount(item.returnedQuantity)}` : ""}</small></span><strong>${money(item.total)}</strong></div>`).join("")}<div class="invoice-detail__final"><span>الإجمالي</span><strong>${money(displayPurchase.total)}</strong></div><div class="invoice-detail__final"><span>المبلغ المدفوع</span><strong>${money(displayPurchase.paidAmount)}</strong></div><div class="invoice-detail__final"><span>المتبقي للمورد</span><strong>${money(displayPurchase.remainingAmount)}</strong></div></div><div class="dialog__actions"><button id="share-purchase-pdf" class="button button--secondary" type="button">مشاركة PDF</button><button id="export-purchase-excel" class="button button--secondary" type="button">مشاركة Excel</button><button id="purchase-return" class="button button--secondary" type="button">مرتجع شراء ${icon("rotate", 17)}</button><button class="button button--primary" data-dialog-close>إغلاق</button></div>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">فاتورة شراء محفوظة</span><h2>${displayPurchase.invoiceNumber}</h2><p class="dialog__subtext">${escapeHtml(displayPurchase.supplierName)} · ${dateTime(displayPurchase.date)}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="invoice-detail">${displayPurchase.items.map((item) => `<div><span><strong>${escapeHtml(item.productName)}</strong><small>${item.packageQuantity ? `${amount(item.packageQuantity)} ${escapeHtml(item.packageUnit || "عبوة")} × ${money(item.packageCost)} · ` : ""}${amount(item.quantity)} ${escapeHtml(item.unit)} · سعر الحبة ${money(item.unitCost)} · سعر البيع ${money(item.salePrice)}${item.batchNumber ? ` · التشغيلة ${escapeHtml(item.batchNumber)}` : ""}${toNumber(item.returnedQuantity) ? ` · مرتجع ${amount(item.returnedQuantity)}` : ""}</small></span><strong>${money(item.total)}</strong></div>`).join("")}<div class="invoice-detail__final"><span>الإجمالي</span><strong>${money(displayPurchase.total)}</strong></div><div class="invoice-detail__final"><span>المبلغ المدفوع</span><strong>${money(displayPurchase.paidAmount)}</strong></div><div class="invoice-detail__final"><span>المتبقي للمورد</span><strong>${money(displayPurchase.remainingAmount)}</strong></div></div><div class="dialog__actions"><button id="print-purchase-invoice" class="button button--primary" type="button">طباعة</button><button id="share-purchase-pdf" class="button button--secondary" type="button">مشاركة PDF</button><button id="export-purchase-excel" class="button button--secondary" type="button">مشاركة Excel</button><button id="purchase-return" class="button button--secondary" type="button">مرتجع شراء ${icon("rotate", 17)}</button><button class="button button--secondary" data-dialog-close>إغلاق</button></div>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#print-purchase-invoice").addEventListener("click", () => { try { printPurchaseInvoice(purchase); } catch (error) { showToast(error.message || "تعذر تجهيز الطباعة.", "error"); } });
   overlay.querySelector("#share-purchase-pdf").addEventListener("click", () => sharePurchasePdf(purchase).catch((error) => showToast(error.message || "تعذر تجهيز PDF.", "error")));
   overlay.querySelector("#export-purchase-excel").addEventListener("click", () => exportPurchaseExcel(purchase).catch((error) => showToast(error.message || "تعذر تجهيز ملف Excel.", "error")));
   overlay.querySelector("#purchase-return").addEventListener("click", () => { closeDialog(); openPurchaseReturnDialog(purchase.id); });

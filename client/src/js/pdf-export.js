@@ -941,7 +941,10 @@ export async function createThermalInvoicePdfFile({ invoice, customer, storeName
   return createPdfFileFromHtml({ html, filename, page: "thermal" });
 }
 
-export async function createPurchaseInvoicePdfFile({ purchase, supplier, storeName, storeInfo, logoDataUrl, formatMoney, formatAmount, formatDateTime, filename }) {
+export async function createPurchaseInvoicePdfFile({ purchase, supplier, storeName, storeInfo, logoDataUrl, formatMoney, formatAmount, formatDateTime, filename, html }) {
+  // مسار موحّد: قالب HTML واحد (مثل كشف حساب العميل) للطباعة و PDF معًا.
+  // يبقى مسار canvas القديم احتياطيًا إذا تعذّر تمرير قالب HTML.
+  if (html) return createPdfFileFromHtml({ html, filename, page: "a4" });
   await loadCanvasArabicFont();
   const logoImage = await loadStoreLogoImage(logoDataUrl);
   const pdf = createA4PdfFromCanvas(drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, logoImage, formatMoney, formatAmount, formatDateTime }));
