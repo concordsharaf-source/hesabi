@@ -492,13 +492,22 @@ test("يعرض اختصاري حساب المورد والاتصال بجانب 
 test("يجمع قائمة إعادة الطلب حسب المورد ويتيح حسابه واتصاله ومشاركة الطلب", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
   assert.match(app, /function openReorderDialog\(\)/);
-  assert.match(app, /data-action="open-reorder-list"/);
   assert.match(app, /data-reorder-supplier/);
   assert.match(app, /data-share-reorder/);
   assert.match(app, /navigator\.share/);
   assert.match(app, /phoneCallButton\(group\.supplier\.phone, group\.supplier\.name\)/);
 });
 
+test("يخفي نموذج التسجيل حتى الضغط على تسجيل جديد", async () => {
+  const [app, styles] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
+  ]);
+  assert.match(app, /data-action="open-setup-form"/);
+  assert.match(app, /<form id="setup-form" hidden>/);
+  assert.match(app, /form\.hidden = false/);
+  assert.match(styles, /\.setup-form\[hidden\] \{ display:none !important; \}/);
+});
 test("يعرض الماسح أدوات مساعدة للكاميرا الضعيفة ويخفف تكرار تحليل الإطارات", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
