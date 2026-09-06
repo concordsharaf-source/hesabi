@@ -247,7 +247,7 @@ label { font-size:15px; }
   .dialog .purchase-line--pack>div { grid-column:1 / -1; }.dialog .purchase-line--pack label:nth-of-type(1) { grid-column:1 / -1; }
   .dialog .purchase-line--pack .purchase-line__total { grid-column:1 / -1; justify-self:stretch; }.dialog .purchase-line--pack>button { grid-column:2; justify-self:end; }
 }
-.purchase-search-control { display:flex; align-items:stretch; gap:8px; }.purchase-search-control input { min-width:0; flex:1; }.purchase-search-control .icon-button { flex:0 0 46px; min-height:46px; color:#fff; background:var(--green); border-color:var(--green); }
+.purchase-search-control { display:flex; align-items:stretch; gap:8px; }.purchase-search-control input { min-width:0; flex:1; }.purchase-search-control .icon-button { flex:0 0 46px; min-height:46px; color:#fff; background:var(--green); border-color:var(--green); }.purchase-new-product { width:100%; margin-top:10px; justify-content:center; }
 .confirm-dialog { max-width:480px; }.confirm-dialog .dialog__subtext { max-width:36ch; }
 .is-negative,
 .metric-card.is-negative strong,
