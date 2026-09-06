@@ -12,11 +12,14 @@ test("يصل الأدمن إلى الشاشات الإدارية والمالي�
   assert.equal(canAccessView(admin, "accounts"), true);
 });
 
-test("يقتصر الكاشير على المبيعات والفواتير", () => {
+test("يصل الكاشير إلى التشغيل وقوائم المنتجات والعملاء والموردين والمشتريات", () => {
   assert.equal(canAccessView(cashier, "sales"), true);
   assert.equal(canAccessView(cashier, "invoices"), true);
+  assert.equal(canAccessView(cashier, "products"), true);
+  assert.equal(canAccessView(cashier, "purchases"), true);
+  assert.equal(canAccessView(cashier, "customers"), true);
+  assert.equal(canAccessView(cashier, "suppliers"), true);
   assert.equal(canAccessView(cashier, "dashboard"), false);
-  assert.equal(canAccessView(cashier, "products"), false);
   assert.equal(canAccessView(cashier, "reports"), false);
   assert.equal(canAccessView(cashier, "general-settings"), false);
   assert.equal(canAccessView(cashier, "brand-settings"), false);
@@ -31,8 +34,16 @@ test("يقيّد الرفع والاستعادة السحابية بالأدمن
   }
 });
 
-test("يمنع الكاشير من إنشاء المنتجات والتقارير وإدارة الحسابات", () => {
+test("يمنع الكاشير من إنشاء المنتجات والتقارير وإدارة الحسابات مع السماح بالعمليات التشغيلية", () => {
   assert.equal(canUseAction(cashier, "new-product"), false);
+  assert.equal(canUseAction(cashier, "new-purchase"), true);
+  assert.equal(canUseAction(cashier, "open-purchase"), true);
+  assert.equal(canUseAction(cashier, "new-customer"), true);
+  assert.equal(canUseAction(cashier, "open-customer"), true);
+  assert.equal(canUseAction(cashier, "edit-customer"), true);
+  assert.equal(canUseAction(cashier, "new-supplier"), true);
+  assert.equal(canUseAction(cashier, "open-supplier"), true);
+  assert.equal(canUseAction(cashier, "open-supplier-account"), true);
   assert.equal(canUseAction(cashier, "export-report"), false);
   assert.equal(canUseAction(cashier, "new-account"), false);
   assert.equal(canUseAction(cashier, "cloud-upload-backup"), false);
