@@ -1795,7 +1795,8 @@ async function deleteSupplier(supplierId) { if (!window.confirm("هل تريد �
 
 async function openSupplierTransaction(transaction) {
   if (!transaction) return;
-  const purchase = transaction.type === "PURCHASE" ? (state.purchases.find((item) => item.id === transaction.referenceId) || await db.getPurchase(transaction.referenceId)) : (state.purchases.find((item) => item.invoiceNumber === transaction.invoiceNumber) || null);
+  let purchase = transaction.type === "PURCHASE" ? await db.getPurchase(transaction.referenceId) : null;
+  if (!purchase && transaction.invoiceNumber) { const summary = state.purchases.find((item) => item.invoiceNumber === transaction.invoiceNumber); purchase = summary ? await db.getPurchase(summary.id) : null; }
   if (purchase) { closeDialog(); openPurchaseDetail(purchase); return; }
   if (transaction.type === "PAYMENT") {
     const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">إيصال دفعة مورد</span><h2>${escapeHtml(transaction.invoiceNumber || "دفعة مورد")}</h2><p class="dialog__subtext">${dateTime(transaction.date)}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="invoice-detail"><div><span><strong>المبلغ المدفوع</strong><small>${escapeHtml(transaction.note || "تسديد مستحق للمورد")}</small></span><strong>${money(Math.abs(toNumber(transaction.amount)))}</strong></div><div class="invoice-detail__final"><span>الرصيد بعد الدفعة</span><strong>${money(transaction.remainingAmount)}</strong></div></div><div class="dialog__actions"><button class="button button--primary" data-dialog-close>إغلاق</button></div>`);
