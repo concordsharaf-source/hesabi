@@ -281,6 +281,10 @@ export const db = {
   async updateAccount(accountId, values) {
     const database = await this.open(); const transaction = database.transaction("accounts", "readwrite"); const accounts = transaction.objectStore("accounts"); const current = await requestAsPromise(accounts.get(accountId));
     if (!current) throw new Error("الحساب غير موجود.");
+    const nextUsername = normalizeUsername(values.username ?? current.username);
+    if (!nextUsername || nextUsername.length < 3 || nextUsername.length > 30) throw new Error("اسم المستخدم يجب أن يتكون من 3 إلى 30 حرفًا أو رقمًا.");
+    const duplicate = await requestAsPromise(accounts.index("username").get(nextUsername));
+    if (duplicate && duplicate.id !== accountId) throw new Error("اسم المستخدم مستخدم بالفعل.");
     const nextRole = accountRole(values.role ?? current.role); const nextActive = values.isActive ?? current.isActive;
     if (current.role === "admin" && current.isActive && (nextRole !== "admin" || !nextActive)) {
       const all = await requestAsPromise(accounts.getAll());
@@ -289,7 +293,7 @@ export const db = {
     const name = normalize(values.name ?? current.name); if (!name) throw new Error("اسم الحساب مطلوب.");
     const jobTitle = normalize(values.jobTitle ?? current.jobTitle);
     const monthlySalary = Math.max(0, toNumber(values.monthlySalary ?? current.monthlySalary));
-    const updated = { ...current, name, role: nextRole, jobTitle, monthlySalary, isActive: nextActive, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
+    const updated = { ...current, username: nextUsername, name, role: nextRole, jobTitle, monthlySalary, isActive: nextActive, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
   },
   async deleteCashierAccount(accountId) {
     const database = await this.open(); const transaction = database.transaction("accounts", "readwrite"); const accounts = transaction.objectStore("accounts"); const current = await requestAsPromise(accounts.get(accountId));
