@@ -296,7 +296,11 @@ test("تظهر صلاحية الشراء في المخزون بتحذير برت
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
   assert.match(app, /function expiryStatus\(product, today = dateKey\(\)\)/);
-  assert.match(app, /const formatDate = \(value\) => \{/);
+  assert.match(app, /const datePartsFormatter = new Intl\.DateTimeFormat\("en-GB-u-ca-gregory-nu-latn", \{ day: "2-digit", month: "2-digit", year: "numeric" \}\)/);
+  assert.match(app, /const dateOnly = \(value\) => \{/);
+  assert.match(app, /const dateTime = \(value\) => \{/);
+  assert.match(app, /const formatDate = \(value\) => dateOnly\(value\)/);
+  assert.doesNotMatch(app, /dateStyle: "medium"/);
   assert.match(app, /days <= 30 \? "danger" : "warning"/);
   assert.match(app, /تنبيه انتهاء الصلاحية/);
   assert.match(app, /data-purchase-expiry-date/);

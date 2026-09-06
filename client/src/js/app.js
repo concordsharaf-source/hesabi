@@ -93,11 +93,17 @@ const money = (value) => {
 const signedMoney = (value) => `<strong class="${toNumber(value) < 0 ? "is-negative" : ""}">${money(value)}</strong>`;
 const amount = (value) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(toNumber(value));
 const amountLatin = (value) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2, useGrouping: false }).format(toNumber(value));
-const dateTime = (value) => new Intl.DateTimeFormat("ar-SA-u-nu-latn", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-const formatDate = (value) => {
-  const date = new Date(`${String(value || "")}T00:00:00`);
-  return Number.isNaN(date.getTime()) ? String(value || "") : new Intl.DateTimeFormat("ar-EG-u-ca-gregory-nu-latn", { year: "numeric", month: "short", day: "numeric" }).format(date);
+const datePartsFormatter = new Intl.DateTimeFormat("en-GB-u-ca-gregory-nu-latn", { day: "2-digit", month: "2-digit", year: "numeric" });
+const timePartsFormatter = new Intl.DateTimeFormat("en-GB-u-ca-gregory-nu-latn", { hour: "2-digit", minute: "2-digit", hour12: false });
+const dateOnly = (value) => {
+  const date = value instanceof Date ? new Date(value) : new Date(`${String(value || "")}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? String(value || "") : datePartsFormatter.format(date);
 };
+const dateTime = (value) => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? String(value || "") : `${datePartsFormatter.format(date)} ${timePartsFormatter.format(date)}`;
+};
+const formatDate = (value) => dateOnly(value);
 const selectNumericFieldValue = (event) => {
   const input = event.target instanceof HTMLInputElement ? event.target : null;
   if (!input || input.type !== "number" || input.disabled || input.readOnly || !input.value) return;
@@ -383,7 +389,7 @@ function dashboardMarkup() {
   const todayAtMidnight = new Date(`${dateKey()}T00:00:00`).getTime();
   const expiring = (state.dashboard?.expiringBatches || []).sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate))).slice(0, 5);
   return `${topbarMarkup("نظرة على يومك", "تابع المبيعات والمخزون من سجل واحد واضح.", `<button class="button button--primary topbar-sales-action" data-action="navigate" data-view="sales">${icon("cart", 18)}<span>بيع جديد</span></button>`)}
-  <section class="daily-ribbon"><div><span class="presence-dot"></span><strong>اليوم التشغيلي</strong><small>كل عملية تحفظ على هذا الجهاز تلقائيًا</small></div><div class="daily-ribbon__date">${new Intl.DateTimeFormat("ar-SA-u-nu-latn", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</div></section>
+  <section class="daily-ribbon"><div><span class="presence-dot"></span><strong>اليوم التشغيلي</strong><small>كل عملية تحفظ على هذا الجهاز تلقائيًا</small></div><div class="daily-ribbon__date">${new Intl.DateTimeFormat("ar-SA-u-nu-latn", { weekday: "long" }).format(new Date())}، ${dateOnly(new Date())}</div></section>
   <section class="metric-grid">
     ${metricCard("مبيعات اليوم", money(dashboard.todaySales), "trend", "قيمة الفواتير المكتملة", dashboard.todaySales)}
     ${metricCard("مشتريات اليوم", money(dashboard.todayPurchases), "truck", "توريد محفوظ", dashboard.todayPurchases)}
