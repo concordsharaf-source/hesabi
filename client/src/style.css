@@ -752,3 +752,9 @@ label { font-size:15px; }
 
 .report-preview-table-scroll{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain;padding-bottom:6px}.report-preview--wide .report-preview-table-scroll table{width:1180px;min-width:1180px;table-layout:fixed}.report-preview__hint{margin:0 0 8px;padding:6px 8px;color:var(--muted);font-size:11px;text-align:right}.report-preview--wide .report-preview-table-scroll::-webkit-scrollbar{height:7px}.report-preview--wide .report-preview-table-scroll::-webkit-scrollbar-thumb{background:var(--green);border-radius:999px}@media(max-width:599px){.report-preview--wide .report-preview-table-scroll table{width:1120px;min-width:1120px}.report-preview__hint{font-size:10px}}
 
+
+/* إبراز رصيد العميل والمورد داخل نافذة معلومات الحساب فقط. */
+.account-summary>div.account-summary__balance { color:#fff !important; background:#a73340 !important; border-color:#ffc3ca !important; box-shadow:0 8px 18px rgba(111,30,40,.22); }
+.account-summary>div.account-summary__balance span,
+.account-summary>div.account-summary__balance strong { color:#fff !important; }
+[data-theme="dark"] .account-summary>div.account-summary__balance { background:#a73340 !important; border-color:#ffc3ca !important; }
