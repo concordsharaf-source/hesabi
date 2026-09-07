@@ -1785,6 +1785,8 @@ async function restoreBackupFromFile(event) {
     catch { throw new Error("ملف النسخة ليس ملف JSON صالحًا. اختر نسخة حسابي بصيغة JSON."); }
     db.validateBackup(parsed);
     if (!window.confirm("ستستبدل الاستعادة كل بيانات هذا الجهاز بالنسخة المختارة، ثم تفتح صفحة تسجيل الدخول. هل تريد المتابعة؟")) return;
+    const safetyBackup = await db.exportBackup();
+    downloadBackupPayload(safetyBackup, `before-local-restore-${dateKey()}`);
     await db.restoreBackup(parsed);
     try { await db.clearPersistentSession(); } catch (error) { console.warn("[Hesabi restore session cleanup]", error); }
     state.settings = await db.getSettings();
