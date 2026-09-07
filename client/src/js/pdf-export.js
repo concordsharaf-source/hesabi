@@ -846,6 +846,56 @@ function createA4PdfFromCanvas(canvas, orientation = "portrait") {
   return pdf;
 }
 
+function getSafeStageBreakPoints(stage, canvas) {
+  const stageRect = stage.getBoundingClientRect();
+  if (!stageRect.height) return [];
+
+  const scaleY = canvas.height / stageRect.height;
+  const breakElements = stage.querySelectorAll("tr, tbody, thead, tfoot, .party-card, .supplier-card, .customer-card, .kpi-card, .summary, .payment-info, .notes, .report-signatures, .report-footer, .report-header, h1, h2, h3, section, article");
+
+  const breakPoints = new Set();
+
+  breakElements.forEach((element) => {
+    const rect = element.getBoundingClientRect();
+    const relativeTop = (rect.top - stageRect.top) * scaleY;
+    const relativeBottom = (rect.bottom - stageRect.top) * scaleY;
+
+    if (relativeTop > 10 && relativeTop < canvas.height - 10) {
+      breakPoints.add(Math.round(relativeTop));
+    }
+    if (relativeBottom > 10 && relativeBottom < canvas.height - 10) {
+      breakPoints.add(Math.round(relativeBottom));
+    }
+  });
+
+  return Array.from(breakPoints).sort((a, b) => a - b);
+}
+
+function findBestSliceHeight(offsetY, maxUsableHeightPx, totalCanvasHeight, safeBreakPoints) {
+  const remainingHeight = totalCanvasHeight - offsetY;
+  if (remainingHeight <= maxUsableHeightPx) {
+    return remainingHeight;
+  }
+
+  const targetLimitY = offsetY + maxUsableHeightPx;
+  const minThresholdY = offsetY + maxUsableHeightPx * 0.65;
+
+  let bestCutY = 0;
+  for (let i = safeBreakPoints.length - 1; i >= 0; i--) {
+    const breakY = safeBreakPoints[i];
+    if (breakY <= targetLimitY && breakY >= minThresholdY) {
+      bestCutY = breakY;
+      break;
+    }
+  }
+
+  if (bestCutY > offsetY) {
+    return bestCutY - offsetY;
+  }
+
+  return maxUsableHeightPx;
+}
+
 export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
   await loadCanvasArabicFont();
   const stage = createPdfStage(html, page);
@@ -861,10 +911,56 @@ export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
     const pixelsPerMm = canvas.width / pageWidth;
-    const pageHeightPx = Math.max(1, Math.floor(pageHeight * pixelsPerMm));
-    const addSlice = (offsetY, sliceHeight) => { const slice = document.createElement("canvas"); slice.width = canvas.width; slice.height = sliceHeight; slice.getContext("2d").drawImage(canvas, 0, offsetY, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight); pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, pageWidth, sliceHeight / pixelsPerMm, undefined, "FAST"); };
-    if (isThermal) addSlice(0, canvas.height);
-    else for (let offsetY = 0; offsetY < canvas.height; offsetY += pageHeightPx) { if (offsetY) pdf.addPage(); addSlice(offsetY, Math.min(pageHeightPx, canvas.height - offsetY)); }
+
+    if (isThermal) {
+      const slice = document.createElement("canvas");
+      slice.width = canvas.width;
+      slice.height = canvas.height;
+      slice.getContext("2d").drawImage(canvas, 0, 0);
+      pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, pageWidth, (canvas.height / pixelsPerMm), undefined, "FAST");
+    } else {
+      // هوامش علوية وسفلية تمنع تلاصق الصفحات وتضمن عدم ضياع البيانات عند الطباعة
+      const topMarginMm = isLandscape ? 10 : 12;
+      const bottomMarginMm = isLandscape ? 12 : 14;
+      const usableHeightMm = pageHeight - topMarginMm - bottomMarginMm;
+      const usableHeightPx = Math.max(1, Math.floor(usableHeightMm * pixelsPerMm));
+      const safeBreakPoints = getSafeStageBreakPoints(stage, canvas);
+
+      let currentOffsetY = 0;
+      let pageIndex = 0;
+
+      while (currentOffsetY < canvas.height) {
+        if (pageIndex > 0) {
+          pdf.addPage();
+        }
+
+        const sliceHeightPx = findBestSliceHeight(currentOffsetY, usableHeightPx, canvas.height, safeBreakPoints);
+        const sliceHeightMm = sliceHeightPx / pixelsPerMm;
+
+        const sliceCanvas = document.createElement("canvas");
+        sliceCanvas.width = canvas.width;
+        sliceCanvas.height = sliceHeightPx;
+        const sliceCtx = sliceCanvas.getContext("2d");
+        sliceCtx.fillStyle = "#ffffff";
+        sliceCtx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+        sliceCtx.drawImage(canvas, 0, currentOffsetY, canvas.width, sliceHeightPx, 0, 0, sliceCanvas.width, sliceHeightPx);
+
+        pdf.addImage(
+          sliceCanvas.toDataURL("image/png"),
+          "PNG",
+          0,
+          topMarginMm,
+          pageWidth,
+          sliceHeightMm,
+          undefined,
+          "FAST"
+        );
+
+        currentOffsetY += sliceHeightPx;
+        pageIndex++;
+      }
+    }
+
     const blob = pdf.output("blob");
     if (!blob || blob.size < 800) throw new Error("تعذر إنشاء ملف PDF كامل المحتوى.");
     return new File([blob], filename, { type: "application/pdf" });
