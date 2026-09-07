@@ -16,6 +16,20 @@ export const escapeHtml = (value = "") =>
     "'": "&#039;",
   }[character]));
 
+export function getStoreLogoDataUri(logoDataUrl, storeName = "حسابي") {
+  const source = String(logoDataUrl || "").trim();
+  if (source.startsWith("data:image/")) return source;
+  if (/^https?:\/\//i.test(source) || source.startsWith("blob:")) return source;
+
+  const initial = (storeName || "حسابي").trim().slice(0, 2);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">
+    <circle cx="50" cy="50" r="48" fill="#f4faf6" stroke="#174c3f" stroke-width="3"/>
+    <circle cx="50" cy="50" r="42" fill="#174c3f" stroke="#b7cdbf" stroke-width="1.5"/>
+    <text x="50%" y="60%" text-anchor="middle" fill="#ffffff" font-family="Cairo, Tahoma, Arial, sans-serif" font-size="28" font-weight="900" direction="rtl">${initial}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 export function getReportStyles(isLandscape = false) {
   return `
     @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap");
@@ -113,18 +127,6 @@ export function getReportStyles(isLandscape = false) {
       object-fit: contain;
       border-radius: 50%;
       display: block;
-    }
-    .report-header__logo-fallback {
-      width: 100%;
-      height: 100%;
-      border-radius: 50%;
-      background: #edf6f0;
-      color: #174c3f;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      font-weight: 800;
     }
     .report-header__store-name {
       margin: 0 0 4px 0;
@@ -359,6 +361,7 @@ export function renderOfficialHeaderHtml({
   cashierName = "",
 }) {
   const periodText = from && to ? `من ${escapeHtml(from)} إلى ${escapeHtml(to)}` : from ? `من ${escapeHtml(from)}` : to ? `حتى ${escapeHtml(to)}` : "";
+  const effectiveLogo = getStoreLogoDataUri(logoDataUrl, storeName);
 
   return `
     <header class="report-header">
@@ -375,7 +378,7 @@ export function renderOfficialHeaderHtml({
           <!-- الوسط: شعار المتجر -->
           <td class="report-header__col-center">
             <div class="report-header__logo-container">
-              ${logoDataUrl ? `<img class="report-header__logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر">` : `<div class="report-header__logo-fallback"><span>${escapeHtml((storeName || "حسابي").slice(0, 2))}</span></div>`}
+              <img class="report-header__logo" src="${escapeHtml(effectiveLogo)}" alt="شعار ${escapeHtml(storeName || "المتجر")}">
             </div>
           </td>
 

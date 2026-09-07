@@ -3,6 +3,8 @@
    Official Purchase Invoice Template
 ═══════════════════════════════════════════════════════════════════════════════ */
 
+import { getStoreLogoDataUri } from "./report-template.js";
+
 export function renderPurchaseInvoiceHtml({
   purchase,
   supplier = null,
@@ -14,6 +16,7 @@ export function renderPurchaseInvoiceHtml({
   formatDateTime,
   escapeHtml,
 }) {
+  const effectiveLogo = getStoreLogoDataUri(logoDataUrl, storeName);
   const items = purchase.items || [];
   const rows = items.map((item) => {
     const packageSummary = item.packageQuantity ? `${escapeHtml(String(formatAmount(item.packageQuantity)))} ${escapeHtml(item.packageUnit || "عبوة")} × ${escapeHtml(String(formatMoney(item.packageCost)))}` : "";
@@ -31,13 +34,6 @@ export function renderPurchaseInvoiceHtml({
       <td class="amount">${escapeHtml(String(formatMoney(item.total)))}</td>
     </tr>`;
   }).join("");
-
-  const storeDetailsList = [
-    storeInfo?.storePhone ? `<span>هاتف: <b dir="ltr">${escapeHtml(storeInfo.storePhone)}</b></span>` : "",
-    storeInfo?.storeAddress ? `<span>العنوان: <b>${escapeHtml(storeInfo.storeAddress)}</b></span>` : "",
-    storeInfo?.taxNumber ? `<span>الرقم الضريبي/السجل: <b dir="ltr">${escapeHtml(storeInfo.taxNumber)}</b></span>` : "",
-    storeInfo?.storeEmail ? `<span>البريد: <b dir="ltr">${escapeHtml(storeInfo.storeEmail)}</b></span>` : "",
-  ].filter(Boolean).join(" · ");
 
   const supplierDetails = `<section class="supplier-card">
     <strong>بيانات المورد</strong>
@@ -179,7 +175,7 @@ export function renderPurchaseInvoiceHtml({
         <!-- الوسط: الشعار -->
         <td style="width:24%;vertical-align:middle;text-align:center;border:none;padding:0 6px;">
           <div style="display:inline-flex;align-items:center;justify-content:center;width:76px;height:76px;background:#ffffff;border:2px solid #1f6b59;border-radius:50%;padding:4px;box-shadow:0 2px 6px rgba(31,107,89,0.12);margin:0 auto;">
-            ${logoDataUrl ? `<img class="invoice-logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر" style="width:100%;height:100%;object-fit:contain;border-radius:50%;border:none;">` : `<div style="width:100%;height:100%;border-radius:50%;background:#edf6f0;color:#174c3f;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;"><span>${escapeHtml((storeName || "حسابي").slice(0, 2))}</span></div>`}
+            <img class="invoice-logo" src="${escapeHtml(effectiveLogo)}" alt="شعار المتجر" style="width:100%;height:100%;object-fit:contain;border-radius:50%;border:none;">
           </div>
         </td>
 
