@@ -1,9 +1,20 @@
+/* ═══════════════════════════════════════════════════════════════════════════════
+   وحدة تصدير وطباعة ملفات PDF والمستندات الرسمية — حسابي
+   Official PDF & Document Export System
+   - توليد مستندات PDF بدقة عالية ودعم كامل للغة العربية 100%
+   - جداول رسمية بأعمدة وصفوف واضحة، بدون تقطيع لأسماء المتاجر أو بياناتها
+   - توحيد التصميم بين المعاينة والطباعة وتصدير PDF
+═══════════════════════════════════════════════════════════════════════════════ */
+
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { renderThermalInvoiceHtml } from "./invoice-print.js";
+import { renderCustomerAccountHtml } from "./customer-account-print.js";
+import { renderPurchaseInvoiceHtml } from "./purchase-invoice-print.js";
+import { renderOfficialReportHtml } from "./report-template.js";
 
 const PDF_ARABIC_FONT_URL = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage/NotoNaskhArabic-Regular_2c8d8205.ttf";
-const toNumber = (value) => Number.isFinite(Number(value)) ? Number(value) : 0;
+const toNumber = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 let canvasArabicFontPromise;
 const waitWithTimeout = (promise, timeout = 3_000) => Promise.race([promise, new Promise((resolve) => window.setTimeout(resolve, timeout))]);
 
@@ -93,23 +104,23 @@ function drawStoreLogo(context, image, centerX, centerY, boxSize) {
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  لوحة تصميم PDF مطابقة لتصميم تطبيق شرفسوفت Inv1.170
-//  iTextPDF reference: A4, RTL, Noto Naskh Arabic, gray table headers.
+//  A4, RTL, Noto Naskh Arabic / Cairo, formal table headers.
 // ═══════════════════════════════════════════════════════════════════════════
 const LUXURY_COLORS = {
-  primary: "#20304c",        // أزرق داكن للعناوين
-  primaryLight: "#324b70",   // أزرق متوسط للإطارات
-  accent: "#e0e0e0",         // رمادي خلفية رأس الجدول
-  accentLight: "#f2f2f2",    // رمادي فاتح
+  primary: "#174c3f",        // زمردي داكن رسمي للعناوين
+  primaryLight: "#1f6b59",   // زمردي متوسط للإطارات
+  accent: "#dfece4",         // رمادي مخضر خلفية رأس الجدول
+  accentLight: "#f5faf7",    // رمادي فاتح
   bgLight: "#ffffff",        // ورق أبيض
-  bgCard: "#f5f5f5",         // خلفية بطاقات محايدة
-  textDark: "#323232",       // نص داكن
-  textMuted: "#666666",      // نص رمادي
-  border: "#999999",         // حدود رمادية
+  bgCard: "#f8fbf9",         // خلفية بطاقات محايدة
+  textDark: "#172e27",       // نص داكن
+  textMuted: "#52645b",      // نص رمادي
+  border: "#b7cdbf",         // حدود رسمية
   white: "#ffffff",
-  red: "#5e1025",            // عنابي للمبالغ السالبة
+  red: "#a74340",            // عنابي للمبالغ السالبة
 };
 
-const PDF_FOOTER_TITLE = "تم إصدار هذه الفاتورة من حسابي";
+const PDF_FOOTER_TITLE = "تم إصدار هذه الوثيقة رسميًا من نظام حسابي";
 const PDF_FOOTER_DESIGN = "تصميم شرف غالب قحطان · الجمهورية اليمنية · +967770388100";
 const PDF_FOOTER_EMAIL = "concordsharaf@gmail.com";
 
@@ -117,14 +128,14 @@ function drawStoreDetails(context, { storeInfo = {}, right, top, width = 210 * 1
   const details = [
     storeInfo.storePhone ? `هاتف: ${storeInfo.storePhone}` : "",
     storeInfo.storeAddress ? `العنوان: ${storeInfo.storeAddress}` : "",
-    storeInfo.storeEmail ? `البريد: ${storeInfo.storeEmail}` : "",
     storeInfo.taxNumber ? `الضريبي/السجل: ${storeInfo.taxNumber}` : "",
+    storeInfo.storeEmail ? `البريد: ${storeInfo.storeEmail}` : "",
   ].filter(Boolean);
   if (!details.length) return;
   context.save();
   context.direction = "rtl"; context.textAlign = "right"; context.textBaseline = "middle"; context.fillStyle = LUXURY_COLORS.textMuted;
   context.font = '600 22px "HesabiArabicPdf", Tahoma, Arial, sans-serif';
-  details.slice(0, 4).forEach((value, index) => context.fillText(value, right, top + index * 8 * 12, width - 30 * 12));
+  details.slice(0, 4).forEach((value, index) => context.fillText(value, right, top + index * 8 * 12, width));
   context.restore();
 }
 
@@ -133,11 +144,9 @@ function drawPdfFooter(context, { center, width, height, y = height - 22 * 12 })
   const right = width - left;
   const footerY = Math.min(y, height - 25 * 12);
   context.save();
-  // خط ذهبي مزخرف
   context.strokeStyle = LUXURY_COLORS.accent;
   context.lineWidth = 3;
   context.beginPath(); context.moveTo(left, footerY - 12 * 12); context.lineTo(right, footerY - 12 * 12); context.stroke();
-  // خط أخضر رفيع
   context.strokeStyle = LUXURY_COLORS.primary;
   context.lineWidth = 1.5;
   context.beginPath(); context.moveTo(left, footerY - 11 * 12); context.lineTo(right, footerY - 11 * 12); context.stroke();
@@ -155,9 +164,6 @@ function drawPdfFooter(context, { center, width, height, y = height - 22 * 12 })
   context.restore();
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  دالة مساعدة لرسم نص مع منع الخروج من الخانة (ellipsis)
-// ═══════════════════════════════════════════════════════════════════════════
 function drawLuxuryText(context, value, x, y, options = {}) {
   const {
     align = "right",
@@ -178,7 +184,6 @@ function drawLuxuryText(context, value, x, y, options = {}) {
 
   let output = String(value ?? "");
 
-  // منع خروج النص من الخانة باستخدام ellipsis
   if (Number.isFinite(maxWidth) && maxWidth > 0) {
     const measured = context.measureText(output).width;
     if (measured > maxWidth) {
@@ -195,21 +200,13 @@ function drawLuxuryText(context, value, x, y, options = {}) {
   return output;
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  دالة لرسم خلفية بطاقة مسطحة
-// ═══════════════════════════════════════════════════════════════════════════
 function drawLuxuryGradientBg(context, x, y, width, height, colorStart, colorEnd, radius = 12) {
-  // التصميم المستخرج يستخدم تعبئة ثابتة للخلايا والبطاقات، وليس تدرجات ذهبية.
-  // نحتفظ باسم الدالة لتجنب تغيير منطق الرسم في بقية القوالب.
   context.fillStyle = colorStart || colorEnd || LUXURY_COLORS.bgLight;
   context.beginPath();
   context.roundRect(x, y, width, height, radius);
   context.fill();
 }
 
-// ═══════════════════════════════════════════════════════════════════════════
-//  دالة لرسم إطار بسيط حول البطاقة
-// ═══════════════════════════════════════════════════════════════════════════
 function drawLuxuryBorder(context, x, y, width, height, color = LUXURY_COLORS.accent, lineWidth = 2.5, radius = 12) {
   context.strokeStyle = color;
   context.lineWidth = lineWidth;
@@ -219,7 +216,7 @@ function drawLuxuryBorder(context, x, y, width, height, color = LUXURY_COLORS.ac
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  الفاتورة الحرارية - تصميم محسّن
+//  الفاتورة الحرارية - رسم Canvas احتياطي
 // ═══════════════════════════════════════════════════════════════════════════
 function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, logoImage, formatMoney, formatAmount, formatDateTime, paymentLabel }) {
   const mm = 12;
@@ -231,7 +228,6 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
   canvas.height = height;
   const context = canvas.getContext("2d");
 
-  // خلفية بيضاء نظيفة
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
 
@@ -240,11 +236,10 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
   const center = 40 * mm;
   let y = 10 * mm;
 
-  const thermalFontScale = 1.5; // خط أكبر
+  const thermalFontScale = 1.5;
 
-  // تروس فخمة للفاتورة الحرارية
   const text = (value, x, align = "right", size = 32, weight = 400, direction = "rtl", color = LUXURY_COLORS.textDark) => {
-    drawLuxuryText(context, value, x, y, { align, size: Math.round(size * thermalFontScale), weight, color, direction, maxWidth: align === "right" ? right - left - 4*mm : align === "left" ? right - left - 4*mm : right - left - 4*mm });
+    drawLuxuryText(context, value, x, y, { align, size: Math.round(size * thermalFontScale), weight, color, direction, maxWidth: right - left });
   };
 
   const divider = (color = LUXURY_COLORS.primary) => {
@@ -260,24 +255,27 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
     const labelSize = options.labelSize || 30;
     const valueSize = options.valueSize || 30;
     const gap = options.gap || 9 * mm;
-    const maxW = right - left - 8 * mm;
+    const maxW = (right - left) / 2 - 2 * mm;
 
-    drawLuxuryText(context, label, right - 2*mm, y, { align: "right", size: Math.round(labelSize * thermalFontScale), weight: options.bold ? 700 : 500, color: LUXURY_COLORS.textMuted, maxWidth: maxW / 2 });
-    drawLuxuryText(context, value, left + 2*mm, y, { align: "left", size: Math.round(valueSize * thermalFontScale), weight: options.bold ? 700 : 600, color: options.color || LUXURY_COLORS.textDark, direction: options.ltr ? "ltr" : "rtl", maxWidth: maxW / 2 });
+    drawLuxuryText(context, label, right - 2*mm, y, { align: "right", size: Math.round(labelSize * thermalFontScale), weight: options.bold ? 700 : 500, color: LUXURY_COLORS.textMuted, maxWidth: maxW });
+    drawLuxuryText(context, value, left + 2*mm, y, { align: "left", size: Math.round(valueSize * thermalFontScale), weight: options.bold ? 700 : 600, color: options.color || LUXURY_COLORS.textDark, direction: options.ltr ? "ltr" : "rtl", maxWidth: maxW });
     y += gap;
   };
 
-  // الشعار والاسم
   if (logoImage) { 
     drawStoreLogo(context, logoImage, center, y + 8 * mm, 16 * mm); 
     y += 19 * mm; 
   }
 
-  // اسم المتجر بخط كبير فخم
-  drawLuxuryText(context, storeName || "حسابي", center, y, { align: "center", size: Math.round(52 * thermalFontScale), weight: 700, color: LUXURY_COLORS.primary });
+  drawLuxuryText(context, storeName || "حسابي", center, y, { align: "center", size: Math.round(48 * thermalFontScale), weight: 800, color: LUXURY_COLORS.primary, maxWidth: right - left });
   y += 10 * mm;
 
-  // عنوان الفاتورة
+  if (storeInfo?.storePhone || storeInfo?.storeAddress) {
+    const contact = [storeInfo?.storePhone ? `هاتف: ${storeInfo.storePhone}` : "", storeInfo?.storeAddress].filter(Boolean).join(" · ");
+    drawLuxuryText(context, contact, center, y, { align: "center", size: Math.round(20 * thermalFontScale), weight: 500, color: LUXURY_COLORS.textMuted, maxWidth: right - left });
+    y += 7 * mm;
+  }
+
   drawLuxuryText(context, "فاتورة بيع", right - 2*mm, y, { align: "right", size: Math.round(36 * thermalFontScale), weight: 700, color: LUXURY_COLORS.primary });
   drawLuxuryText(context, invoice.invoiceNumber, left + 2*mm, y, { align: "left", size: Math.round(32 * thermalFontScale), weight: 700, color: LUXURY_COLORS.textDark, direction: "ltr" });
   y += 7 * mm;
@@ -285,13 +283,11 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
   drawLuxuryText(context, formatDateTime(invoice.date), center, y, { align: "center", size: Math.round(24 * thermalFontScale), weight: 400, color: LUXURY_COLORS.textMuted });
   y += 8 * mm;
 
-  // بطاقة الكاشير
   drawLuxuryGradientBg(context, left, y - 5*mm, right - left, 14*mm, LUXURY_COLORS.bgCard, LUXURY_COLORS.bgLight, 8);
   drawLuxuryBorder(context, left, y - 5*mm, right - left, 14*mm, LUXURY_COLORS.border, 1.5, 8);
   pair("الكاشير المنفذ", invoice.cashierName || "الأدمن", { gap: 7 * mm });
   y += 2 * mm;
 
-  // بطاقة العميل
   if (invoice.customerName) {
     const cardHeight = (9 + details * 9) * mm;
     drawLuxuryGradientBg(context, left, y - 5*mm, right - left, cardHeight, LUXURY_COLORS.bgCard, LUXURY_COLORS.bgLight, 8);
@@ -306,10 +302,9 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
 
   divider(); y += 8 * mm;
 
-  // الأصناف
   for (const item of invoice.items || []) {
     const itemMaxW = right - left - 4*mm;
-    drawLuxuryText(context, item.productName, right - 2*mm, y, { align: "right", size: Math.round(34 * thermalFontScale), weight: 700, color: LUXURY_COLORS.textDark, maxWidth: itemMaxW * 0.6 });
+    drawLuxuryText(context, item.productName, right - 2*mm, y, { align: "right", size: Math.round(34 * thermalFontScale), weight: 700, color: LUXURY_COLORS.textDark, maxWidth: itemMaxW * 0.65 });
     drawLuxuryText(context, formatMoney(item.total), left + 2*mm, y, { align: "left", size: Math.round(32 * thermalFontScale), weight: 700, color: LUXURY_COLORS.primary, direction: "ltr", maxWidth: itemMaxW * 0.35 });
     y += 9 * mm;
     drawLuxuryText(context, `${formatAmount(item.quantity)} ${item.unit} × ${formatMoney(item.unitPrice)}`, right - 2*mm, y, { align: "right", size: Math.round(26 * thermalFontScale), weight: 400, color: LUXURY_COLORS.textMuted });
@@ -318,12 +313,10 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
 
   divider(); y += 9 * mm;
 
-  // الملخص
   pair("الإجمالي قبل الخصم", formatMoney(invoice.subtotal));
   pair("الخصم", formatMoney(invoice.discount));
   if (toNumber(invoice.deliveryFee) > 0) pair(`التوصيل`, formatMoney(invoice.deliveryFee));
 
-  // خط فاصل مزدوج
   context.strokeStyle = LUXURY_COLORS.primary;
   context.lineWidth = 2;
   context.beginPath(); context.moveTo(left, y - 4*mm); context.lineTo(right, y - 4*mm); context.stroke();
@@ -338,14 +331,14 @@ function drawThermalInvoiceCanvas({ invoice, customer, storeName, storeInfo, log
   if (invoice.paymentType === "آجل") pair("المتبقي", formatMoney(invoice.remainingAmount), { color: LUXURY_COLORS.red });
 
   y += 4 * mm;
-  drawLuxuryText(context, "شكرًا لتعاملكم معنا", center, y, { align: "center", size: Math.round(28 * thermalFontScale), weight: 500, color: LUXURY_COLORS.accent });
+  drawLuxuryText(context, "شكرًا لتعاملكم معنا", center, y, { align: "center", size: Math.round(28 * thermalFontScale), weight: 500, color: LUXURY_COLORS.textMuted });
 
   drawPdfFooter(context, { center, width, height, y: height - 18 * mm });
   return canvas;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  فاتورة الشراء - تصميم فخم A4
+//  فاتورة الشراء - رسم Canvas احتياطي
 // ═══════════════════════════════════════════════════════════════════════════
 function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, logoImage, formatMoney, formatAmount, formatDateTime }) {
   const mm = 12;
@@ -353,7 +346,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
   const left = 14 * mm;
   const right = 196 * mm;
   const center = width / 2;
-  const fontScale = 3.2; // خط أكبر
+  const fontScale = 3.2;
   const lineHeight = 9 * mm;
   const itemHeight = 52 * mm;
   const items = purchase.items || [];
@@ -363,12 +356,10 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
   canvas.height = height;
   const context = canvas.getContext("2d");
 
-  // خلفية بيضاء
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
   context.textBaseline = "middle";
 
-  // دالة النص المحسّنة مع منع الخروج
   const text = (value, x, y, align = "right", size = 30, weight = 400, direction = "rtl", color = LUXURY_COLORS.textDark, maxWidth = Infinity) => {
     return drawLuxuryText(context, value, x, y, { align, size: Math.round(size * fontScale / 3), weight, color, direction, maxWidth });
   };
@@ -417,18 +408,13 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
     text(value, left + 6 * mm, y, "left", options.valueSize || 30, options.valueWeight || 700, options.ltr ? "ltr" : "rtl", options.color || LUXURY_COLORS.textDark, maxW); 
   };
 
-  // ═══ الترويسة الفخمة ═══
   let y = 20 * mm;
-
-  // خلفية الترويسة المتدرجة
   drawLuxuryGradientBg(context, left - 4*mm, y - 8*mm, right - left + 8*mm, 50*mm, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 16);
 
   if (logoImage) drawStoreLogo(context, logoImage, center, y + 6 * mm, 24 * mm);
 
-  // اسم المتجر بخط كبير أبيض
-  drawLuxuryText(context, storeName || "حسابي", center, y + 22 * mm, { align: "center", size: 56, weight: 700, color: "#ffffff" });
+  drawLuxuryText(context, storeName || "حسابي", center, y + 22 * mm, { align: "center", size: 52, weight: 800, color: "#ffffff", maxWidth: right - left - 20*mm });
 
-  // خط ذهبي تحت الاسم
   context.strokeStyle = LUXURY_COLORS.accent;
   context.lineWidth = 3;
   context.beginPath();
@@ -436,21 +422,16 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
   context.lineTo(center + 40*mm, y + 28*mm);
   context.stroke();
 
-  // تفاصيل المتجر
   drawStoreDetails(context, { storeInfo, right: right - 8*mm, top: y + 2 * mm, width: width - 16*mm });
-
-  // عنوان الفاتورة
   drawLuxuryText(context, "فاتورة شراء", center, y + 38 * mm, { align: "center", size: 36, weight: 700, color: LUXURY_COLORS.accentLight });
 
-  // رقم الفاتورة والتاريخ
   text(`رقم الفاتورة: ${purchase.invoiceNumber || "—"}`, left + 6*mm, y + 8 * mm, "left", 28, 700, "ltr", "#ffffff");
   text(formatDateTime(purchase.date), left + 6*mm, y + 18 * mm, "left", 24, 400, "ltr", LUXURY_COLORS.accentLight);
 
   y += 55 * mm;
 
-  // ═══ بطاقة المورد ═══
   const supplierLines = [
-    ["اسم المورد", purchase.supplierName || "بدون مورد", false],
+    ["اسم المورد", purchase.supplierName || supplier?.name || "بدون مورد", false],
     ["الهاتف", supplier?.phone || purchase.supplierPhone || "غير متوفر", true],
     ["العنوان", supplier?.address || purchase.supplierAddress || "غير متوفر", false],
   ];
@@ -462,14 +443,11 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
   supplierRows.forEach(([label, value, ltr]) => { pair(label, value, y, { ltr, valueSize: 28 }); y += lineHeight; });
   y += 8 * mm;
 
-  // ═══ جدول الأصناف الفخم ═══
   const colBounds = [right, 138 * mm, 117 * mm, 85 * mm, 53 * mm, left];
   const tableTop = y;
 
-  // تروس الجدول بتدرج أخضر داكن
   drawLuxuryGradientBg(context, left, tableTop, right - left, 14 * mm, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 0);
 
-  // نصوص التروس بخط كبير أبيض
   const headerMaxW = [62*mm, 20*mm, 28*mm, 28*mm, 25*mm];
   text("الصنف", right - 5 * mm, tableTop + 7 * mm, "right", 28, 700, "rtl", "#ffffff", headerMaxW[0]);
   text("الكمية", 132 * mm, tableTop + 7 * mm, "right", 28, 700, "rtl", "#ffffff", headerMaxW[1]);
@@ -477,31 +455,25 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
   text("سعر البيع", 69 * mm, tableTop + 7 * mm, "right", 28, 700, "rtl", "#ffffff", headerMaxW[3]);
   text("الإجمالي", left + 5 * mm, tableTop + 7 * mm, "left", 28, 700, "rtl", "#ffffff", headerMaxW[4]);
 
-  // خطوط فاصلة بيضاء رفيعة
   colBounds.slice(1, -1).forEach((x) => vline(x, tableTop, tableTop + 14 * mm, "rgba(255,255,255,0.4)"));
   y += 14 * mm;
 
-  // صفوف الأصناف
   items.forEach((item, index) => {
-    // تظليل متناوب
     if (index % 2 === 0) { 
       context.fillStyle = LUXURY_COLORS.bgLight; 
       context.fillRect(left, y, right - left, itemHeight); 
     }
 
-    // اسم الصنف مع التفاف
     context.save();
     context.font = `700 ${Math.round(26 * fontScale / 3)}px "HesabiArabicPdf", "Noto Naskh Arabic", Tahoma, Arial, sans-serif`;
     const itemNameRows = wrapped(item.productName || "", right - 5 * mm, y + 8 * mm, 62 * mm, { size: 26, weight: 700, maxRows: 2 });
     context.restore();
 
-    // باقي البيانات
     text(`${formatAmount(item.quantity)} ${item.unit || ""}`, 132 * mm, y + 9 * mm, "right", 25, 600, "rtl", LUXURY_COLORS.textDark, 20*mm);
     text(formatMoney(item.unitCost), 101 * mm, y + 9 * mm, "right", 25, 600, "ltr", LUXURY_COLORS.textDark, 28*mm);
     text(formatMoney(item.salePrice ?? 0), 69 * mm, y + 9 * mm, "right", 25, 700, "ltr", LUXURY_COLORS.primary, 28*mm);
     text(formatMoney(item.total), left + 5 * mm, y + 9 * mm, "left", 25, 700, "ltr", LUXURY_COLORS.textDark, 25*mm);
 
-    // تفاصيل إضافية
     let detailY = y + (itemNameRows > 1 ? 20 : 16) * mm;
     const purchaseDetails = [
       item.packageQuantity ? `العبوات: ${formatAmount(item.packageQuantity)} ${item.packageUnit || "عبوة"}` : "",
@@ -519,19 +491,16 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
     }
 
     y += itemHeight;
-    // خطوط فاصلة
     colBounds.slice(1, -1).forEach((x) => vline(x, y - itemHeight, y, LUXURY_COLORS.border));
     rule(y, LUXURY_COLORS.border);
   });
 
-  // إطار الجدول الخارجي
   colBounds.forEach((x) => vline(x, tableTop, y, LUXURY_COLORS.primaryLight));
   rule(tableTop, LUXURY_COLORS.primary);
   rule(y, LUXURY_COLORS.primary);
 
   y += 10 * mm;
 
-  // ═══ ملخص الفاتورة الفخم ═══
   const summaryTop = y;
   const summaryRows = [
     ["الإجمالي قبل الخصم", formatMoney(purchase.subtotal ?? purchase.total), false],
@@ -546,7 +515,6 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
   ];
   const summaryHeight = (summaryRows.length * 9 + 12) * mm;
 
-  // صندوق الملخص بتدرج فخم
   luxuryBox(summaryTop, summaryHeight, LUXURY_COLORS.bgCard);
 
   y += 12 * mm;
@@ -560,7 +528,6 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
     }); 
     y += lineHeight; 
     if (strong) {
-      // خط ذهبي تحت الإجمالي
       context.strokeStyle = LUXURY_COLORS.accent;
       context.lineWidth = 2;
       context.beginPath();
@@ -571,7 +538,6 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
   });
   y += 6 * mm;
 
-  // الملاحظات
   if (purchase.notes) { 
     text("ملاحظات", right, y, "right", 28, 700, "rtl", LUXURY_COLORS.primary); 
     y += 8 * mm; 
@@ -585,7 +551,7 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  كشف حساب العميل - تصميم فخم
+//  كشف حساب العميل - رسم Canvas احتياطي
 // ═══════════════════════════════════════════════════════════════════════════
 function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, formatMoney, formatDateTime }) {
   const mm = 12;
@@ -619,15 +585,12 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
   };
 
   let y = 22 * mm;
-
-  // الترويسة الفخمة
   drawLuxuryGradientBg(context, left - 4*mm, y - 10*mm, right - left + 8*mm, 45*mm, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 16);
 
   if (logoImage) drawStoreLogo(context, logoImage, center, y + 5 * mm, 26 * mm);
 
-  drawLuxuryText(context, storeName || "حسابي", center, y + 20 * mm, { align: "center", size: 62, weight: 700, color: "#ffffff" });
+  drawLuxuryText(context, storeName || "حسابي", center, y + 20 * mm, { align: "center", size: 56, weight: 800, color: "#ffffff", maxWidth: right - left - 20*mm });
 
-  // خط ذهبي
   context.strokeStyle = LUXURY_COLORS.accent;
   context.lineWidth = 3;
   context.beginPath();
@@ -636,26 +599,21 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
   context.stroke();
 
   drawStoreDetails(context, { storeInfo, right: right - 8*mm, top: y + 2 * mm, width: width - 16*mm });
-
   y += 50 * mm;
 
-  // عنوان التقرير
   drawLuxuryText(context, "كشف حساب مديونية عميل", center, y, { align: "center", size: 44, weight: 700, color: LUXURY_COLORS.primary });
   y += 12 * mm;
   text(`تاريخ الإنشاء: ${formatDateTime(new Date().toISOString())}`, right, y, "right", 28, 400, "rtl", LUXURY_COLORS.textMuted);
   y += 12 * mm;
 
-  // بطاقة بيانات العميل الفخمة
   const cardTop = y - 6 * mm;
   const hasPhone = Boolean(account.customer?.phone);
   const hasAddress = Boolean(account.customer?.address);
   const cardHeight = (hasPhone && hasAddress ? 55 : hasPhone || hasAddress ? 43 : 33) * mm;
 
-  // تدرج أخضر فاتح للبطاقة
   drawLuxuryGradientBg(context, left, cardTop, right - left, cardHeight, "#e8f5f0", LUXURY_COLORS.bgLight, 14);
   drawLuxuryBorder(context, left, cardTop, right - left, cardHeight, LUXURY_COLORS.primaryLight, 3, 14);
 
-  // شريط جانبي ذهبي
   context.fillStyle = LUXURY_COLORS.accent;
   context.fillRect(right - 3*mm, cardTop + 5*mm, 3*mm, cardHeight - 10*mm);
 
@@ -674,7 +632,6 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
   if (hasAddress) detail("العنوان", account.customer.address);
   y = cardTop + cardHeight + 15 * mm;
 
-  // ═══ ملخص الحساب - ثلاث بطاقات فخمة ═══
   const summary = [
     ["إجمالي المبيعات الآجلة", formatMoney(account.totalSales), LUXURY_COLORS.bgCard, LUXURY_COLORS.textDark, LUXURY_COLORS.border],
     ["إجمالي المسدد", formatMoney(account.totalPaid), LUXURY_COLORS.bgCard, LUXURY_COLORS.textDark, LUXURY_COLORS.border],
@@ -685,27 +642,21 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
 
   summary.forEach(([label, value, background, color, borderColor], index) => {
     const x = right - (index + 1) * boxWidth - index * boxGap;
-
     drawLuxuryGradientBg(context, x, y, boxWidth, 32 * mm, background, background === LUXURY_COLORS.primary ? LUXURY_COLORS.primaryLight : "#ffffff", 12);
-
     drawLuxuryBorder(context, x, y, boxWidth, 32 * mm, borderColor, 2, 12);
-
     text(label, x + boxWidth - 5 * mm, y + 10 * mm, "right", 26, 600, "rtl", color, boxWidth - 10*mm);
     text(value, x + boxWidth - 5 * mm, y + 22 * mm, "right", 38, 700, "rtl", color, boxWidth - 10*mm);
   });
   y += 45 * mm;
 
-  // عنوان الجدول
   drawLuxuryText(context, "تفاصيل العمليات", right, y, "right", 44, 700, "rtl", LUXURY_COLORS.primary);
   y += 10 * mm;
 
-  // ═══ جدول العمليات الفخم ═══
   const columns = [right, 151 * mm, 105 * mm, 59 * mm, left];
   const colBoundsAcct = [right + 2 * mm, 165 * mm, 130 * mm, 85 * mm, 40 * mm, left - 2 * mm];
   const tableTopAcct = y - 8 * mm;
   const rowHeightAcct = 14 * mm;
 
-  // تروس الجدول
   drawLuxuryGradientBg(context, left, tableTopAcct, right - left, rowHeightAcct, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 0);
 
   const acctHeaders = ["العملية", "التاريخ", "المرجع", "القيمة", "الرصيد بعد العملية"];
@@ -741,7 +692,6 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
     line(left, y, right, y, LUXURY_COLORS.border, 1.5);
   });
 
-  // إطار الجدول
   colBoundsAcct.forEach((x) => line(x, tableTopAcct, x, y, LUXURY_COLORS.primaryLight, 2));
   line(left, tableTopAcct, right, tableTopAcct, LUXURY_COLORS.primary, 2.5);
   line(left, y, right, y, LUXURY_COLORS.primary, 2.5);
@@ -752,13 +702,11 @@ function drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, f
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  التقارير المالية - تصميم فخم مع منع خروج النصوص
+//  التقارير المالية - رسم Canvas احتياطي
 // ═══════════════════════════════════════════════════════════════════════════
 function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
   const mm = 12, wide = rows[0]?.length > 6, width = (wide ? 297 : 210) * mm, pageHeight = (wide ? 210 : 297) * mm, left = 14 * mm, right = width - left, center = width / 2;
-  const headerHeight = (wide ? 72 : 78) * mm, footerHeight = 20 * mm, rowHeight = (wide ? 26 : 24) * mm;
-  // اترك صف رأس الجدول ومساحة التذييل خارج عدد الصفوف حتى لا يتداخل التذييل
-  // مع آخر صف في الصفحة. أحجام الخط أصغر من الفاتورة لتفادي اختصار الأرقام.
+  const headerHeight = (wide ? 72 : 78) * mm, rowHeight = (wide ? 26 : 24) * mm;
   const tableFont = wide ? 20 : 30, bodyFont = wide ? 18 : 28;
   const footerReserve = 28 * mm;
   const rowsPerPage = Math.max(1, Math.floor((pageHeight - headerHeight - footerReserve - rowHeight) / rowHeight));
@@ -789,25 +737,21 @@ function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
   const drawHeader = (page, xs) => {
     const top = page * pageHeight; 
 
-    // إطار الترويسة الفخم
     drawLuxuryGradientBg(context, left, top + 8*mm, right - left, 35*mm, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 14);
     drawLuxuryBorder(context, left, top + 8*mm, right - left, 35*mm, LUXURY_COLORS.accent, 2.5, 14);
 
     if (logoImage) drawStoreLogo(context, logoImage, center, top + 22*mm, 22*mm);
 
-    // اسم المتجر والتقرير
-    text(storeName || 'حسابي', right - 8*mm, top + 16*mm, 'right', 40, 700, '#ffffff', 'rtl', 65*mm); 
-    text('تقرير مالي وتحليلي', right - 8*mm, top + 27*mm, 'right', 28, 600, LUXURY_COLORS.accentLight, 'rtl', 65*mm);
+    text(storeName || 'حسابي', right - 8*mm, top + 16*mm, 'right', 40, 800, '#ffffff', 'rtl', right - left - 30*mm); 
+    text('تقرير مالي وتحليلي', right - 8*mm, top + 27*mm, 'right', 28, 600, LUXURY_COLORS.accentLight, 'rtl', 100*mm);
 
-    text('Hesabi · Store Report', left + 8*mm, top + 16*mm, 'left', 32, 700, '#ffffff', 'ltr', 65*mm); 
-    text(`${from||'بداية السجل'} - ${to||'اليوم'}`, left + 8*mm, top + 27*mm, 'left', 26, 500, LUXURY_COLORS.accentLight, 'ltr', 65*mm);
+    text('Hesabi · Store Report', left + 8*mm, top + 16*mm, 'left', 32, 700, '#ffffff', 'ltr', 80*mm); 
+    text(`${from||'بداية السجل'} - ${to||'اليوم'}`, left + 8*mm, top + 27*mm, 'left', 26, 500, LUXURY_COLORS.accentLight, 'ltr', 80*mm);
 
-    // خط الفترة
     line(left, top + 48*mm, right, top + 48*mm, LUXURY_COLORS.accent, 2);
     text(`الفترة: ${from||'بداية السجل'} إلى ${to||'اليوم'}`, center, top + 55*mm, 'center', 34, 700, LUXURY_COLORS.primary, 'rtl', 170*mm); 
     text(`صفحة ${page+1} من ${pageCount}`, center, top + 66*mm, 'center', 24, 400, LUXURY_COLORS.textMuted, 'rtl', 170*mm);
 
-    // تروس الجدول
     const tableTop = top + headerHeight, count = xs.length, bounds = [left, ...xs.slice(1).map((x,i)=>(x+xs[i])/2), right];
     drawLuxuryGradientBg(context, left, tableTop, right - left, rowHeight, LUXURY_COLORS.primary, LUXURY_COLORS.primaryLight, 0);
 
@@ -843,7 +787,6 @@ function drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }) {
       y += rowHeight; 
     }); 
 
-    // إطار الجدول
     line(left, y, right, y, LUXURY_COLORS.primary, 2.5); 
     header.bounds.forEach((x) => line(x, bodyTop, x, y, LUXURY_COLORS.primaryLight, 1.5)); 
     line(left, page * pageHeight + headerHeight, left, y, LUXURY_COLORS.primary, 2); 
@@ -901,38 +844,30 @@ export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
 
 const escapePdfValue = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]));
 
-export async function createThermalInvoicePdfFile({ invoice, customer, storeName, storeInfo, logoDataUrl, formatMoney, formatAmount, formatDateTime, paymentLabel, filename }) {
+export async function createThermalInvoicePdfFile({ invoice, customer, storeName, logoDataUrl, storeInfo, formatMoney, formatAmount, formatDateTime, paymentLabel, filename }) {
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[character]));
-  const html = renderThermalInvoiceHtml({ invoice, customer, storeName, logoDataUrl, formatMoney, formatAmount, formatDateTime, escapeHtml, paymentLabel });
+  const html = renderThermalInvoiceHtml({ invoice, customer, storeName, logoDataUrl, storeInfo, formatMoney, formatAmount, formatDateTime, escapeHtml, paymentLabel });
   return createPdfFileFromHtml({ html, filename, page: "thermal" });
 }
 
-export async function createPurchaseInvoicePdfFile({ purchase, supplier, storeName, storeInfo, logoDataUrl, formatMoney, formatAmount, formatDateTime, filename }) {
-  await loadCanvasArabicFont();
-  const logoImage = await loadStoreLogoImage(logoDataUrl);
-  const pdf = createA4PdfFromCanvas(drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, logoImage, formatMoney, formatAmount, formatDateTime }));
-  const blob = pdf.output("blob");
-  if (!blob || blob.size < 800) throw new Error("تعذر إنشاء ملف PDF واضح لفاتورة الشراء.");
-  return new File([blob], filename, { type: "application/pdf" });
+export async function createPurchaseInvoicePdfFile({ purchase, supplier, storeName, storeInfo, logoDataUrl, formatMoney, formatAmount, formatDateTime, filename, html }) {
+  if (html) return createPdfFileFromHtml({ html, filename, page: "a4" });
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[character]));
+  const generatedHtml = renderPurchaseInvoiceHtml({ purchase, supplier, storeName, storeInfo, logoDataUrl, formatMoney, formatAmount, formatDateTime, escapeHtml });
+  return createPdfFileFromHtml({ html: generatedHtml, filename, page: "a4" });
 }
 
 export async function createCustomerAccountPdfFile({ account, storeName, storeInfo, logoDataUrl, formatMoney, formatDateTime, filename, html }) {
   if (html) return createPdfFileFromHtml({ html, filename, page: "a4" });
-  await loadCanvasArabicFont();
-  const logoImage = await loadStoreLogoImage(logoDataUrl);
-  const pdf = createA4PdfFromCanvas(drawCustomerAccountCanvas({ account, storeName, storeInfo, logoImage, formatMoney, formatDateTime }));
-  const blob = pdf.output("blob");
-  if (!blob || blob.size < 800) throw new Error("تعذر إنشاء ملف PDF واضح لكشف الحساب.");
-  return new File([blob], filename, { type: "application/pdf" });
+  const escapeHtml = (value) => String(value ?? "").replace(/[&<>\"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[character]));
+  const generatedHtml = renderCustomerAccountHtml({ account, storeName, storeInfo, logoDataUrl, formatMoney, formatDateTime, escapeHtml });
+  return createPdfFileFromHtml({ html: generatedHtml, filename, page: "a4" });
 }
 
-export async function createReportPdfFile({ rows, storeName, storeInfo, logoDataUrl, from, to, filename }) {
-  await loadCanvasArabicFont();
-  const logoImage = await loadStoreLogoImage(logoDataUrl);
-  const pdf = createA4PdfFromCanvas(drawReportCanvas({ rows, storeName, storeInfo, logoImage, from, to }), rows[0]?.length > 6 ? "landscape" : "portrait");
-  const blob = pdf.output("blob");
-  if (!blob || blob.size < 800) throw new Error("تعذر إنشاء تقرير PDF عربي واضح.");
-  return new File([blob], filename, { type: "application/pdf" });
+export async function createReportPdfFile({ rows, storeName, storeInfo, logoDataUrl, from, to, title = "التقرير المالي", filename, html }) {
+  if (html) return createPdfFileFromHtml({ html, filename, page: "a4" });
+  const generatedHtml = renderOfficialReportHtml({ title, rows, storeName, storeInfo, logoDataUrl, from, to, generatedAt: new Date().toLocaleString("ar-YE") });
+  return createPdfFileFromHtml({ html: generatedHtml, filename, page: "a4" });
 }
 
 export async function shareOrDownloadPdf({ html, filename, title, page = "a4" }) { return fileOrDownload(await createPdfFileFromHtml({ html, filename, page }), title); }

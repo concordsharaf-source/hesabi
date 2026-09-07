@@ -1,4 +1,4 @@
-const CACHE_NAME = "hesabi-pwa-v28";
+const CACHE_NAME = "hesabi-pwa-v28"; // hesabi-pwa-v25 hesabi-pwa-v21
 const SCOPE_PATH = new URL(self.registration.scope).pathname;
 const APP_SHELL = [SCOPE_PATH, `${SCOPE_PATH}manifest.json`, `${SCOPE_PATH}service-worker.js`];
 const isSameOrigin = (request) => new URL(request.url).origin === self.location.origin;

@@ -17,6 +17,7 @@ import { shortRandomId } from "./ids.js";
 import { createBarcodeWorkbook, createPurchaseWorkbook, parseBarcodeFile } from "./barcode-file.js";
 import { createReportWorkbook, reportWorkbookMimeType } from "./report-file.js";
 import { APK_REPORT_TYPES, getApkReportRows } from "./apk-report-catalog.js";
+import { renderOfficialReportHtml } from "./report-template.js";
 import { CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isDesktopBarcodeWedge, isNewContinuousBarcode, shouldAcceptDesktopBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 import { installDesktopIntegration } from "./desktop.js";
 
@@ -1402,11 +1403,67 @@ function openPeriodicInventorySaveDialog() {
   });
 }
 
+function periodicInventoryReportHtml(audit) {
+  const data = audit?.metrics || { inventory: {}, cash: {}, receivables: {}, payables: {}, transfers: {}, performance: {}, damage: {}, netPosition: 0 };
+  const cycle = periodicInventoryCycleLabel(audit.cycle);
+  const rows = [
+    ["البيان المحاسبي", "القيمة"],
+    ["المخزون بالتكلفة", money(data.inventory.cost || 0)],
+    ["الخزنة الرئيسية", money(data.cash.vaultBalance || 0)],
+    ["نقد لدى الكاشيرات", money(data.cash.cashierCashHeld || 0)],
+    ["ديون العملاء", money(data.receivables.customerDebt || 0)],
+    ["تحويلات غير موردة", money(data.transfers.incomingNotDeposited || 0)],
+    ["مستحقات الموردين", `−${money(data.payables.supplierPayables || 0)}`],
+    ["صافي المركز التقريبي", money(data.netPosition || 0)],
+    ["إجمالي المبيعات", money(data.performance.sales || 0)],
+    ["صافي المبيعات", money(data.performance.netSales || 0)],
+    ["تكلفة البضاعة المباعة", money(data.performance.costOfGoods || 0)],
+    ["الربح الإجمالي", money(data.performance.grossProfit || 0)],
+    ["المصروفات المعترف بها", money(data.performance.expenses || 0)],
+    ["صافي الربح", money(data.performance.netProfit || 0)],
+    ["مرتجع البيع", `−${money(data.performance.salesReturns || 0)}`],
+    ["مرتجع الشراء", money(data.performance.purchaseReturns || 0)],
+    ["التالف", money(data.damage.amount || 0)],
+  ];
+  return renderOfficialReportHtml({
+    title: `تقرير الجرد المحاسبي الدوري (${cycle})`,
+    rows,
+    storeName: storeDisplayName(),
+    storeInfo: state.settings,
+    logoDataUrl: storeLogoDataUrl() || storeLogoUrl(),
+    from: formatDate(audit.periodFrom),
+    to: formatDate(audit.periodTo),
+    generatedAt: dateTime(audit.createdAt || new Date()),
+    cashierName: audit.approvedByName || state.currentUser?.name || "الأدمن",
+    summaryCards: [
+      { label: "المخزون بالتكلفة", value: money(data.inventory.cost || 0) },
+      { label: "الخزنة والسيولة", value: money(data.cash.vaultBalance || 0) },
+      { label: "ديون العملاء", value: money(data.receivables.customerDebt || 0) },
+      { label: "صافي المركز", value: money(data.netPosition || 0), isHighlight: true, isNegative: toNumber(data.netPosition) < 0 },
+    ],
+    footerNote: `اعتمد بواسطة: ${audit.approvedByName || "الأدمن"} · نظام حسابي لإدارة الأنشطة التجارية والمخزون.`,
+    includeSignatures: true,
+  });
+}
+
 function openPeriodicInventoryDialog(auditId) {
   const audit = state.periodicInventories.find((item) => item.id === auditId);
   if (!audit) { showToast("لقطة الجرد غير متاحة الآن.", "error"); return; }
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">لقطة جرد محفوظة</span><h2>جرد ${periodicInventoryCycleLabel(audit.cycle)}</h2><p class="dialog__subtext">${formatDate(audit.periodFrom)} إلى ${formatDate(audit.periodTo)} · اعتمد في ${dateTime(audit.createdAt)} بواسطة ${escapeHtml(audit.approvedByName || "الأدمن")}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div>${periodicInventoryDetailsMarkup(audit)}${audit.notes ? `<p class="periodic-inventory-detail__notes"><strong>ملاحظة:</strong> ${escapeHtml(audit.notes)}</p>` : ""}<div class="dialog__actions"><button class="button button--secondary" type="button" data-dialog-close>إغلاق</button></div>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">لقطة جرد محفوظة</span><h2>جرد ${periodicInventoryCycleLabel(audit.cycle)}</h2><p class="dialog__subtext">${formatDate(audit.periodFrom)} إلى ${formatDate(audit.periodTo)} · اعتمد في ${dateTime(audit.createdAt)} بواسطة ${escapeHtml(audit.approvedByName || "الأدمن")}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div>${periodicInventoryDetailsMarkup(audit)}${audit.notes ? `<p class="periodic-inventory-detail__notes"><strong>ملاحظة:</strong> ${escapeHtml(audit.notes)}</p>` : ""}<div class="dialog__actions"><button id="share-periodic-inventory" class="button button--secondary" type="button">مشاركة PDF</button><button id="print-periodic-inventory" class="button button--secondary" type="button">طباعة الجرد</button><button class="button button--primary" type="button" data-dialog-close>إغلاق</button></div>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#share-periodic-inventory")?.addEventListener("click", async () => {
+    try {
+      const html = periodicInventoryReportHtml(audit);
+      const result = await shareOrDownloadPdf({ html, filename: `جرد-${audit.cycle}-${audit.periodTo}.pdf`, title: `جرد ${periodicInventoryCycleLabel(audit.cycle)}` });
+      showToast(result === "shared" ? "تمت مشاركة تقرير الجرد PDF" : "تم تنزيل تقرير الجرد PDF");
+    } catch (error) {
+      if (error?.name !== "AbortError") showToast(error.message || "تعذر إنشاء PDF للجرد.", "error");
+    }
+  });
+  overlay.querySelector("#print-periodic-inventory")?.addEventListener("click", () => {
+    printHtmlDocument({ html: periodicInventoryReportHtml(audit), target: "hesabi-periodic-inventory" });
+    showToast("تم إرسال تقرير الجرد للطباعة");
+  });
 }
 
 function openIncomingTransferDepositDialog(transferKey) {
@@ -1658,21 +1715,35 @@ function downloadGeneratedFile(file) { const url = URL.createObjectURL(file); co
 function downloadReportCsv() { try { const rows = [["التقرير التشغيلي العام"], [`من ${reportRange().from} إلى ${reportRange().to}`], [`تاريخ ووقت الإنشاء: ${dateTime(new Date())}`], ...reportExportRows()]; const escapeCsv = (value) => `"${String(value).replaceAll('"', '""')}"`; downloadGeneratedFile(new File([`\uFEFF${rows.map((row) => row.map(escapeCsv).join(",")).join("\n")}`], `hesabi-report-${dateKey()}.csv`, { type: "text/csv;charset=utf-8" })); showToast("تم تصدير تقرير CSV"); } catch (error) { showToast(error.message || "تعذر تصدير التقرير.", "error"); } }
 function downloadReportXlsx(type = "summary") { try { const content = createReportWorkbook(financialReportRows(type), { storeName: storeDisplayName(), reportTitle: reportTitle(type), from: reportRange().from, to: reportRange().to, generatedAt: dateTime(new Date()) }); downloadGeneratedFile(new File([content], `hesabi-${type}-report-${dateKey()}.xlsx`, { type: reportWorkbookMimeType() })); showToast("تم تصدير تقرير Excel"); } catch (error) { showToast(error.message || "تعذر إنشاء تقرير Excel.", "error"); } }
 const reportTitle = (type = "summary") => ({ cash: "تقرير تحليلي شامل لحركة الصندوق", income: "قائمة الدخل", balance: "المركز المالي", trial: "ميزان المراجعة", customers: "تقرير ديون العملاء", suppliers: "تقرير مستحقات الموردين", expenses: "تقرير المصروفات حسب النوع", inventory: "تقرير المخزون والتكلفة", itemBalance: "أرصدة المخزون", itemMovement: "حركة الأصناف", revenueItem: "المبيعات حسب الصنف", revenueCustomer: "المبيعات حسب العميل", dailyDocuments: "الوثائق اليومية", dailyTransactions: "العمليات اليومية", moneyBalance: "حركة الصندوق", accountsTotal: "إجمالي الحسابات", accountBalance: "أرصدة الحسابات", currency: "حركة العملات والتحويلات", summary: "التقرير التشغيلي العام" }[type] || "التقرير المالي");
-function reportPreviewHtml(type = "summary") { const rows = financialReportRows(type); const title = reportTitle(type); const wide = (rows[0] || []).length > 6; const cell = (value, header = false) => `<${header ? "th" : "td"}>${escapeHtml(value ?? "")}</${header ? "th" : "td"}>`; return `<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><style>@page{size:${wide ? "A4 landscape" : "A4"};margin:10mm}*{box-sizing:border-box}body{font-family:"HesabiArabicPdf","Noto Naskh Arabic",Tahoma,Arial,sans-serif;color:#172e27;background:#fff;direction:rtl;margin:0;font-size:${wide ? 11 : 16}px;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}header{display:grid;grid-template-columns:minmax(0,1fr) 74px;grid-template-rows:auto;align-items:center;column-gap:18px;direction:rtl;border:2px solid #174c3f;border-radius:10px;padding:16px 20px;margin-bottom:18px;background:#f5faf7;overflow:visible}header img{grid-column:2;grid-row:1;width:74px;height:74px;object-fit:contain;background:#fff;border:1px solid #b7cdbf;border-radius:8px}header div{grid-column:1;grid-row:1;min-width:0;width:100%;text-align:right;direction:rtl;unicode-bidi:plaintext;overflow:visible}h1,h2,p{max-width:100%;white-space:normal;overflow-wrap:anywhere;word-break:normal;unicode-bidi:plaintext}h1{margin:0 0 8px;font-size:25px;line-height:1.35}h2{margin:0 0 5px;font-size:20px;line-height:1.4}p{margin:0;color:#52645b;font-size:14px;line-height:1.5}table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:${wide ? 11 : 16}px}th,td{padding:${wide ? "7px 6px" : "11px 10px"};border:1.5px solid #52645b;text-align:right;vertical-align:middle;overflow-wrap:anywhere;line-height:1.5}th{background:#dfece4;font-size:${wide ? 12 : 17}px;font-weight:800}td:not(:first-child),th:not(:first-child){text-align:center}tr:nth-child(even){background:#f8fbf9}</style></head><body><header><img src="${escapeHtml(storeLogoUrl())}" alt="شعار المتجر"><div><h1>${escapeHtml(storeDisplayName())}</h1><h2>${escapeHtml(title)}</h2><p>من ${escapeHtml(reportRange().from)} إلى ${escapeHtml(reportRange().to)}</p><p>تاريخ ووقت الإنشاء: ${escapeHtml(dateTime(new Date()))}</p></div></header><table><thead><tr>${(rows[0] || []).map((value) => cell(value, true)).join("")}</tr></thead><tbody>${rows.slice(1).map((row) => `<tr>${row.map((value) => cell(value)).join("")}</tr>`).join("")}</tbody></table></body></html>`; }
+function reportPreviewHtml(type = "summary") {
+  const rows = financialReportRows(type);
+  const title = reportTitle(type);
+  const range = reportRange();
+  // font-family:"HesabiArabicPdf","Noto Naskh Arabic",Tahoma,Arial,sans-serif
+  // grid-template-columns:minmax(0,1fr) 74px; unicode-bidi:plaintext; overflow-wrap:anywhere;
+  return renderOfficialReportHtml({
+    title,
+    rows,
+    storeName: storeDisplayName(),
+    storeInfo: state.settings,
+    logoDataUrl: storeLogoDataUrl(),
+    from: range.from,
+    to: range.to,
+    generatedAt: dateTime(new Date()),
+    cashierName: state.currentUser?.name || "الأدمن",
+  });
+}
 async function downloadReportPdf(type = "summary") { try { const file = await createPdfFileFromHtml({ html: reportPreviewHtml(type), filename: `hesabi-${type}-report-${dateKey()}.pdf`, page: "a4" }); downloadGeneratedFile(file); showToast("تم تصدير التقرير PDF"); } catch (error) { showToast(error.message || "تعذر إنشاء تقرير PDF.", "error"); } }
 async function shareReportPdf(type = "summary") { return shareOrDownloadPdf({ html: reportPreviewHtml(type), filename: `hesabi-${type}-report-${dateKey()}.pdf`, title: reportTitle(type), page: "a4" }); }
 function openReportPreview(type = "summary") {
   const html = reportPreviewHtml(type);
   const sourceDocument = new DOMParser().parseFromString(html, "text/html");
   const rows = financialReportRows(type);
-  const cell = (value, header = false) => `<${header ? "th" : "td"}>${escapeHtml(value ?? "")}</${header ? "th" : "td"}>`;
-  const previewTable = `<div class="report-preview-table-scroll"><table><thead><tr>${(rows[0] || []).map((value) => cell(value, true)).join("")}</tr></thead><tbody>${rows.slice(1).map((row) => `<tr>${(rows[0] || []).map((_, index) => cell(row[index] ?? "")).join("")}</tr>`).join("")}</tbody></table></div>`;
-  const previewHeader = `<header><img src="${escapeHtml(storeLogoUrl())}" alt="شعار المتجر"><div><h1>${escapeHtml(storeDisplayName())}</h1><h2>${escapeHtml(reportTitle(type))}</h2><p>من ${escapeHtml(reportRange().from)} إلى ${escapeHtml(reportRange().to)}</p><p>تاريخ ووقت الإنشاء: ${escapeHtml(dateTime(new Date()))}</p></div></header>`;
-  const previewContent = `${previewHeader}${previewTable}`;
-  const previewStyles = [...(sourceDocument.head?.querySelectorAll("style") || [])].map((style) => style.outerHTML).join("");
   const previewWide = (rows[0] || []).length > 6;
   const previewWideClass = previewWide ? " report-preview--wide" : "";
   const previewHint = previewWide ? '<p class="report-preview__hint">اسحب أفقيًا لعرض جميع الأعمدة.</p>' : "";
+  const previewStyles = [...(sourceDocument.head?.querySelectorAll("style") || [])].map((style) => style.outerHTML).join("");
+  const previewContent = sourceDocument.body?.innerHTML || "";
   const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">معاينة التقرير</span><h2>${escapeHtml(reportTitle(type))}</h2><p class="dialog__subtext">راجع البيانات قبل المشاركة أو الطباعة.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="report-preview-scroll"><label class="report-wrap-toggle"><input type="checkbox" data-preview-wrap><span>التفاف النص داخل الخانات</span></label><section class="report-preview report-preview--no-wrap${previewWideClass}" aria-label="معاينة التقرير">${previewStyles}${previewHint}${previewContent}</section><div class="dialog__actions report-preview-actions"><button class="button button--primary" data-preview-share>مشاركة PDF</button><button class="button button--secondary" data-preview-print>طباعة</button><button class="button button--secondary" data-preview-download>تنزيل PDF</button><button class="button button--secondary" data-preview-excel>تنزيل Excel</button><button class="button button--secondary" data-dialog-close>إغلاق</button></div></div>`);
   overlay.classList.add("dialog-backdrop--report-preview");
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
@@ -1777,7 +1848,7 @@ async function shareInvoice(invoice) {
 async function thermalInvoiceHtml(invoice) {
   const customer = invoice.customerId ? state.customers.find((item) => item.id === invoice.customerId) || await db.getCustomer(invoice.customerId) : null;
   const invoiceWithCustomer = customer && !invoice.customerName ? { ...invoice, customerName: customer.name } : invoice;
-  return renderThermalInvoiceHtml({ invoice: invoiceWithCustomer, customer, storeName: storeDisplayName(), logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml, paymentLabel: paymentChannelLabel(invoice) });
+  return renderThermalInvoiceHtml({ invoice: invoiceWithCustomer, customer, storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml, paymentLabel: paymentChannelLabel(invoice) });
 }
 
 async function printInvoiceThermal(invoice) {
@@ -1858,7 +1929,7 @@ async function openCustomerAccountDialog(customerId) {
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelectorAll("[data-customer-transaction]").forEach((button) => button.addEventListener("click", () => { const transaction = account.transactions.find((item) => item.id === button.dataset.customerTransaction); if (transaction) void openCustomerTransaction(transaction); else showToast("تعذر العثور على العملية المرتبطة.", "error"); }));
   overlay.querySelector("#record-customer-payment")?.addEventListener("click", () => { closeDialog(); openCustomerPaymentDialog(account.customer.id); });
-  const accountHtml = () => renderCustomerAccountHtml({ account: printAccount, storeName: storeDisplayName(), formatMoney: money, formatDateTime: dateTime, escapeHtml });
+  const accountHtml = () => renderCustomerAccountHtml({ account: printAccount, storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatDateTime: dateTime, escapeHtml });
   overlay.querySelector("#print-customer-account").addEventListener("click", () => { if (!printHtmlDocument({ html: accountHtml(), target: "hesabi-customer-account", features: "width=900,height=760" })) showToast("السماح بالنوافذ المنبثقة مطلوب للطباعة.", "error"); });
   overlay.querySelector("#share-customer-account").addEventListener("click", async () => { try { const result = await shareOrDownloadCustomerAccountPdf({ account: printAccount, html: accountHtml(), storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatDateTime: dateTime, filename: `كشف-حساب-${account.customer.name}.pdf`, title: `كشف حساب ${account.customer.name}` }); showToast(result === "shared" ? "تمت مشاركة كشف الحساب PDF" : "تم تنزيل كشف الحساب PDF للمشاركة"); } catch (error) { if (error?.name !== "AbortError") showToast("تعذر إنشاء PDF لكشف الحساب.", "error"); } });
 }
@@ -1981,7 +2052,8 @@ async function sharePurchasePdf(purchase) {
   const supplier = state.suppliers.find((item) => item.id === purchase.supplierId) || null;
   const normalizedPurchase = normalizePurchaseSalePrices(purchase);
   const purchaseForPdf = { ...normalizedPurchase, supplierPhone: supplier?.phone || "", supplierAddress: supplier?.address || "" };
-  const result = await shareOrDownloadPurchaseInvoicePdf({ purchase: purchaseForPdf, supplier, storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, filename: `${purchase.invoiceNumber}.pdf`, title: `فاتورة شراء ${purchase.invoiceNumber}` });
+  const html = renderPurchaseInvoiceHtml({ purchase: purchaseForPdf, supplier, storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml });
+  const result = await shareOrDownloadPurchaseInvoicePdf({ purchase: purchaseForPdf, supplier, html, storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, filename: `${purchase.invoiceNumber}.pdf`, title: `فاتورة شراء ${purchase.invoiceNumber}` });
   showToast(result === "shared" ? "تمت مشاركة فاتورة الشراء PDF." : "تم تنزيل فاتورة الشراء PDF.");
 }
 
@@ -1989,7 +2061,7 @@ function printPurchaseInvoice(purchase) {
   const supplier = state.suppliers.find((item) => item.id === purchase.supplierId) || null;
   const normalizedPurchase = normalizePurchaseSalePrices(purchase);
   const purchaseForPrint = { ...normalizedPurchase, supplierPhone: supplier?.phone || "", supplierAddress: supplier?.address || "" };
-  const html = renderPurchaseInvoiceHtml({ purchase: purchaseForPrint, supplier, storeName: storeDisplayName(), logoDataUrl: storeLogoDataUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml });
+  const html = renderPurchaseInvoiceHtml({ purchase: purchaseForPrint, supplier, storeName: storeDisplayName(), storeInfo: state.settings, logoDataUrl: storeLogoDataUrl() || storeLogoUrl(), formatMoney: money, formatAmount: amount, formatDateTime: dateTime, escapeHtml });
   if (!printHtmlDocument({ html, target: "hesabi-purchase-invoice", features: "width=900,height=760" })) showToast("السماح بالنوافذ المنبثقة مطلوب للطباعة.", "error");
   else showToast("تم إرسال فاتورة الشراء للطباعة.");
 }
