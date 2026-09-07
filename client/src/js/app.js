@@ -59,7 +59,7 @@ const icon = (name, size = 20) => {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ""}</svg>`;
 };
 
-const state = { view: "dashboard", lastStableView: "dashboard", showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
+const state = { view: "dashboard", lastStableView: "dashboard", showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
 const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "purchases"].includes(id))];
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
@@ -499,7 +499,10 @@ function salesMarkup() {
   const totals = calculateSaleTotals(state.cart);
   return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.", `<button class="button button--secondary" data-action="navigate" data-view="invoices">${icon("receipt", 17)}<span>الفواتير</span></button>`)}
   <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div><p class="desktop-barcode-reader-note">${icon("scan", 15)} قارئ الباركود المتصل بالكمبيوتر يعمل مباشرةً في صفحة المبيعات؛ امسح الرمز ثم Enter أو Tab.</p>
-  <div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => `<div class="sale-product-line"><button class="sale-product ${product.quantity <= 0 && !state.settings?.allowNegativeSales ? "is-disabled" : ""}" data-action="add-cart" data-id="${product.id}" ${product.quantity <= 0 && !state.settings?.allowNegativeSales ? "disabled" : ""}><div><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)} متاح</small></div><span>${money(product.salePrice)}</span><i>${icon("plus", 18)}</i></button>${productSupplierActions(product)}</div>`).join("") : `<div class="no-match"><strong>لا توجد نتيجة</strong><span>تحقق من الاسم أو الباركود أو أضف منتجًا جديدًا.</span><button class="text-button" data-action="new-product">إنشاء منتج</button></div>`}</div></div>
+  <div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => {
+    const isFlash = state.lastAddedProductId === product.id;
+    return `<div class="sale-product-line"><button class="sale-product ${product.quantity <= 0 && !state.settings?.allowNegativeSales ? "is-disabled" : ""} ${isFlash ? "is-flash-added" : ""}" data-action="add-cart" data-id="${product.id}" ${product.quantity <= 0 && !state.settings?.allowNegativeSales ? "disabled" : ""}><div><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)} متاح</small></div><span>${money(product.salePrice)}</span><i>${icon(isFlash ? "check" : "plus", 18)}</i></button>${productSupplierActions(product)}</div>`;
+  }).join("") : `<div class="no-match"><strong>لا توجد نتيجة</strong><span>تحقق من الاسم أو الباركود أو أضف منتجًا جديدًا.</span><button class="text-button" data-action="new-product">إنشاء منتج</button></div>`}</div></div>
   <aside class="cart-panel"><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div>${state.cart.length ? `<button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div>
   <div class="cart-lines">${state.cart.length ? state.cart.map(cartLine).join("") : `<div class="cart-empty">${icon("cart", 30)}<p>اختر منتجًا من القائمة لتبدأ البيع.</p></div>`}</div>
   <div class="cart-total"><div class="cart-total__summary"><div><span>إجمالي السلة</span><strong data-cart-subtotal>${money(totals.subtotal)}</strong></div></div><button class="button button--primary button--wide checkout-launch" data-action="checkout" ${state.cart.length ? "" : "disabled"}>إتمام البيع ${icon("arrow", 18)}</button></div></aside></section><section class="sales-bottom-action"><div><span class="eyebrow">سجل المبيعات</span><strong>فواتير المبيعات</strong><small>اعرض الفواتير المحفوظة وابحث عنها وراجع تفاصيل كل فاتورة.</small></div><button class="button button--primary" data-action="navigate" data-view="invoices">${icon("receipt", 22)}<span>الانتقال إلى فواتير المبيعات</span></button></section>`;
@@ -510,7 +513,8 @@ function cartLine(line) {
   const unitsPerPackage = Math.max(1, Math.floor(toNumber(line.unitsPerPackage ?? product?.unitsPerPackage) || 1)); const packageUnit = line.packageUnit || product?.purchasePackageUnit || "كرتون"; const soldAsPackage = Boolean(line.soldAsPackage && unitsPerPackage > 1); const cartonCount = Math.max(1, Math.round(toNumber(line.quantity) / unitsPerPackage)); const totals = calculateSaleTotals([line]); const canSellCarton = unitsPerPackage > 1 && (state.settings?.allowNegativeSales || toNumber(product?.quantity) >= unitsPerPackage);
   const quantityInput = soldAsPackage ? `<input data-cart-carton-count="${line.productId}" type="number" inputmode="numeric" min="1" ${state.settings?.allowNegativeSales ? "" : `max="${Math.floor(toNumber(product?.quantity) / unitsPerPackage)}"`} step="1" value="${cartonCount}" aria-label="عدد الكراتين" />` : `<input data-cart-quantity="${line.productId}" type="number" inputmode="decimal" min="1" ${state.settings?.allowNegativeSales ? "" : `max="${toNumber(product?.quantity)}"`} step="1" value="${line.quantity}" aria-label="عدد الحبات" />`;
   const cashierHint = state.currentUser?.role === "cashier" ? "حد الكاشير: 10% من قيمة السطر." : "مثال: 100 أو 10%";
-  return `<article class="cart-line ${soldAsPackage ? "cart-line--package" : ""}"><div class="cart-line__detail"><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(line.name)}</strong><small>${money(line.unitPrice)} × ${amount(line.quantity)} ${escapeHtml(product?.unit || "حبة")}${soldAsPackage ? ` · ${amount(cartonCount)} ${escapeHtml(packageUnit)}` : ""}</small></div><strong data-cart-line-total="${line.productId}">${money(totals.total)}</strong><label class="cart-line__price ${state.settings?.allowSalePriceEdit ? "" : "cart-line__price--locked"}" title="${state.settings?.allowSalePriceEdit ? "يمكن تعديل السعر قبل إتمام البيع" : "تعديل السعر معطل من الإعدادات"}"><span>سعر البيع</span><input data-cart-line-price="${line.productId}" type="number" inputmode="decimal" min="0" step="0.01" value="${escapeHtml(line.unitPrice)}" aria-label="سعر بيع ${escapeHtml(line.name)}" ${state.settings?.allowSalePriceEdit ? "" : "disabled"} /></label><div class="cart-line__controls"><div class="quantity-control quantity-control--dark"><button aria-label="إنقاص ${soldAsPackage ? "كرتون" : "حبة"}" data-action="cart-decrement" data-id="${line.productId}">${icon("minus", 15)}</button>${quantityInput}<button aria-label="زيادة ${soldAsPackage ? "كرتون" : "حبة"}" data-action="cart-increment" data-id="${line.productId}">${icon("plus", 15)}</button></div>${unitsPerPackage > 1 ? `<button class="carton-toggle ${soldAsPackage ? "is-active" : ""}" data-action="toggle-carton-sale" data-id="${line.productId}" ${canSellCarton ? "" : "disabled"} aria-pressed="${soldAsPackage}" aria-label="${soldAsPackage ? "العودة للبيع بالحبات" : `بيع ${packageUnit}`}" title="${soldAsPackage ? "العودة للبيع بالحبات" : `بيع ${packageUnit}: ${unitsPerPackage} حبة`}">${icon("package", 17)}</button>` : ""}<label class="cart-line__discount" title="خصم السطر بالمبلغ أو النسبة"><span>خصم</span><input data-cart-line-discount="${line.productId}" type="text" inputmode="decimal" maxlength="4" value="${escapeHtml(line.discount || "")}" placeholder="خصم" autocomplete="off" aria-label="خصم السطر" /></label></div>${soldAsPackage ? `<div class="cart-line__package"><span>${escapeHtml(packageUnit)} =</span><label><input data-cart-carton-size="${line.productId}" type="number" inputmode="numeric" min="1" ${state.settings?.allowNegativeSales ? "" : `max="${toNumber(product?.quantity)}"`} step="1" value="${unitsPerPackage}" /> حبة</label><small>يمكن تعديل عدد الحبات في هذا البيع فقط.</small></div>` : ""}<small class="cart-line__discount-note">${cashierHint}${toNumber(totals.discount) ? ` · الخصم الحالي ${money(totals.discount)}` : ""}</small><button class="remove-line" aria-label="حذف من السلة" data-action="cart-remove" data-id="${line.productId}">${icon("close", 16)}</button></article>`;
+  const isFlash = state.lastAddedProductId === line.productId;
+  return `<article class="cart-line ${soldAsPackage ? "cart-line--package" : ""} ${isFlash ? "is-flash-added" : ""}"><div class="cart-line__detail"><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(line.name)}</strong><small>${money(line.unitPrice)} × ${amount(line.quantity)} ${escapeHtml(product?.unit || "حبة")}${soldAsPackage ? ` · ${amount(cartonCount)} ${escapeHtml(packageUnit)}` : ""}</small></div><strong data-cart-line-total="${line.productId}">${money(totals.total)}</strong><label class="cart-line__price ${state.settings?.allowSalePriceEdit ? "" : "cart-line__price--locked"}" title="${state.settings?.allowSalePriceEdit ? "يمكن تعديل السعر قبل إتمام البيع" : "تعديل السعر معطل من الإعدادات"}"><span>سعر البيع</span><input data-cart-line-price="${line.productId}" type="number" inputmode="decimal" min="0" step="0.01" value="${escapeHtml(line.unitPrice)}" aria-label="سعر بيع ${escapeHtml(line.name)}" ${state.settings?.allowSalePriceEdit ? "" : "disabled"} /></label><div class="cart-line__controls"><div class="quantity-control quantity-control--dark"><button aria-label="إنقاص ${soldAsPackage ? "كرتون" : "حبة"}" data-action="cart-decrement" data-id="${line.productId}">${icon("minus", 15)}</button>${quantityInput}<button aria-label="زيادة ${soldAsPackage ? "كرتون" : "حبة"}" data-action="cart-increment" data-id="${line.productId}">${icon("plus", 15)}</button></div>${unitsPerPackage > 1 ? `<button class="carton-toggle ${soldAsPackage ? "is-active" : ""}" data-action="toggle-carton-sale" data-id="${line.productId}" ${canSellCarton ? "" : "disabled"} aria-pressed="${soldAsPackage}" aria-label="${soldAsPackage ? "العودة للبيع بالحبات" : `بيع ${packageUnit}`}" title="${soldAsPackage ? "العودة للبيع بالحبات" : `بيع ${packageUnit}: ${unitsPerPackage} حبة`}">${icon("package", 17)}</button>` : ""}<label class="cart-line__discount" title="خصم السطر بالمبلغ أو النسبة"><span>خصم</span><input data-cart-line-discount="${line.productId}" type="text" inputmode="decimal" maxlength="4" value="${escapeHtml(line.discount || "")}" placeholder="خصم" autocomplete="off" aria-label="خصم السطر" /></label></div>${soldAsPackage ? `<div class="cart-line__package"><span>${escapeHtml(packageUnit)} =</span><label><input data-cart-carton-size="${line.productId}" type="number" inputmode="numeric" min="1" ${state.settings?.allowNegativeSales ? "" : `max="${toNumber(product?.quantity)}"`} step="1" value="${unitsPerPackage}" /> حبة</label><small>يمكن تعديل عدد الحبات في هذا البيع فقط.</small></div>` : ""}<small class="cart-line__discount-note">${cashierHint}${toNumber(totals.discount) ? ` · الخصم الحالي ${money(totals.discount)}` : ""}</small><button class="remove-line" aria-label="حذف من السلة" data-action="cart-remove" data-id="${line.productId}">${icon("close", 16)}</button></article>`;
 }
 
 function invoiceCashierName(invoice) { return invoice?.cashierName || state.accounts.find((account) => account.id === invoice?.cashierId)?.name || "الأدمن"; }
@@ -1131,6 +1135,16 @@ async function handleActionUnsafe(event) {
   if (action === "delete-cashier-account") { await deleteCashierAccount(id); return; }
 }
 
+let lastAddedFlashTimeoutId = null;
+function flashProductRow(productId) {
+  state.lastAddedProductId = productId;
+  window.clearTimeout(lastAddedFlashTimeoutId);
+  lastAddedFlashTimeoutId = window.setTimeout(() => {
+    state.lastAddedProductId = null;
+    document.querySelectorAll(".is-flash-added").forEach((el) => el.classList.remove("is-flash-added"));
+  }, 650);
+}
+
 function addToCart(productId) {
   const product = state.products.find((item) => item.id === productId);
   if (!product) return false;
@@ -1139,6 +1153,10 @@ function addToCart(productId) {
   if (existing) existing.quantity += 1;
   else state.cart.push({ productId: product.id, name: product.name, unitPrice: product.salePrice, quantity: 1, discount: "", packageUnit: product.purchasePackageUnit || "كرتون", unitsPerPackage: Math.max(1, toNumber(product.unitsPerPackage) || 1), soldAsPackage: false });
   state.saleQuery = "";
+  flashProductRow(productId);
+  if (navigator.vibrate) {
+    try { navigator.vibrate(25); } catch {}
+  }
   render();
   return true;
 }
@@ -2173,26 +2191,54 @@ function getScannerSuccessAudioContext() {
   return scannerSuccessAudioContext ||= new AudioContextConstructor();
 }
 function primeScannerSuccessSound() {
-  try { getScannerSuccessAudioContext()?.resume().catch(() => {}); } catch { /* لا تمنع قيود الصوت بدء الماسح. */ }
+  try {
+    const context = getScannerSuccessAudioContext();
+    if (context && context.state === "suspended") {
+      context.resume().catch(() => {});
+    }
+  } catch { /* لا تمنع قيود الصوت بدء الماسح. */ }
 }
 function playScannerSuccessSound() {
   try {
     const context = getScannerSuccessAudioContext();
-    if (!context) return;
-    const oscillator = context.createOscillator();
-    const gain = context.createGain();
-    const startAt = context.currentTime;
-    context.resume().catch(() => {});
-    oscillator.type = "sine";
-    oscillator.frequency.setValueAtTime(880, startAt);
-    oscillator.frequency.exponentialRampToValueAtTime(1175, startAt + 0.09);
-    gain.gain.setValueAtTime(0.0001, startAt);
-    gain.gain.exponentialRampToValueAtTime(0.11, startAt + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.16);
-    oscillator.connect(gain).connect(context.destination);
-    oscillator.start(startAt);
-    oscillator.stop(startAt + 0.17);
+    if (context) {
+      if (context.state === "suspended") {
+        context.resume().catch(() => {});
+      }
+      const startAt = context.currentTime;
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+
+      // صافرة ماسح الباركود الحقيقي للكاشير (تردد 2650 هرتز - صوت أجهزة Zebra و Honeywell الدقيقة)
+      oscillator.type = "sine";
+      oscillator.frequency.setValueAtTime(2650, startAt);
+
+      // منحنى صوتي فوري وحاد يحاكي صوت الباركود في آلات الكاشير الحقيقية بدقة
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.linearRampToValueAtTime(0.35, startAt + 0.002);
+      gain.gain.setValueAtTime(0.35, startAt + 0.055);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.075);
+
+      oscillator.connect(gain).connect(context.destination);
+      oscillator.start(startAt);
+      oscillator.stop(startAt + 0.08);
+    }
   } catch { /* لا يؤثر غياب الصوت في مسار المسح أو الإدخال اليدوي. */ }
+  try {
+    if (navigator.vibrate) navigator.vibrate(45);
+  } catch {}
+}
+
+function installAudioUnlockListener() {
+  const unlock = () => {
+    primeScannerSuccessSound();
+    window.removeEventListener("pointerdown", unlock);
+    window.removeEventListener("touchstart", unlock);
+    window.removeEventListener("click", unlock);
+  };
+  window.addEventListener("pointerdown", unlock, { passive: true, once: true });
+  window.addEventListener("touchstart", unlock, { passive: true, once: true });
+  window.addEventListener("click", unlock, { passive: true, once: true });
 }
 
 function openScannerOverlay({ title, description, onDetected, unsupportedMessage, manualMode, onManualEntry = null, continuous = false }) {
@@ -2403,5 +2449,6 @@ export async function bootApp(target) {
   installDesktopIntegration();
   installRuntimeGuards();
   installDesktopBarcodeReader();
+  installAudioUnlockListener();
   try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }
