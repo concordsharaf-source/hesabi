@@ -52,11 +52,11 @@ export function getReportStyles(isLandscape = false) {
       text-align: right;
     }
 
-    /* ═══ Official Document Header (ترويسة رسمية متكاملة) ═══ */
+    /* ═══ Official Document Header (ترويسة ثلاثية منظمة: يمين، وسط، يسار) ═══ */
     .report-header {
       border: 2px solid #174c3f;
       border-radius: 10px;
-      padding: 14px 18px;
+      padding: 12px 16px;
       margin-bottom: 16px;
       background: #f5faf7;
       direction: rtl;
@@ -77,73 +77,95 @@ export function getReportStyles(isLandscape = false) {
       padding: 0 !important;
       vertical-align: middle !important;
     }
-    .report-header__logo {
-      width: 74px;
-      height: 74px;
-      object-fit: contain;
+    .report-header__col-right {
+      width: 38% !important;
+      text-align: right !important;
+      direction: rtl !important;
+      padding-left: 8px !important;
+    }
+    .report-header__col-center {
+      width: 24% !important;
+      text-align: center !important;
+      padding: 0 6px !important;
+    }
+    .report-header__col-left {
+      width: 38% !important;
+      text-align: left !important;
+      direction: rtl !important;
+      padding-right: 8px !important;
+    }
+    .report-header__logo-container {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto;
+      width: 76px;
+      height: 76px;
       background: #ffffff;
-      border: 1.5px solid #b7cdbf;
-      border-radius: 8px;
-      padding: 3px;
+      border: 2px solid #174c3f;
+      border-radius: 50%;
+      padding: 4px;
+      box-shadow: 0 2px 6px rgba(23,76,63,0.12);
+    }
+    .report-header__logo {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 50%;
       display: block;
+    }
+    .report-header__logo-fallback {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: #edf6f0;
+      color: #174c3f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      font-weight: 800;
     }
     .report-header__store-name {
       margin: 0 0 4px 0;
-      font-size: ${isLandscape ? "20px" : "23px"};
+      font-size: ${isLandscape ? "18px" : "21px"};
       font-weight: 800;
       color: #174c3f;
       line-height: 1.35;
-      max-width: 100%;
       white-space: normal;
       overflow-wrap: break-word;
       word-break: normal;
       direction: rtl;
       text-align: right;
-      unicode-bidi: plaintext;
     }
     .report-header__title {
-      margin: 0 0 6px 0;
-      font-size: ${isLandscape ? "15px" : "17px"};
-      font-weight: 700;
+      margin: 0 0 4px 0;
+      font-size: ${isLandscape ? "14px" : "16px"};
+      font-weight: 800;
       color: #1f6b59;
-      line-height: 1.4;
-      max-width: 100%;
+      line-height: 1.35;
       white-space: normal;
       overflow-wrap: break-word;
       word-break: normal;
       direction: rtl;
-      text-align: right;
-      unicode-bidi: plaintext;
+      text-align: left;
     }
     .report-header__meta-item {
-      margin: 0 0 4px 0;
+      margin: 0 0 3px 0;
       color: #52645b;
-      font-size: ${isLandscape ? "11px" : "12px"};
-      line-height: 1.5;
-      max-width: 100%;
+      font-size: ${isLandscape ? "10px" : "11.5px"};
+      line-height: 1.45;
       white-space: normal;
       overflow-wrap: break-word;
       word-break: normal;
-      direction: rtl;
-      text-align: right;
-      unicode-bidi: plaintext;
     }
-    .report-header__details {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px 16px;
-      margin-top: 6px;
-      padding-top: 6px;
-      border-top: 1px dashed #b7cdbf;
-      font-size: ${isLandscape ? "10px" : "11.5px"};
-      color: #43574e;
-      direction: rtl;
-      text-align: right;
+    .report-header__meta-item.align-left {
+      text-align: left !important;
+      direction: rtl !important;
     }
-    .report-header__details-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
+    .report-header__meta-item.align-right {
+      text-align: right !important;
+      direction: rtl !important;
     }
 
     /* ═══ Party / Summary Info Cards ═══ */
@@ -336,32 +358,35 @@ export function renderOfficialHeaderHtml({
   generatedAt = "",
   cashierName = "",
 }) {
-  const storeDetails = [
-    storeInfo?.storePhone ? `<span class="report-header__details-item"><span>هاتف:</span> <b dir="ltr">${escapeHtml(storeInfo.storePhone)}</b></span>` : "",
-    storeInfo?.storeAddress ? `<span class="report-header__details-item"><span>العنوان:</span> <b>${escapeHtml(storeInfo.storeAddress)}</b></span>` : "",
-    storeInfo?.taxNumber ? `<span class="report-header__details-item"><span>الرقم الضريبي/السجل:</span> <b dir="ltr">${escapeHtml(storeInfo.taxNumber)}</b></span>` : "",
-    storeInfo?.storeEmail ? `<span class="report-header__details-item"><span>البريد:</span> <b dir="ltr">${escapeHtml(storeInfo.storeEmail)}</b></span>` : "",
-    storeInfo?.businessType ? `<span class="report-header__details-item"><span>النشاط:</span> <b>${escapeHtml(storeInfo.businessType)}</b></span>` : "",
-  ].filter(Boolean).join(" · ");
-
   const periodText = from && to ? `من ${escapeHtml(from)} إلى ${escapeHtml(to)}` : from ? `من ${escapeHtml(from)}` : to ? `حتى ${escapeHtml(to)}` : "";
 
   return `
     <header class="report-header">
-      <table class="report-header-layout-table" style="width:100%;border-collapse:collapse;border:none;margin:0;padding:0;background:transparent;">
-        <tr style="border:none;background:transparent;">
-          <td style="vertical-align:middle;text-align:right;border:none;padding:0;background:transparent;direction:rtl;">
+      <table class="report-header-layout-table">
+        <tr>
+          <!-- الجانب الأيمن: معلومات المتجر والمنشأة -->
+          <td class="report-header__col-right">
             <h1 class="report-header__store-name">${escapeHtml(storeName || "حسابي")}</h1>
-            <h2 class="report-header__title">${escapeHtml(title)}</h2>
-            ${periodText ? `<p class="report-header__meta-item">من ${escapeHtml(from || "البداية")} إلى ${escapeHtml(to || "الآن")}</p>` : `<p class="report-header__meta-item">من ${escapeHtml(from || "البداية")} إلى ${escapeHtml(to || "الآن")}</p>`}
-            <p class="report-header__meta-item">تاريخ ووقت الإنشاء: ${escapeHtml(generatedAt || new Date().toLocaleString("ar-YE"))}</p>
-            ${storeDetails ? `<div class="report-header__details">${storeDetails}</div>` : ""}
+            ${storeInfo?.businessType ? `<p class="report-header__meta-item align-right">النشاط: <b>${escapeHtml(storeInfo.businessType)}</b></p>` : ""}
+            ${storeInfo?.storePhone ? `<p class="report-header__meta-item align-right">الهاتف: <b dir="ltr">${escapeHtml(storeInfo.storePhone)}</b></p>` : ""}
+            ${storeInfo?.storeAddress ? `<p class="report-header__meta-item align-right">العنوان: <b>${escapeHtml(storeInfo.storeAddress)}</b></p>` : ""}
           </td>
-          ${logoDataUrl ? `
-          <td style="width:80px;min-width:80px;vertical-align:middle;text-align:left;border:none;padding:0 16px 0 0;background:transparent;">
-            <img class="report-header__logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر">
-          </td>` : `
-          <td style="width:1px;border:none;padding:0;background:transparent;"></td>`}
+
+          <!-- الوسط: شعار المتجر -->
+          <td class="report-header__col-center">
+            <div class="report-header__logo-container">
+              ${logoDataUrl ? `<img class="report-header__logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر">` : `<div class="report-header__logo-fallback"><span>${escapeHtml((storeName || "حسابي").slice(0, 2))}</span></div>`}
+            </div>
+          </td>
+
+          <!-- الجانب الأيسر: معلومات التقرير والتوثيق -->
+          <td class="report-header__col-left">
+            <h2 class="report-header__title">${escapeHtml(title)}</h2>
+            ${periodText ? `<p class="report-header__meta-item align-left">الفترة: <b>${escapeHtml(periodText)}</b></p>` : `<p class="report-header__meta-item align-left">من ${escapeHtml(from || "البداية")} إلى ${escapeHtml(to || "الآن")}</p>`}
+            <p class="report-header__meta-item align-left">تاريخ الإنشاء: <b>${escapeHtml(generatedAt || new Date().toLocaleString("ar-YE"))}</b></p>
+            ${storeInfo?.taxNumber ? `<p class="report-header__meta-item align-left">الرقم الضريبي/السجل: <b dir="ltr">${escapeHtml(storeInfo.taxNumber)}</b></p>` : ""}
+            ${cashierName ? `<p class="report-header__meta-item align-left">المستخدم: <b>${escapeHtml(cashierName)}</b></p>` : ""}
+          </td>
         </tr>
       </table>
     </header>

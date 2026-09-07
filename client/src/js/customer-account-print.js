@@ -149,16 +149,27 @@ export function renderCustomerAccountHtml({
   <header class="head">
     <table class="report-header-layout-table" style="width:100%;border-collapse:collapse;border:none;margin:0;padding:0;background:transparent;">
       <tr style="border:none;background:transparent;">
-        <td style="vertical-align:middle;text-align:right;border:none;padding:0;background:transparent;direction:rtl;">
+        <!-- اليمين: بيانات المتجر -->
+        <td style="width:38%;vertical-align:middle;text-align:right;border:none;padding:0 0 0 8px;direction:rtl;">
           <h1>${escapeHtml(storeName || "حسابي")}</h1>
-          <p class="doc-title">كشف حساب مديونية عميل</p>
-          ${storeDetailsList ? `<p class="store-info-line">${storeDetailsList}</p>` : ""}
+          ${storeInfo?.businessType ? `<p class="store-info-line">النشاط: <b>${escapeHtml(storeInfo.businessType)}</b></p>` : ""}
+          ${storeInfo?.storePhone ? `<p class="store-info-line">الهاتف: <b dir="ltr">${escapeHtml(storeInfo.storePhone)}</b></p>` : ""}
+          ${storeInfo?.storeAddress ? `<p class="store-info-line">العنوان: <b>${escapeHtml(storeInfo.storeAddress)}</b></p>` : ""}
         </td>
-        ${logoDataUrl ? `
-        <td style="width:80px;min-width:80px;vertical-align:middle;text-align:left;border:none;padding:0 16px 0 0;background:transparent;">
-          <img class="invoice-logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر">
-        </td>` : `
-        <td style="width:1px;border:none;padding:0;background:transparent;"></td>`}
+
+        <!-- الوسط: الشعار -->
+        <td style="width:24%;vertical-align:middle;text-align:center;border:none;padding:0 6px;">
+          <div style="display:inline-flex;align-items:center;justify-content:center;width:76px;height:76px;background:#ffffff;border:2px solid #1f6b59;border-radius:50%;padding:4px;box-shadow:0 2px 6px rgba(31,107,89,0.12);margin:0 auto;">
+            ${logoDataUrl ? `<img class="invoice-logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر" style="width:100%;height:100%;object-fit:contain;border-radius:50%;border:none;">` : `<div style="width:100%;height:100%;border-radius:50%;background:#edf6f0;color:#174c3f;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;"><span>${escapeHtml((storeName || "حسابي").slice(0, 2))}</span></div>`}
+          </div>
+        </td>
+
+        <!-- اليسار: بيانات كشف الحساب -->
+        <td style="width:38%;vertical-align:middle;text-align:left;border:none;padding:0 8px 0 0;direction:rtl;">
+          <p class="doc-title" style="text-align:left;font-size:16px;font-weight:800;color:#1f6b59;margin:0 0 4px 0;">كشف حساب مديونية عميل</p>
+          <p class="meta" style="text-align:left;margin:0 0 3px 0;">تاريخ الكشف: <b>${escapeHtml(formatDateTime(new Date()))}</b></p>
+          ${storeInfo?.taxNumber ? `<p class="store-info-line" style="text-align:left;margin:0 0 3px 0;">الرقم الضريبي/السجل: <b dir="ltr">${escapeHtml(storeInfo.taxNumber)}</b></p>` : ""}
+        </td>
       </tr>
     </table>
   </header>
