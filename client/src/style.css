@@ -825,3 +825,8 @@ label { font-size:15px; }
 .report-preview-table-scroll{width:100%;max-width:100%;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-inline:contain;padding-bottom:6px}.report-preview--wide .report-preview-table-scroll table{width:1180px;min-width:1180px;table-layout:fixed}.report-preview__hint{margin:0 0 8px;padding:6px 8px;color:var(--muted);font-size:11px;text-align:right}.report-preview--wide .report-preview-table-scroll::-webkit-scrollbar{height:7px}.report-preview--wide .report-preview-table-scroll::-webkit-scrollbar-thumb{background:var(--green);border-radius:999px}@media(max-width:599px){.report-preview--wide .report-preview-table-scroll table{width:1120px;min-width:1120px}.report-preview__hint{font-size:10px}}
 
 [hidden] { display:none !important; }
+/* العمليات المرتبطة في حساب المورد تفتح المستند المرجعي عند النقر. */
+.account-transactions article.supplier-transaction { cursor: pointer; transition: background .16s ease, transform .16s ease; }
+.account-transactions article.supplier-transaction:hover { background: rgba(31,107,89,.12); transform: translateX(-2px); }
+.account-transactions article.supplier-transaction:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; border-radius: 9px; }
+[data-theme="dark"] .account-transactions article.supplier-transaction:hover { background: rgba(133,207,166,.16); }
