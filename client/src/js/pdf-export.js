@@ -38,13 +38,32 @@ function createPdfStage(html, page) {
   stage.lang = parsed.documentElement.lang || "ar";
   stage.dataset.pdfStage = "true";
   stage.dataset.pdfOrientation = isLandscape ? "landscape" : "portrait";
-  stage.style.cssText = `position:fixed;top:0;left:0;width:${isThermal ? "80mm" : isLandscape ? "297mm" : "210mm"};min-height:20mm;padding:0;background:#fff;color:#111;z-index:2147483647;pointer-events:none;overflow:visible;`;
+  stage.style.cssText = `position:fixed;top:0;left:0;width:${isThermal ? "80mm" : isLandscape ? "297mm" : "210mm"};min-height:20mm;padding:0;margin:0;background:#fff;color:#172e27;z-index:2147483647;pointer-events:none;overflow:visible;direction:rtl;text-align:right;font-family:"HesabiArabicPdf","Noto Naskh Arabic","Cairo","Noto Sans Arabic",Tahoma,Arial,sans-serif;`;
   const printStyles = [...parsed.head.querySelectorAll("style")].map((style) => style.outerHTML).join("");
+  const headLinks = [...parsed.head.querySelectorAll("link")].map((link) => link.outerHTML).join("");
   const pdfSafetyStyles = `<style data-pdf-safety>
     @font-face{font-family:"HesabiArabicPdf";src:url("${PDF_ARABIC_FONT_URL}") format("truetype");font-style:normal;font-weight:100 900;font-display:block}
-    [data-pdf-stage], [data-pdf-stage] *{box-sizing:border-box}
+    [data-pdf-stage], [data-pdf-stage] *{box-sizing:border-box !important;-webkit-print-color-adjust:exact !important;print-color-adjust:exact !important;letter-spacing:0 !important;word-spacing:normal !important;}
+    [data-pdf-stage] {
+      font-family:"HesabiArabicPdf","Noto Naskh Arabic","Cairo","Noto Sans Arabic",Tahoma,Arial,sans-serif !important;
+      direction:rtl !important;
+      text-align:right !important;
+      color:#172e27 !important;
+      background:#ffffff !important;
+      line-height:1.5 !important;
+      -webkit-font-smoothing:antialiased !important;
+      text-rendering:optimizeLegibility !important;
+    }
+    [data-pdf-stage] table { border-collapse:collapse !important; }
+    [data-pdf-stage] h1, [data-pdf-stage] h2, [data-pdf-stage] p {
+      max-width:100% !important;
+      white-space:normal !important;
+      overflow-wrap:break-word !important;
+      word-break:normal !important;
+      unicode-bidi:plaintext !important;
+    }
   </style>`;
-  stage.innerHTML = `${printStyles}${pdfSafetyStyles}${parsed.body.innerHTML}`;
+  stage.innerHTML = `${headLinks}${printStyles}${pdfSafetyStyles}${parsed.body.innerHTML}`;
   document.body.appendChild(stage);
   return stage;
 }
@@ -52,6 +71,18 @@ function createPdfStage(html, page) {
 async function waitForPdfStage(stage) {
   if (!stage.textContent.trim()) throw new Error("لا يوجد محتوى صالح لإنشاء ملف PDF.");
   if (document.fonts?.ready) await waitWithTimeout(document.fonts.ready);
+  const images = [...stage.querySelectorAll("img")];
+  if (images.length) {
+    const imagePromises = images.map((img) => {
+      if (img.complete) return Promise.resolve();
+      return new Promise((resolve) => {
+        img.onload = () => resolve();
+        img.onerror = () => resolve();
+        window.setTimeout(resolve, 2000);
+      });
+    });
+    await Promise.all(imagePromises);
+  }
   await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   if (stage.getBoundingClientRect().height < 1 || stage.scrollHeight < 1) throw new Error("تعذر تجهيز محتوى الفاتورة للطباعة.");
 }

@@ -72,23 +72,33 @@ export function renderCustomerAccountHtml({
     }
     h1, h2, p { margin: 0; }
     .head {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 74px;
-      align-items: center;
-      column-gap: 16px;
-      padding: 12px 16px;
       border: 2px solid #1f6b59;
       border-radius: 10px;
       background: #f5faf7;
       margin-bottom: 14px;
+      padding: 12px 16px;
+      direction: rtl;
+      text-align: right;
     }
-    .head h1 { font-size: 22px; font-weight: 800; color: #174c3f; line-height: 1.35; white-space: normal; overflow-wrap: break-word; }
-    .head p.doc-title { color: #1f6b59; font-size: 15px; font-weight: 700; margin-top: 3px; }
-    .head p, .meta { color: #52645b; font-size: 11px; }
-    .head .store-info-line { margin-top: 4px; font-size: 10.5px; color: #43574e; }
+    .report-header-layout-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      border: none !important;
+      background: transparent !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .report-header-layout-table td {
+      border: none !important;
+      background: transparent !important;
+      padding: 0 !important;
+      vertical-align: middle !important;
+    }
+    .head h1 { font-size: 22px; font-weight: 800; color: #174c3f; line-height: 1.35; white-space: normal; overflow-wrap: break-word; margin: 0 0 3px 0; direction: rtl; text-align: right; }
+    .head p.doc-title { color: #1f6b59; font-size: 15px; font-weight: 700; margin: 0 0 4px 0; direction: rtl; text-align: right; }
+    .head p, .meta { color: #52645b; font-size: 11px; direction: rtl; text-align: right; }
+    .head .store-info-line { margin-top: 4px; font-size: 10.5px; color: #43574e; direction: rtl; text-align: right; }
     .invoice-logo {
-      grid-column: 2;
-      grid-row: 1;
       width: 74px;
       height: 74px;
       object-fit: contain;
@@ -96,7 +106,7 @@ export function renderCustomerAccountHtml({
       border: 1.5px solid #b7cdbf;
       border-radius: 8px;
       padding: 3px;
-      justify-self: end;
+      display: block;
     }
     .meta { margin: 8px 0 12px; font-size: 11px; color: #52645b; }
     .customer-card {
@@ -137,12 +147,20 @@ export function renderCustomerAccountHtml({
 </head>
 <body>
   <header class="head">
-    ${logoDataUrl ? `<img class="invoice-logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر">` : `<div></div>`}
-    <div>
-      <h1>${escapeHtml(storeName || "حسابي")}</h1>
-      <p class="doc-title">كشف حساب مديونية عميل</p>
-      ${storeDetailsList ? `<p class="store-info-line">${storeDetailsList}</p>` : ""}
-    </div>
+    <table class="report-header-layout-table" style="width:100%;border-collapse:collapse;border:none;margin:0;padding:0;background:transparent;">
+      <tr style="border:none;background:transparent;">
+        <td style="vertical-align:middle;text-align:right;border:none;padding:0;background:transparent;direction:rtl;">
+          <h1>${escapeHtml(storeName || "حسابي")}</h1>
+          <p class="doc-title">كشف حساب مديونية عميل</p>
+          ${storeDetailsList ? `<p class="store-info-line">${storeDetailsList}</p>` : ""}
+        </td>
+        ${logoDataUrl ? `
+        <td style="width:80px;min-width:80px;vertical-align:middle;text-align:left;border:none;padding:0 16px 0 0;background:transparent;">
+          <img class="invoice-logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر">
+        </td>` : `
+        <td style="width:1px;border:none;padding:0;background:transparent;"></td>`}
+      </tr>
+    </table>
   </header>
   <p class="meta">تاريخ الإنشاء: ${escapeHtml(formatDateTime(new Date().toISOString()))}</p>
   ${customerDetails}

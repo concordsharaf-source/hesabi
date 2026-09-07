@@ -24,15 +24,18 @@ export function getReportStyles(isLandscape = false) {
       margin: ${isLandscape ? "8mm 10mm" : "10mm 12mm"};
     }
     *, *::before, *::after {
-      box-sizing: border-box;
+      box-sizing: border-box !important;
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
+      letter-spacing: 0 !important;
+      word-spacing: normal !important;
     }
-    body {
+    body, [data-pdf-stage] {
       font-family: "HesabiArabicPdf", "Noto Naskh Arabic", "Cairo", "Noto Sans Arabic", Tahoma, "Segoe UI", Arial, sans-serif;
       color: #172e27;
       background: #ffffff;
       direction: rtl;
+      text-align: right;
       margin: 0;
       padding: 0;
       font-size: ${isLandscape ? "11px" : "13px"};
@@ -45,26 +48,36 @@ export function getReportStyles(isLandscape = false) {
       width: 100%;
       margin: 0 auto;
       background: #ffffff;
+      direction: rtl;
+      text-align: right;
     }
 
     /* ═══ Official Document Header (ترويسة رسمية متكاملة) ═══ */
     .report-header {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 74px;
-      grid-template-rows: auto;
-      align-items: center;
-      column-gap: 18px;
-      direction: rtl;
       border: 2px solid #174c3f;
       border-radius: 10px;
       padding: 14px 18px;
       margin-bottom: 16px;
       background: #f5faf7;
+      direction: rtl;
+      text-align: right;
       overflow: visible;
     }
-    .report-header img, .report-header__logo {
-      grid-column: 2;
-      grid-row: 1;
+    .report-header-layout-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      border: none !important;
+      background: transparent !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .report-header-layout-table td {
+      border: none !important;
+      background: transparent !important;
+      padding: 0 !important;
+      vertical-align: middle !important;
+    }
+    .report-header__logo {
       width: 74px;
       height: 74px;
       object-fit: contain;
@@ -72,21 +85,11 @@ export function getReportStyles(isLandscape = false) {
       border: 1.5px solid #b7cdbf;
       border-radius: 8px;
       padding: 3px;
-      justify-self: end;
+      display: block;
     }
-    .report-header div, .report-header__content {
-      grid-column: 1;
-      grid-row: 1;
-      min-width: 0;
-      width: 100%;
-      text-align: right;
-      direction: rtl;
-      unicode-bidi: plaintext;
-      overflow: visible;
-    }
-    .report-header h1, .report-header__store-name {
-      margin: 0 0 6px;
-      font-size: ${isLandscape ? "21px" : "24px"};
+    .report-header__store-name {
+      margin: 0 0 4px 0;
+      font-size: ${isLandscape ? "20px" : "23px"};
       font-weight: 800;
       color: #174c3f;
       line-height: 1.35;
@@ -94,11 +97,13 @@ export function getReportStyles(isLandscape = false) {
       white-space: normal;
       overflow-wrap: break-word;
       word-break: normal;
+      direction: rtl;
+      text-align: right;
       unicode-bidi: plaintext;
     }
-    .report-header h2, .report-header__title {
-      margin: 0 0 6px;
-      font-size: ${isLandscape ? "15px" : "18px"};
+    .report-header__title {
+      margin: 0 0 6px 0;
+      font-size: ${isLandscape ? "15px" : "17px"};
       font-weight: 700;
       color: #1f6b59;
       line-height: 1.4;
@@ -106,42 +111,39 @@ export function getReportStyles(isLandscape = false) {
       white-space: normal;
       overflow-wrap: break-word;
       word-break: normal;
+      direction: rtl;
+      text-align: right;
       unicode-bidi: plaintext;
     }
-    .report-header p, .report-header__meta-item {
-      margin: 0 0 4px;
+    .report-header__meta-item {
+      margin: 0 0 4px 0;
       color: #52645b;
-      font-size: ${isLandscape ? "11px" : "12.5px"};
+      font-size: ${isLandscape ? "11px" : "12px"};
       line-height: 1.5;
       max-width: 100%;
       white-space: normal;
       overflow-wrap: break-word;
       word-break: normal;
+      direction: rtl;
+      text-align: right;
       unicode-bidi: plaintext;
     }
     .report-header__details {
       display: flex;
       flex-wrap: wrap;
       gap: 4px 16px;
-      margin-top: 4px;
-      margin-bottom: 4px;
-      padding-top: 4px;
+      margin-top: 6px;
+      padding-top: 6px;
       border-top: 1px dashed #b7cdbf;
       font-size: ${isLandscape ? "10px" : "11.5px"};
       color: #43574e;
+      direction: rtl;
+      text-align: right;
     }
     .report-header__details-item {
       display: inline-flex;
       align-items: center;
       gap: 4px;
-    }
-    .report-header__meta-row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px 16px;
-      margin-top: 4px;
-      font-size: ${isLandscape ? "10px" : "11px"};
-      color: #52645b;
     }
 
     /* ═══ Party / Summary Info Cards ═══ */
@@ -151,6 +153,8 @@ export function getReportStyles(isLandscape = false) {
       padding: 10px 14px;
       margin: 12px 0;
       background: #edf6f0;
+      direction: rtl;
+      text-align: right;
     }
     .party-card strong {
       display: block;
@@ -179,13 +183,15 @@ export function getReportStyles(isLandscape = false) {
       grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
       gap: 10px;
       margin: 14px 0;
+      direction: rtl;
     }
     .kpi-card {
       background: #f4f6f1;
-      border: 1px solid #d9e0d7;
+      border: 1.5px solid #d9e0d7;
       border-radius: 8px;
       padding: 10px 12px;
       text-align: right;
+      direction: rtl;
     }
     .kpi-card span {
       display: block;
@@ -307,6 +313,7 @@ export function getReportStyles(isLandscape = false) {
       gap: 30px;
       margin-top: 24px;
       padding: 0 16px;
+      direction: rtl;
     }
     .report-signature-box {
       border-top: 1px dashed #174c3f;
@@ -341,14 +348,22 @@ export function renderOfficialHeaderHtml({
 
   return `
     <header class="report-header">
-      ${logoDataUrl ? `<img class="report-header__logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر">` : `<img class="report-header__logo" src="" alt="شعار المتجر" style="display:none">`}
-      <div class="report-header__content">
-        <h1 class="report-header__store-name">${escapeHtml(storeName || "حسابي")}</h1>
-        <h2 class="report-header__title">${escapeHtml(title)}</h2>
-        ${periodText ? `<p class="report-header__meta-item">من ${escapeHtml(from || "البداية")} إلى ${escapeHtml(to || "الآن")}</p>` : `<p class="report-header__meta-item">من ${escapeHtml(from || "البداية")} إلى ${escapeHtml(to || "الآن")}</p>`}
-        <p class="report-header__meta-item">تاريخ ووقت الإنشاء: ${escapeHtml(generatedAt || new Date().toLocaleString("ar-YE"))}</p>
-        ${storeDetails ? `<div class="report-header__details">${storeDetails}</div>` : ""}
-      </div>
+      <table class="report-header-layout-table" style="width:100%;border-collapse:collapse;border:none;margin:0;padding:0;background:transparent;">
+        <tr style="border:none;background:transparent;">
+          <td style="vertical-align:middle;text-align:right;border:none;padding:0;background:transparent;direction:rtl;">
+            <h1 class="report-header__store-name">${escapeHtml(storeName || "حسابي")}</h1>
+            <h2 class="report-header__title">${escapeHtml(title)}</h2>
+            ${periodText ? `<p class="report-header__meta-item">من ${escapeHtml(from || "البداية")} إلى ${escapeHtml(to || "الآن")}</p>` : `<p class="report-header__meta-item">من ${escapeHtml(from || "البداية")} إلى ${escapeHtml(to || "الآن")}</p>`}
+            <p class="report-header__meta-item">تاريخ ووقت الإنشاء: ${escapeHtml(generatedAt || new Date().toLocaleString("ar-YE"))}</p>
+            ${storeDetails ? `<div class="report-header__details">${storeDetails}</div>` : ""}
+          </td>
+          ${logoDataUrl ? `
+          <td style="width:80px;min-width:80px;vertical-align:middle;text-align:left;border:none;padding:0 16px 0 0;background:transparent;">
+            <img class="report-header__logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر">
+          </td>` : `
+          <td style="width:1px;border:none;padding:0;background:transparent;"></td>`}
+        </tr>
+      </table>
     </header>
   `;
 }

@@ -86,23 +86,33 @@ export function renderPurchaseInvoiceHtml({
     }
     h1, h2, p { margin: 0; }
     .head {
-      display: grid;
-      grid-template-columns: minmax(0, 1fr) 74px;
-      align-items: center;
-      column-gap: 16px;
-      padding: 12px 16px;
       border: 2px solid #1f6b59;
       border-radius: 10px;
       background: #f5faf7;
       margin-bottom: 12px;
+      padding: 12px 16px;
+      direction: rtl;
+      text-align: right;
     }
-    .head h1 { font-size: 22px; font-weight: 800; color: #174c3f; line-height: 1.35; white-space: normal; overflow-wrap: break-word; }
-    .head .title { color: #1f6b59; font-size: 15px; font-weight: 700; margin-top: 2px; }
-    .head .meta { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 11px; color: #52645b; }
-    .head .store-info-line { margin-top: 4px; font-size: 10.5px; color: #43574e; }
+    .report-header-layout-table {
+      width: 100% !important;
+      border-collapse: collapse !important;
+      border: none !important;
+      background: transparent !important;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+    .report-header-layout-table td {
+      border: none !important;
+      background: transparent !important;
+      padding: 0 !important;
+      vertical-align: middle !important;
+    }
+    .head h1 { font-size: 22px; font-weight: 800; color: #174c3f; line-height: 1.35; white-space: normal; overflow-wrap: break-word; margin: 0 0 3px 0; direction: rtl; text-align: right; }
+    .head .title { color: #1f6b59; font-size: 15px; font-weight: 700; margin: 0 0 4px 0; direction: rtl; text-align: right; }
+    .head .meta { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px 18px; font-size: 11px; color: #52645b; direction: rtl; text-align: right; }
+    .head .store-info-line { margin-top: 4px; font-size: 10.5px; color: #43574e; direction: rtl; text-align: right; }
     .invoice-logo {
-      grid-column: 2;
-      grid-row: 1;
       width: 74px;
       height: 74px;
       object-fit: contain;
@@ -110,7 +120,7 @@ export function renderPurchaseInvoiceHtml({
       border: 1.5px solid #b7cdbf;
       border-radius: 8px;
       padding: 3px;
-      justify-self: end;
+      display: block;
     }
     .supplier-card {
       margin: 12px 0;
@@ -156,16 +166,24 @@ export function renderPurchaseInvoiceHtml({
 </head>
 <body>
   <header class="head">
-    ${logoDataUrl ? `<img class="invoice-logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر">` : `<div></div>`}
-    <div>
-      <h1>${escapeHtml(storeName || "حسابي")}</h1>
-      <p class="title">فاتورة شراء ${escapeHtml(purchase.invoiceNumber || "")}</p>
-      <p class="meta">
-        <span>رقم الفاتورة: <b dir="ltr">${escapeHtml(purchase.invoiceNumber || "—")}</b></span>
-        <span>التاريخ: <b>${escapeHtml(formatDateTime(purchase.date))}</b></span>
-      </p>
-      ${storeDetailsList ? `<p class="store-info-line">${storeDetailsList}</p>` : ""}
-    </div>
+    <table class="report-header-layout-table" style="width:100%;border-collapse:collapse;border:none;margin:0;padding:0;background:transparent;">
+      <tr style="border:none;background:transparent;">
+        <td style="vertical-align:middle;text-align:right;border:none;padding:0;background:transparent;direction:rtl;">
+          <h1>${escapeHtml(storeName || "حسابي")}</h1>
+          <p class="title">فاتورة شراء ${escapeHtml(purchase.invoiceNumber || "")}</p>
+          <p class="meta">
+            <span>رقم الفاتورة: <b dir="ltr">${escapeHtml(purchase.invoiceNumber || "—")}</b></span>
+            <span>التاريخ: <b>${escapeHtml(formatDateTime(purchase.date))}</b></span>
+          </p>
+          ${storeDetailsList ? `<p class="store-info-line">${storeDetailsList}</p>` : ""}
+        </td>
+        ${logoDataUrl ? `
+        <td style="width:80px;min-width:80px;vertical-align:middle;text-align:left;border:none;padding:0 16px 0 0;background:transparent;">
+          <img class="invoice-logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر">
+        </td>` : `
+        <td style="width:1px;border:none;padding:0;background:transparent;"></td>`}
+      </tr>
+    </table>
   </header>
   ${supplierDetails}
   ${summary}
