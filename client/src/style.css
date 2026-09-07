@@ -830,3 +830,18 @@ label { font-size:15px; }
 .account-transactions article.supplier-transaction:hover { background: rgba(31,107,89,.12); transform: translateX(-2px); }
 .account-transactions article.supplier-transaction:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; border-radius: 9px; }
 [data-theme="dark"] .account-transactions article.supplier-transaction:hover { background: rgba(133,207,166,.16); }
+
+/* معاينة التقارير: تمرير سلس حتى آخر بند مع بقاء رأس النافذة وزر الإغلاق ظاهرين. */
+.dialog-backdrop--report-preview .dialog__head { position: sticky; top: 0; z-index: 10; flex: 0 0 auto; margin: -24px -24px 0; padding: 20px 24px 14px; background: var(--paper); border-bottom: 1px solid var(--line); }
+.dialog-backdrop--report-preview .report-preview-scroll { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; padding-bottom: 18px; }
+.dialog-backdrop--report-preview .report-preview { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; padding-bottom: 88px; }
+[data-theme="dark"] .dialog-backdrop--report-preview .dialog__head { background: #1a2d26; border-color: #557267; }
+@media (max-width:599px) {
+  .dialog-backdrop--report-preview .dialog__head { margin: -19px -19px 0; padding: 16px 19px 12px; }
+  .dialog-backdrop--report-preview .report-preview { padding-bottom: 96px; }
+}
+
+/* قوائم التقارير والحركات: تمرير سلس ومساحة كافية للوصول إلى آخر بند. */
+.movement-list, .report-grid { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
+.movement-list { scroll-padding-block: 12px; padding-bottom: 24px; overscroll-behavior-y: contain; }
+@media (max-width:599px) { .movement-list { max-height: 60vh; padding-bottom: 30px; } }
