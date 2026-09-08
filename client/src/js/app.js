@@ -52,6 +52,9 @@ const icon = (name, size = 20) => {
     download: '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/>',
     share: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/>',
     key: '<circle cx="7.5" cy="15.5" r="3.5"/><path d="m10.3 12.7 8.2-8.2 2.2 2.2-1.7 1.7 1.6 1.6-2 2-1.6-1.6-3.9 3.9"/>',
+    pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
+    clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+    calculator: '<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M8 18h.01M12 18h.01"/>',
     phone: '<path d="M22 16.9v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.8a2 2 0 0 1-.45 2.11L8.11 9.89a16 16 0 0 0 6 6l1.26-1.26a2 2 0 0 1 2.11-.45c.9.35 1.84.59 2.8.72A2 2 0 0 1 22 16.9Z"/>',
     moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
@@ -59,7 +62,43 @@ const icon = (name, size = 20) => {
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ""}</svg>`;
 };
 
-const state = { view: "dashboard", lastStableView: "dashboard", showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
+const HELD_INVOICES_STORAGE_KEY = "hesabi-held-invoices";
+function loadHeldInvoicesFromStorage() {
+  try {
+    const raw = localStorage.getItem(HELD_INVOICES_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+function saveHeldInvoicesToStorage(list) {
+  try {
+    localStorage.setItem(HELD_INVOICES_STORAGE_KEY, JSON.stringify(list));
+  } catch {}
+}
+function formatTimeAgo(isoDate) {
+  if (!isoDate) return "";
+  const diffMs = Date.now() - new Date(isoDate).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return "الآن";
+  if (diffMins < 60) return `منذ ${diffMins} د`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `منذ ${diffHours} س`;
+  return formatDate(isoDate);
+}
+function generateQuickCashOptions(total) {
+  const rounded = roundMoney(total);
+  const list = [rounded];
+  if (rounded <= 0) return list;
+  const step = rounded < 1000 ? 100 : rounded < 5000 ? 500 : 1000;
+  const nextStep = Math.ceil(rounded / step) * step;
+  if (nextStep > rounded) list.push(nextStep);
+  const standardNotes = [500, 1000, 2000, 5000, 10000, 20000, 50000];
+  standardNotes.filter((n) => n > rounded && !list.includes(n)).slice(0, 4).forEach((n) => list.push(n));
+  return list.slice(0, 6);
+}
+
+const state = { view: "dashboard", lastStableView: "dashboard", showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
 const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "purchases"].includes(id))];
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
@@ -497,15 +536,17 @@ function salesMarkup() {
   const query = state.saleQuery.trim().toLocaleLowerCase("ar");
   const matches = state.products.filter((product) => !query || [product.name, product.barcode, product.internalCode].some((value) => value?.toLocaleLowerCase("ar").includes(query))).slice(0, 7);
   const totals = calculateSaleTotals(state.cart);
-  return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.", `<button class="button button--secondary" data-action="navigate" data-view="invoices">${icon("receipt", 17)}<span>الفواتير</span></button>`)}
+  const heldCount = state.heldInvoices?.length || 0;
+  const topbarActions = `<div class="sales-topbar-actions">${heldCount ? `<button class="button button--secondary button--compact held-topbar-btn" data-action="open-held-invoices" title="الفواتير المعلقة">${icon("clock", 16)}<span>معلقة (${heldCount})</span></button>` : ""}<button class="button button--secondary" data-action="navigate" data-view="invoices">${icon("receipt", 17)}<span>الفواتير</span></button></div>`;
+  return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.", topbarActions)}
   <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div><p class="desktop-barcode-reader-note">${icon("scan", 15)} قارئ الباركود المتصل بالكمبيوتر يعمل مباشرةً في صفحة المبيعات؛ امسح الرمز ثم Enter أو Tab.</p>
   <div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => {
     const isFlash = state.lastAddedProductId === product.id;
     return `<div class="sale-product-line"><button class="sale-product ${product.quantity <= 0 && !state.settings?.allowNegativeSales ? "is-disabled" : ""} ${isFlash ? "is-flash-added" : ""}" data-action="add-cart" data-id="${product.id}" ${product.quantity <= 0 && !state.settings?.allowNegativeSales ? "disabled" : ""}><div><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)} متاح</small></div><span>${money(product.salePrice)}</span><i>${icon(isFlash ? "check" : "plus", 18)}</i></button>${productSupplierActions(product)}</div>`;
   }).join("") : `<div class="no-match"><strong>لا توجد نتيجة</strong><span>تحقق من الاسم أو الباركود أو أضف منتجًا جديدًا.</span><button class="text-button" data-action="new-product">إنشاء منتج</button></div>`}</div></div>
-  <aside class="cart-panel"><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div>${state.cart.length ? `<button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div>
+  <aside class="cart-panel"><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div><div class="cart-head-actions">${heldCount ? `<button class="button button--secondary button--compact held-badge-btn" data-action="open-held-invoices" title="عرض الفواتير المعلقة">${icon("clock", 15)}<span>معلقة (${heldCount})</span></button>` : ""}${state.cart.length ? `<button class="button button--secondary button--compact" data-action="hold-cart" title="تعليق الفاتورة الحالية">${icon("pause", 15)}<span>تعليق</span></button><button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div></div>
   <div class="cart-lines">${state.cart.length ? state.cart.map(cartLine).join("") : `<div class="cart-empty">${icon("cart", 30)}<p>اختر منتجًا من القائمة لتبدأ البيع.</p></div>`}</div>
-  <div class="cart-total"><div class="cart-total__summary"><div><span>إجمالي السلة</span><strong data-cart-subtotal>${money(totals.subtotal)}</strong></div></div><button class="button button--primary button--wide checkout-launch" data-action="checkout" ${state.cart.length ? "" : "disabled"}>إتمام البيع ${icon("arrow", 18)}</button></div></aside></section><section class="sales-bottom-action"><div><span class="eyebrow">سجل المبيعات</span><strong>فواتير المبيعات</strong><small>اعرض الفواتير المحفوظة وابحث عنها وراجع تفاصيل كل فاتورة.</small></div><button class="button button--primary" data-action="navigate" data-view="invoices">${icon("receipt", 22)}<span>الانتقال إلى فواتير المبيعات</span></button></section>`;
+  <div class="cart-total"><div class="cart-total__summary"><div><span>إجمالي السلة</span><strong data-cart-subtotal>${money(totals.subtotal)}</strong></div></div><div class="cart-actions-grid">${state.cart.length ? `<button class="button button--secondary button--hold" data-action="hold-cart" title="تعليق الفاتورة مؤقتًا">${icon("pause", 17)}<span>تعليق</span></button>` : ""}<button class="button button--primary ${state.cart.length ? "checkout-launch" : "button--wide"}" data-action="checkout" ${state.cart.length ? "" : "disabled"}>إتمام البيع ${icon("arrow", 18)}</button></div></div></aside></section><section class="sales-bottom-action"><div><span class="eyebrow">سجل المبيعات</span><strong>فواتير المبيعات</strong><small>اعرض الفواتير المحفوظة وابحث عنها وراجع تفاصيل كل فاتورة.</small></div><button class="button button--primary" data-action="navigate" data-view="invoices">${icon("receipt", 22)}<span>الانتقال إلى فواتير المبيعات</span></button></section>`;
 }
 
 function cartLine(line) {
@@ -1096,6 +1137,8 @@ async function handleActionUnsafe(event) {
   if (action === "cart-decrement") { changeCart(id, -1); return; }
   if (action === "cart-remove") { state.cart = state.cart.filter((line) => line.productId !== id); if (!state.cart.length) state.cartDiscount = ""; render(); return; }
   if (action === "clear-cart") { state.cart = []; state.cartDiscount = ""; render(); return; }
+  if (action === "hold-cart") { openHoldInvoiceDialog(); return; }
+  if (action === "open-held-invoices") { openHeldInvoicesDialog(); return; }
   if (action === "checkout") { openCheckoutDialog(); return; }
   if (action === "open-invoice") { openInvoiceDialog(id); return; }
   if (action === "new-customer") { openCustomerDialog(); return; }
@@ -1911,21 +1954,295 @@ async function toggleTheme() { try { const theme = state.settings?.theme === "da
 
 async function deleteAllProducts() { const count = state.products.length; if (!count) { showToast("لا توجد منتجات لحذفها."); return; } if (!window.confirm(`تنبيه: سيتم حذف ${count} منتجًا من قوائم المنتجات والمخزون. ستبقى الفواتير والسجلات المالية محفوظة. هل تريد المتابعة؟`)) return; if (!window.confirm("تأكيد نهائي: سيتم إخفاء جميع المنتجات الحالية من القوائم لتتمكن من استيراد قائمة جديدة. هل تؤكد الحذف؟")) return; try { const deleted = await db.softDeleteAllProducts(); state.cart = []; await refresh(); render(); showToast(`تم حذف ${deleted} منتجًا من القوائم مع الحفاظ على السجلات.`); } catch (error) { showToast(error.message || "تعذر حذف المنتجات.", "error"); } }
 
+function openHoldInvoiceDialog() {
+  if (!state.cart.length) {
+    showToast("السلة فارغة حاليًا.", "error");
+    return;
+  }
+  const totals = calculateSaleTotals(state.cart, state.cartDiscount);
+  const defaultName = `زبون #${(state.heldInvoices?.length || 0) + 1}`;
+  const overlay = openDialog(`
+    <div class="dialog__head">
+      <div>
+        <span class="eyebrow">تعليق الفاتورة</span>
+        <h2>تعليق سلة البيع الحالية</h2>
+        <p class="dialog__subtext">سيتم حفظ أصناف السلة (${state.cart.length} أصناف · ${money(totals.total)}) مؤقتًا لخدمة الزبون التالي.</p>
+      </div>
+      <button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button>
+    </div>
+    <form id="hold-invoice-form" class="form-grid">
+      <label class="form-full">
+        اسم الزبون أو علامة تمييز (اختياري)
+        <input name="note" dir="rtl" maxlength="50" placeholder="مثال: زبون القميص الأزرق / طاولة 3" value="${defaultName}" autofocus />
+      </label>
+      <div class="dialog__actions form-full">
+        <button type="button" class="button button--secondary" data-dialog-close>إلغاء</button>
+        <button type="submit" class="button button--primary">${icon("pause", 17)} تأكيد التعليق</button>
+      </div>
+    </form>
+  `);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#hold-invoice-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const note = String(new FormData(event.currentTarget).get("note") || "").trim() || defaultName;
+    const held = {
+      id: `held-${randomId()}`,
+      note,
+      cart: JSON.parse(JSON.stringify(state.cart)),
+      cartDiscount: state.cartDiscount || "",
+      total: totals.total,
+      itemsCount: state.cart.length,
+      heldAt: nowIso(),
+      heldByName: state.currentUser?.name || "الكاشير",
+    };
+    state.heldInvoices = [held, ...(state.heldInvoices || [])];
+    saveHeldInvoicesToStorage(state.heldInvoices);
+    state.cart = [];
+    state.cartDiscount = "";
+    closeDialog();
+    render();
+    showToast(`تم تعليق فاتورة «${escapeHtml(note)}». يمكنك خدمة الزبون التالي.`);
+  });
+}
+
+function openHeldInvoicesDialog() {
+  const list = state.heldInvoices || [];
+  const overlay = openDialog(`
+    <div class="dialog__head">
+      <div>
+        <span class="eyebrow">الفواتير المعلقة</span>
+        <h2>قائمة الفواتير المعلقة (${list.length})</h2>
+        <p class="dialog__subtext">اختر الفاتورة المراد استئنافها في السلة وإتمام البيع.</p>
+      </div>
+      <button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button>
+    </div>
+    <section class="held-invoices-list">
+      ${list.length ? list.map((held) => {
+        const itemsSummary = (held.cart || []).map((item) => `${escapeHtml(item.name)} × ${amount(item.quantity)}`).join("، ");
+        return `
+          <article class="held-invoice-card">
+            <div class="held-invoice-card__head">
+              <div class="held-invoice-card__title">
+                <div class="held-icon">${icon("clock", 18)}</div>
+                <div>
+                  <strong>${escapeHtml(held.note || "فاتورة معلقة")}</strong>
+                  <small>${formatTimeAgo(held.heldAt)} · ${formatDateTime(held.heldAt)} · ${escapeHtml(held.heldByName || "")}</small>
+                </div>
+              </div>
+              <strong class="held-invoice-card__total">${money(held.total)}</strong>
+            </div>
+            <p class="held-invoice-card__summary">${itemsSummary}</p>
+            <div class="held-invoice-card__actions">
+              <button class="button button--secondary button--compact text-danger" data-delete-held="${held.id}">
+                ${icon("trash", 16)} حذف
+              </button>
+              <button class="button button--primary button--compact" data-resume-held="${held.id}">
+                ${icon("cart", 16)} استعادة إلى السلة
+              </button>
+            </div>
+          </article>
+        `;
+      }).join("") : `<div class="inline-empty">لا توجد فواتير معلقة حالياً.</div>`}
+    </section>
+    <div class="dialog__actions">
+      <button type="button" class="button button--secondary" data-dialog-close>إغلاق</button>
+    </div>
+  `);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+
+  overlay.querySelectorAll("[data-resume-held]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const heldId = btn.dataset.resumeHeld;
+      const held = state.heldInvoices.find((h) => h.id === heldId);
+      if (!held) return;
+      if (state.cart.length > 0) {
+        if (!window.confirm("توجد أصناف حالية في السلة. هل تريد استبدالها بالفاتورة المعلقة؟ (يمكنك تعليق السلة الحالية أولاً)")) {
+          return;
+        }
+      }
+      state.cart = JSON.parse(JSON.stringify(held.cart));
+      state.cartDiscount = held.cartDiscount || "";
+      state.heldInvoices = state.heldInvoices.filter((h) => h.id !== heldId);
+      saveHeldInvoicesToStorage(state.heldInvoices);
+      closeDialog();
+      render();
+      showToast(`تمت استعادة فاتورة «${escapeHtml(held.note)}» إلى السلة.`);
+    });
+  });
+
+  overlay.querySelectorAll("[data-delete-held]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const heldId = btn.dataset.deleteHeld;
+      const held = state.heldInvoices.find((h) => h.id === heldId);
+      if (!held) return;
+      if (!window.confirm(`هل أنت متأكد من حذف الفاتورة المعلقة «${held.note}»؟`)) return;
+      state.heldInvoices = state.heldInvoices.filter((h) => h.id !== heldId);
+      saveHeldInvoicesToStorage(state.heldInvoices);
+      closeDialog();
+      openHeldInvoicesDialog();
+      showToast("تم حذف الفاتورة المعلقة.");
+    });
+  });
+}
+
 function openCheckoutDialog() {
   if (state.currentUser?.role === "cashier" && !state.activeCashierShift) { showToast("سجل المبلغ المستلم من الصندوق قبل إتمام أول عملية بيع.", "error"); openCashierShiftStartDialog(); return; }
   const initial = calculateSaleTotals(state.cart); const isCashierSale = state.currentUser?.role === "cashier";
   const paymentMethodToggle = `<fieldset class="payment-method-toggle"><legend>طريقة التحصيل</legend><input type="hidden" name="paymentMethod" value="نقدي" /><button class="payment-method-toggle__button is-selected is-cash" type="button" data-sale-payment-method="نقدي">كاش</button><button class="payment-method-toggle__button is-transfer" type="button" data-sale-payment-method="تحويل">تحويل</button></fieldset>`;
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تثبيت الفاتورة</span><h2>مراجعة البيع</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="checkout-lines">${initial.lines.map((line) => `<div><span>${escapeHtml(line.name)} × ${amount(line.quantity)}</span><strong>${money(line.total)}</strong></div>`).join("")}</div><form id="checkout-form" class="form-grid"><label>الخصم العام<input name="discount" type="text" inputmode="decimal" placeholder="0 أو 20%" value="" autocomplete="off" /><small class="field-hint">أدخل مبلغًا مثل 100 أو نسبة مثل 20%</small></label><div class="delivery-charge-type delivery-compact form-full"><label class="delivery-compact__amount">خدمة التوصيل<input name="deliveryFee" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" /></label><div class="delivery-compact__choices" role="radiogroup" aria-label="خدمة التوصيل على"><label class="delivery-choice delivery-choice--store"><input name="deliveryChargeType" type="radio" value="store" checked /> <span>على المحل</span></label><label class="delivery-choice delivery-choice--customer"><input name="deliveryChargeType" type="radio" value="customer" /> <span>على العميل</span></label></div></div>${paymentMethodToggle}<fieldset class="payment-type form-full"><legend>نوع الدفع</legend><label><input name="paymentType" type="radio" value="نقدي" checked /> نقدي</label><label><input name="paymentType" type="radio" value="آجل" /> آجل</label></fieldset><label id="credit-customer-field" class="form-full" hidden>العميل<select name="customerId"><option value="">اختر العميل</option>${state.customers.map((customer) => `<option value="${customer.id}">${escapeHtml(customer.name)}${toNumber(customer.balance) ? ` — رصيد ${money(customer.balance)}` : ""}</option>`).join("")}</select></label><label class="form-full">المبلغ المدفوع<input id="paid-amount" name="paidAmount" type="number" inputmode="decimal" min="0" max="${initial.total}" step="0.01" value="${initial.total}" required /></label><div class="credit-summary form-full" id="credit-summary" hidden><span>المبلغ المتبقي</span><strong id="remaining-amount">${money(0)}</strong><small id="payment-status">مدفوعة</small></div><div class="checkout-total form-full"><span>الإجمالي النهائي</span><strong id="checkout-total">${money(initial.total)}</strong></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>رجوع</button><button type="submit" class="button button--primary checkout-submit">تأكيد البيع ${icon("check", 17)}</button></div></form>`);
+  const cashCalcMarkup = `
+    <div class="cash-calculator-section form-full" id="cash-calculator-section">
+      <div class="cash-calc-head">
+        <span>${icon("calculator", 16)} حاسبة النقدية السريعة</span>
+        <small>أدخل الواصل لحساب الصرف/الفكة بدقة</small>
+      </div>
+      <div class="cash-calc-body">
+        <div class="cash-calc-inputs">
+          <label class="cash-tendered-label">
+            <span>المبلغ المستلم من الزبون (الواصل)</span>
+            <input id="cash-tendered" type="number" inputmode="decimal" min="0" step="0.01" value="${initial.total}" placeholder="أدخل الواصل" />
+          </label>
+        </div>
+        <div class="quick-cash-buttons" id="quick-cash-buttons"></div>
+        <div class="cash-change-result" id="cash-change-result">
+          <div class="cash-change-card cash-change-card--exact">
+            <span>المتبقي للزبون (الفكة):</span>
+            <strong id="cash-change-text">${money(0)} (بالضبط)</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تثبيت الفاتورة</span><h2>مراجعة البيع</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="checkout-lines">${initial.lines.map((line) => `<div><span>${escapeHtml(line.name)} × ${amount(line.quantity)}</span><strong>${money(line.total)}</strong></div>`).join("")}</div><form id="checkout-form" class="form-grid"><label>الخصم العام<input name="discount" type="text" inputmode="decimal" placeholder="0 أو 20%" value="" autocomplete="off" /><small class="field-hint">أدخل مبلغًا مثل 100 أو نسبة مثل 20%</small></label><div class="delivery-charge-type delivery-compact form-full"><label class="delivery-compact__amount">خدمة التوصيل<input name="deliveryFee" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" /></label><div class="delivery-compact__choices" role="radiogroup" aria-label="خدمة التوصيل على"><label class="delivery-choice delivery-choice--store"><input name="deliveryChargeType" type="radio" value="store" checked /> <span>على المحل</span></label><label class="delivery-choice delivery-choice--customer"><input name="deliveryChargeType" type="radio" value="customer" /> <span>على العميل</span></label></div></div>${paymentMethodToggle}<fieldset class="payment-type form-full"><legend>نوع الدفع</legend><label><input name="paymentType" type="radio" value="نقدي" checked /> نقدي</label><label><input name="paymentType" type="radio" value="آجل" /> آجل</label></fieldset><label id="credit-customer-field" class="form-full" hidden>العميل<select name="customerId"><option value="">اختر العميل</option>${state.customers.map((customer) => `<option value="${customer.id}">${escapeHtml(customer.name)}${toNumber(customer.balance) ? ` — رصيد ${money(customer.balance)}` : ""}</option>`).join("")}</select></label>${cashCalcMarkup}<label class="form-full">المبلغ المدفوع<input id="paid-amount" name="paidAmount" type="number" inputmode="decimal" min="0" max="${initial.total}" step="0.01" value="${initial.total}" required /></label><div class="credit-summary form-full" id="credit-summary" hidden><span>المبلغ المتبقي</span><strong id="remaining-amount">${money(0)}</strong><small id="payment-status">مدفوعة</small></div><div class="checkout-total form-full"><span>الإجمالي النهائي</span><strong id="checkout-total">${money(initial.total)}</strong></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>رجوع</button><button type="submit" class="button button--primary checkout-submit">تأكيد البيع ${icon("check", 17)}</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
-  const form = overlay.querySelector("#checkout-form"); const paidInput = overlay.querySelector("#paid-amount"); const creditField = overlay.querySelector("#credit-customer-field"); const creditSummary = overlay.querySelector("#credit-summary"); const submitButton = form.querySelector(".checkout-submit");
-  const cashierLimitNote = document.createElement("p"); cashierLimitNote.id = "cashier-discount-limit"; cashierLimitNote.className = "scanner-session-note form-full"; cashierLimitNote.hidden = !isCashierSale; form.discount.closest("label").insertAdjacentElement("afterend", cashierLimitNote);
-  const setPaymentMethod = (method) => { form.paymentMethod.value = method; overlay.querySelectorAll("[data-sale-payment-method]").forEach((button) => button.classList.toggle("is-selected", button.dataset.salePaymentMethod === method)); };
+  const form = overlay.querySelector("#checkout-form");
+  const paidInput = overlay.querySelector("#paid-amount");
+  const creditField = overlay.querySelector("#credit-customer-field");
+  const creditSummary = overlay.querySelector("#credit-summary");
+  const submitButton = form.querySelector(".checkout-submit");
+  const cashCalcSection = overlay.querySelector("#cash-calculator-section");
+  const cashTenderedInput = overlay.querySelector("#cash-tendered");
+  const quickCashButtonsContainer = overlay.querySelector("#quick-cash-buttons");
+  const cashChangeCard = overlay.querySelector(".cash-change-card");
+
+  let lastKnownTotal = initial.total;
+
+  const cashierLimitNote = document.createElement("p");
+  cashierLimitNote.id = "cashier-discount-limit";
+  cashierLimitNote.className = "scanner-session-note form-full";
+  cashierLimitNote.hidden = !isCashierSale;
+  form.discount.closest("label").insertAdjacentElement("afterend", cashierLimitNote);
+
+  const setPaymentMethod = (method) => {
+    form.paymentMethod.value = method;
+    overlay.querySelectorAll("[data-sale-payment-method]").forEach((button) => button.classList.toggle("is-selected", button.dataset.salePaymentMethod === method));
+  };
   overlay.querySelectorAll("[data-sale-payment-method]").forEach((button) => button.addEventListener("click", () => setPaymentMethod(button.dataset.salePaymentMethod)));
-  const totalsForForm = () => { const totals = calculateSaleTotals(state.cart, form.discount.value); const delivery = form.deliveryChargeType.value === "customer" ? Math.max(0, toNumber(form.deliveryFee.value)) : 0; return { ...totals, total: roundMoney(totals.total + delivery) }; };
-  const syncCheckout = () => { state.cartDiscount = form.discount.value; const totals = totalsForForm(); const isCredit = form.paymentType.value === "آجل"; const deliveryForCustomer = form.deliveryChargeType.value === "customer" && Math.max(0, toNumber(form.deliveryFee.value)) > 0; const cashierLimitPercent = normalizeCashierDiscountLimit(state.settings?.cashierDiscountLimitPercent, 10); const cashierLimit = roundMoney(totals.subtotal * cashierLimitPercent / 100); const exceedsCashierLimit = isCashierSale && totals.discount > cashierLimit; paidInput.max = totals.total; paidInput.disabled = isCredit; paidInput.value = isCredit ? 0 : totals.total; const remaining = Math.max(0, totals.total - toNumber(paidInput.value)); overlay.querySelector("#checkout-total").textContent = money(totals.total); overlay.querySelector("#remaining-amount").textContent = money(remaining); overlay.querySelector("#payment-status").textContent = isCredit ? "غير مدفوعة — يُسجل التحصيل لاحقًا من حساب العميل" : deliveryForCustomer ? "مدفوعة بما فيها التوصيل" : "مدفوعة"; if (isCashierSale) { cashierLimitNote.textContent = exceedsCashierLimit ? `الخصم الحالي ${money(totals.discount)} يتجاوز سقف الكاشير ${cashierLimitPercent}% (${money(cashierLimit)}).` : `خصم السطور والخصم العام: ${money(totals.discount)} من سقف الكاشير ${cashierLimitPercent}% (${money(cashierLimit)}).`; cashierLimitNote.classList.toggle("is-negative", exceedsCashierLimit); } submitButton.disabled = exceedsCashierLimit; creditField.hidden = !isCredit; creditSummary.hidden = !isCredit; };
-  form.querySelectorAll("[name=paymentType]").forEach((input) => input.addEventListener("change", syncCheckout)); form.querySelectorAll("[name=deliveryChargeType]").forEach((input) => input.addEventListener("change", syncCheckout)); form.discount.addEventListener("input", syncCheckout); form.deliveryFee.addEventListener("input", syncCheckout);
+
+  const totalsForForm = () => {
+    const totals = calculateSaleTotals(state.cart, form.discount.value);
+    const delivery = form.deliveryChargeType.value === "customer" ? Math.max(0, toNumber(form.deliveryFee.value)) : 0;
+    return { ...totals, total: roundMoney(totals.total + delivery) };
+  };
+
+  const renderQuickCashButtons = (total) => {
+    if (!quickCashButtonsContainer) return;
+    const options = generateQuickCashOptions(total);
+    quickCashButtonsContainer.innerHTML = options.map((opt) => {
+      const isExact = opt === total;
+      return `<button type="button" class="quick-cash-btn ${isExact ? "is-exact" : ""}" data-quick-cash="${opt}">${isExact ? "بالضبط" : money(opt)}</button>`;
+    }).join("");
+    quickCashButtonsContainer.querySelectorAll("[data-quick-cash]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const val = toNumber(btn.dataset.quickCash);
+        cashTenderedInput.value = val;
+        syncChange();
+      });
+    });
+  };
+
+  const syncChange = () => {
+    const totals = totalsForForm();
+    const isCredit = form.paymentType.value === "آجل";
+    if (cashCalcSection) {
+      cashCalcSection.hidden = isCredit;
+    }
+    if (isCredit) return;
+    const tendered = toNumber(cashTenderedInput.value);
+    const diff = roundMoney(tendered - totals.total);
+    if (diff === 0) {
+      cashChangeCard.className = "cash-change-card cash-change-card--exact";
+      cashChangeCard.innerHTML = `<span>المتبقي للزبون (الفكة):</span><strong>${money(0)} (بالضبط)</strong>`;
+    } else if (diff > 0) {
+      cashChangeCard.className = "cash-change-card cash-change-card--change";
+      cashChangeCard.innerHTML = `<span>المتبقي للزبون (الفكة):</span><strong>${money(diff)}</strong>`;
+    } else {
+      cashChangeCard.className = "cash-change-card cash-change-card--short";
+      cashChangeCard.innerHTML = `<span>المتبقي على الزبون (ناقص):</span><strong>${money(Math.abs(diff))}</strong>`;
+    }
+  };
+
+  cashTenderedInput?.addEventListener("input", syncChange);
+
+  const syncCheckout = () => {
+    state.cartDiscount = form.discount.value;
+    const totals = totalsForForm();
+    const isCredit = form.paymentType.value === "آجل";
+    const deliveryForCustomer = form.deliveryChargeType.value === "customer" && Math.max(0, toNumber(form.deliveryFee.value)) > 0;
+    const cashierLimitPercent = normalizeCashierDiscountLimit(state.settings?.cashierDiscountLimitPercent, 10);
+    const cashierLimit = roundMoney(totals.subtotal * cashierLimitPercent / 100);
+    const exceedsCashierLimit = isCashierSale && totals.discount > cashierLimit;
+    paidInput.max = totals.total;
+    paidInput.disabled = isCredit;
+    paidInput.value = isCredit ? 0 : totals.total;
+    const remaining = Math.max(0, totals.total - toNumber(paidInput.value));
+    overlay.querySelector("#checkout-total").textContent = money(totals.total);
+    overlay.querySelector("#remaining-amount").textContent = money(remaining);
+    overlay.querySelector("#payment-status").textContent = isCredit ? "غير مدفوعة — يُسجل التحصيل لاحقًا من حساب العميل" : deliveryForCustomer ? "مدفوعة بما فيها التوصيل" : "مدفوعة";
+    if (isCashierSale) {
+      cashierLimitNote.textContent = exceedsCashierLimit ? `الخصم الحالي ${money(totals.discount)} يتجاوز سقف الكاشير ${cashierLimitPercent}% (${money(cashierLimit)}).` : `خصم السطور والخصم العام: ${money(totals.discount)} من سقف الكاشير ${cashierLimitPercent}% (${money(cashierLimit)}).`;
+      cashierLimitNote.classList.toggle("is-negative", exceedsCashierLimit);
+    }
+    submitButton.disabled = exceedsCashierLimit;
+    creditField.hidden = !isCredit;
+    creditSummary.hidden = !isCredit;
+
+    if (cashTenderedInput && (toNumber(cashTenderedInput.value) === lastKnownTotal || toNumber(cashTenderedInput.value) <= 0)) {
+      cashTenderedInput.value = totals.total;
+    }
+    lastKnownTotal = totals.total;
+    renderQuickCashButtons(totals.total);
+    syncChange();
+  };
+
+  form.querySelectorAll("[name=paymentType]").forEach((input) => input.addEventListener("change", syncCheckout));
+  form.querySelectorAll("[name=deliveryChargeType]").forEach((input) => input.addEventListener("change", syncCheckout));
+  form.discount.addEventListener("input", syncCheckout);
+  form.deliveryFee.addEventListener("input", syncCheckout);
   syncCheckout();
-  form.addEventListener("submit", async (event) => { event.preventDefault(); const values = Object.fromEntries(new FormData(event.currentTarget)); try { const sale = await db.completeSale({ items: state.cart, ...values, sellerRole: state.currentUser?.role || "", cashierShiftId: state.activeCashierShift?.id || "", cashierId: state.currentUser?.role === "cashier" ? state.currentUser.id : "", cashierName: state.currentUser?.name || "الأدمن" }); state.cart = []; state.cartDiscount = ""; await refresh(); closeDialog(); state.view = "invoices"; render(); showToast(sale.paymentType === "آجل" ? `حُفظت الفاتورة ${sale.invoiceNumber} وربطت بحساب العميل` : `تم حفظ الفاتورة ${sale.invoiceNumber} وخصم المخزون`); } catch (error) { showToast(error.message, "error"); } });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.currentTarget));
+    try {
+      const sale = await db.completeSale({
+        items: state.cart,
+        ...values,
+        sellerRole: state.currentUser?.role || "",
+        cashierShiftId: state.activeCashierShift?.id || "",
+        cashierId: state.currentUser?.role === "cashier" ? state.currentUser.id : "",
+        cashierName: state.currentUser?.name || "الأدمن",
+      });
+      state.cart = [];
+      state.cartDiscount = "";
+      await refresh();
+      closeDialog();
+      state.view = "invoices";
+      render();
+      showToast(sale.paymentType === "آجل" ? `حُفظت الفاتورة ${sale.invoiceNumber} وربطت بحساب العميل` : `تم حفظ الفاتورة ${sale.invoiceNumber} وخصم المخزون`);
+    } catch (error) {
+      showToast(error.message, "error");
+    }
+  });
 }
 
 async function openInvoiceDialog(saleId) {

@@ -884,3 +884,61 @@ label { font-size:15px; }
 .movement-list, .report-grid { scroll-behavior: smooth; -webkit-overflow-scrolling: touch; }
 .movement-list { scroll-padding-block: 12px; padding-bottom: 24px; overscroll-behavior-y: contain; }
 @media (max-width:599px) { .movement-list { max-height: 60vh; padding-bottom: 30px; } }
+
+/* الفواتير المعلقة وحاسبة النقدية السريعة */
+.sales-topbar-actions { display: flex; align-items: center; gap: 8px; }
+.cart-head-actions { display: flex; align-items: center; gap: 6px; }
+.held-badge-btn, .held-topbar-btn { background: rgba(224, 138, 46, 0.12); color: #b86e00; border: 1px solid rgba(224, 138, 46, 0.35); font-weight: 700; padding: 6px 12px; border-radius: 9px; display: inline-flex; align-items: center; gap: 6px; }
+.held-badge-btn:hover, .held-topbar-btn:hover { background: rgba(224, 138, 46, 0.22); border-color: rgba(224, 138, 46, 0.6); }
+[data-theme="dark"] .held-badge-btn, [data-theme="dark"] .held-topbar-btn { background: rgba(235, 163, 76, 0.18); color: #f7ba6b; border-color: rgba(235, 163, 76, 0.4); }
+.cart-actions-grid { display: grid; grid-template-columns: auto 1fr; gap: 8px; width: 100%; }
+.cart-actions-grid .button--hold { background: rgba(31, 107, 89, 0.08); border: 1px solid rgba(31, 107, 89, 0.25); color: var(--green-deep); padding: 0 14px; }
+.cart-actions-grid .button--hold:hover { background: rgba(31, 107, 89, 0.16); }
+[data-theme="dark"] .cart-actions-grid .button--hold { background: rgba(133, 207, 166, 0.12); border-color: rgba(133, 207, 166, 0.3); color: #a8e6c8; }
+
+.held-invoices-list { display: grid; gap: 12px; max-height: 60vh; overflow-y: auto; padding: 4px 2px; }
+.held-invoice-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; box-shadow: var(--shadow-subtle); transition: border-color .15s ease, box-shadow .15s ease; }
+.held-invoice-card:hover { border-color: var(--green); box-shadow: 0 4px 12px rgba(31, 107, 89, 0.08); }
+[data-theme="dark"] .held-invoice-card { background: #172d25; border-color: #3b5a4d; }
+.held-invoice-card__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.held-invoice-card__title { display: flex; align-items: flex-start; gap: 10px; }
+.held-icon { width: 32px; height: 32px; border-radius: 8px; background: rgba(224, 138, 46, 0.12); color: #c97300; display: grid; place-items: center; flex-shrink: 0; }
+[data-theme="dark"] .held-icon { background: rgba(235, 163, 76, 0.18); color: #f7ba6b; }
+.held-invoice-card__title strong { font-size: 15px; color: var(--ink); display: block; }
+.held-invoice-card__title small { font-size: 11px; color: var(--muted); }
+.held-invoice-card__total { font-size: 16px; color: var(--green-deep); font-weight: 700; white-space: nowrap; }
+[data-theme="dark"] .held-invoice-card__total { color: #79dcb1; }
+.held-invoice-card__summary { margin: 0; font-size: 12px; color: var(--ink-secondary); background: rgba(0, 0, 0, 0.02); border-radius: 6px; padding: 6px 10px; line-height: 1.5; }
+[data-theme="dark"] .held-invoice-card__summary { background: rgba(255, 255, 255, 0.04); }
+.held-invoice-card__actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+.cash-calculator-section { background: linear-gradient(135deg, rgba(31, 107, 89, 0.05), rgba(217, 162, 59, 0.06)); border: 1px solid rgba(31, 107, 89, 0.18); border-radius: 14px; padding: 14px; display: grid; gap: 10px; margin: 4px 0; }
+[data-theme="dark"] .cash-calculator-section { background: linear-gradient(135deg, rgba(31, 107, 89, 0.14), rgba(217, 162, 59, 0.1)); border-color: rgba(133, 207, 166, 0.25); }
+.cash-calc-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.cash-calc-head span { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; font-size: 13px; color: var(--green-deep); }
+[data-theme="dark"] .cash-calc-head span { color: #8ce1ba; }
+.cash-calc-head small { font-size: 11px; color: var(--muted); }
+.cash-calc-body { display: grid; gap: 10px; }
+.cash-tendered-label { display: grid; gap: 4px; }
+.cash-tendered-label span { font-size: 12px; font-weight: 600; color: var(--ink); }
+.cash-tendered-label input { font-size: 18px !important; font-weight: 700; padding: 8px 12px !important; color: var(--green-deep) !important; border-color: rgba(31, 107, 89, 0.4) !important; }
+[data-theme="dark"] .cash-tendered-label input { color: #79dcb1 !important; }
+.quick-cash-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.quick-cash-btn { background: #fff; border: 1px solid rgba(31, 107, 89, 0.25); border-radius: 8px; padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--ink); cursor: pointer; transition: all .15s ease; }
+.quick-cash-btn:hover { background: var(--green); color: #fff; border-color: var(--green); }
+.quick-cash-btn.is-exact { background: rgba(31, 107, 89, 0.12); border-color: var(--green); color: var(--green-deep); font-weight: 700; }
+[data-theme="dark"] .quick-cash-btn { background: #1f3d32; border-color: #4b7162; color: #d1eee0; }
+[data-theme="dark"] .quick-cash-btn:hover { background: var(--green); color: #fff; }
+[data-theme="dark"] .quick-cash-btn.is-exact { background: rgba(133, 207, 166, 0.22); color: #a8f5d1; }
+.cash-change-card { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
+.cash-change-card strong { font-size: 17px; }
+.cash-change-card--exact { background: rgba(31, 107, 89, 0.08); border: 1px solid rgba(31, 107, 89, 0.2); color: var(--green-deep); }
+[data-theme="dark"] .cash-change-card--exact { background: rgba(31, 107, 89, 0.2); color: #8ce1ba; }
+.cash-change-card--change { background: rgba(22, 163, 74, 0.12); border: 1px solid rgba(22, 163, 74, 0.35); color: #15803d; }
+.cash-change-card--change strong { color: #166534; }
+[data-theme="dark"] .cash-change-card--change { background: rgba(34, 197, 94, 0.18); border-color: rgba(34, 197, 94, 0.4); color: #86efac; }
+[data-theme="dark"] .cash-change-card--change strong { color: #4ade80; }
+.cash-change-card--short { background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.3); color: #b91c1c; }
+.cash-change-card--short strong { color: #991b1b; }
+[data-theme="dark"] .cash-change-card--short { background: rgba(239, 68, 68, 0.18); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; }
+[data-theme="dark"] .cash-change-card--short strong { color: #f87171; }
