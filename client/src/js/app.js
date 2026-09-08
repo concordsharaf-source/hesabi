@@ -2456,7 +2456,7 @@ function openCheckoutDialog() {
       cashChangeCard.innerHTML = `<span>المتبقي للزبون (الفكة):</span><strong>${money(diff)}</strong>`;
     } else {
       cashChangeCard.className = "cash-change-card cash-change-card--short";
-      cashChangeCard.innerHTML = `<span>المتبقي على الزبون (ناقص):</span><strong>${money(Math.abs(diff))}</strong>`;
+      cashChangeCard.innerHTML = `<span>${icon("alert", 15)} المتبقي على الزبون (ناقص):</span><strong>${money(Math.abs(diff))}</strong>`;
     }
   };
 
