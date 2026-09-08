@@ -930,18 +930,20 @@ label { font-size:15px; }
 [data-theme="dark"] .quick-cash-btn { background: #1f3d32; border-color: #4b7162; color: #d1eee0; }
 [data-theme="dark"] .quick-cash-btn:hover { background: var(--green); color: #fff; }
 [data-theme="dark"] .quick-cash-btn.is-exact { background: rgba(133, 207, 166, 0.22); color: #a8f5d1; }
-.cash-change-card { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; font-size: 14px; }
-.cash-change-card strong { font-size: 17px; }
-.cash-change-card--exact { background: rgba(31, 107, 89, 0.08); border: 1px solid rgba(31, 107, 89, 0.2); color: var(--green-deep); }
-[data-theme="dark"] .cash-change-card--exact { background: rgba(31, 107, 89, 0.2); color: #8ce1ba; }
-.cash-change-card--change { background: rgba(22, 163, 74, 0.12); border: 1px solid rgba(22, 163, 74, 0.35); color: #15803d; }
-.cash-change-card--change strong { color: #166534; }
-[data-theme="dark"] .cash-change-card--change { background: rgba(34, 197, 94, 0.18); border-color: rgba(34, 197, 94, 0.4); color: #86efac; }
-[data-theme="dark"] .cash-change-card--change strong { color: #4ade80; }
-.cash-change-card--short { background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.3); color: #b91c1c; }
-.cash-change-card--short strong { color: #991b1b; }
-[data-theme="dark"] .cash-change-card--short { background: rgba(239, 68, 68, 0.18); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; }
-[data-theme="dark"] .cash-change-card--short strong { color: #f87171; }
+.cash-change-card { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px; font-size: 14px; font-weight: 700; color: #fff; background: linear-gradient(145deg, #c42a47, #84132b); border: 1px solid #f28a9c; box-shadow: 0 8px 18px rgba(132, 19, 43, .25); }
+.cash-change-card span { display: inline-flex; align-items: center; gap: 6px; color: #fff; font-weight: 700; }
+.cash-change-card strong { font-size: 17px; font-weight: 800; color: #fff; }
+.cash-change-card--exact { color: #fff; background: linear-gradient(145deg, #c42a47, #84132b); border-color: #f28a9c; }
+[data-theme="dark"] .cash-change-card--exact { color: #fff; background: linear-gradient(145deg, #c42a47, #84132b); border-color: #ff9eb0; }
+.cash-change-card--change { color: #fff; background: linear-gradient(145deg, #c42a47, #84132b); border-color: #f28a9c; }
+.cash-change-card--change strong { color: #fff; }
+[data-theme="dark"] .cash-change-card--change { color: #fff; background: linear-gradient(145deg, #c42a47, #84132b); border-color: #ff9eb0; }
+[data-theme="dark"] .cash-change-card--change strong { color: #fff; }
+.cash-change-card--short { color: #fff; background: linear-gradient(145deg, #a51f38, #6b0f21); border-color: #ff9eb0; }
+.cash-change-card--short strong { color: #fff; }
+[data-theme="dark"] .cash-change-card--short { color: #fff; background: linear-gradient(145deg, #a51f38, #6b0f21); border-color: #ff9eb0; }
+[data-theme="dark"] .cash-change-card--short strong { color: #fff; }
+[data-theme="dark"] .cash-change-card { box-shadow: 0 10px 22px rgba(0, 0, 0, .4); }
 
 /* بطاقات المؤشرات والتقارير الذكية (Smart Analytics & Intelligence) */
 .smart-analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin: 12px 0 20px; }

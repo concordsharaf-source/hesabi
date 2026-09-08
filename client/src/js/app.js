@@ -2,7 +2,7 @@
 /* اتجاه التصميم: دفتر التاجر الهادئ — تفاعلات سريعة، RTL واضح، وماسح منتج لا يقطع سياق النموذج. */
 import { ACCOUNT_ROLES, BUSINESS_PROFILES, BUSINESS_TYPES, CURRENCIES, DAILY_EXPENSE_CATEGORIES, DEFAULT_CURRENCY_CODE, EXPENSE_CATEGORIES, MONTHLY_EXPENSE_CATEGORIES, NAV_ITEMS, PACKAGE_UNITS, PAYMENT_METHODS, UNITS } from "./constants.js";
 import { db } from "./database.js";
-import { calculateDiscountAmount, calculatePackagePurchase, calculateSaleTotals, calculateTransferCollections, dateKey, expiryProgress, normalizeCashierDiscountLimit, roundMoney, stockStatus, toNumber } from "./domain.js";
+import { calculateDiscountAmount, calculatePackagePurchase, calculateSaleTotals, calculateTransferCollections, dateKey, expiryProgress, normalizeCashierDiscountLimit, nowIso, roundMoney, stockStatus, toNumber } from "./domain.js";
 import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, resetCloudBackupPassword, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
 import { approveAssistantRequest, createPairingInvite, createStoreWorkspace, getCloudDeviceIdentity, redeemPairingInvite, requestAssistantDevice, revokeCloudDevice, seedWorkspaceBackup, watchAssistantRequests } from "./firebase-sync.js";
 import { installSyncCoordinator } from "./sync-coordinator.js";
@@ -69,7 +69,9 @@ const HELD_INVOICES_STORAGE_KEY = "hesabi-held-invoices";
 function loadHeldInvoicesFromStorage() {
   try {
     const raw = localStorage.getItem(HELD_INVOICES_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((held) => held && typeof held === "object") : [];
   } catch {
     return [];
   }
@@ -77,7 +79,11 @@ function loadHeldInvoicesFromStorage() {
 function saveHeldInvoicesToStorage(list) {
   try {
     localStorage.setItem(HELD_INVOICES_STORAGE_KEY, JSON.stringify(list));
-  } catch {}
+    return true;
+  } catch (error) {
+    console.warn("[Hesabi held invoices storage warning]", error);
+    return false;
+  }
 }
 function formatTimeAgo(isoDate) {
   if (!isoDate) return "";
@@ -2185,7 +2191,7 @@ async function restoreBackupFromFile(event) {
     showToast(error.message || "تعذرت استعادة ملف النسخة الاحتياطية.", "error");
   } finally { input.value = ""; }
 }
-async function resetAllData() { if (!window.confirm("سيُمسح كل السجل المحلي على هذا الجهاز. صدّر نسخة احتياطية أولًا. هل تريد المتابعة؟")) return; if (!window.confirm("تأكيد نهائي: لا يمكن التراجع من داخل التطبيق. هل تمضي في المسح؟")) return; try { await db.resetAllData(); state.settings = null; state.cart = []; state.view = "dashboard"; await refresh(); render(); showToast("مُسحت البيانات المحلية. يمكنك بدء سجل متجر جديد."); } catch (error) { showToast(error.message, "error"); } }
+async function resetAllData() { if (!window.confirm("سيُمسح كل السجل المحلي على هذا الجهاز. صدّر نسخة احتياطية أولًا. هل تريد المتابعة؟")) return; if (!window.confirm("تأكيد نهائي: لا يمكن التراجع من داخل التطبيق. هل تمضي في المسح؟")) return; try { await db.resetAllData(); state.settings = null; state.cart = []; state.cartDiscount = ""; state.heldInvoices = []; saveHeldInvoicesToStorage(state.heldInvoices); state.view = "dashboard"; await refresh(); render(); showToast("مُسحت البيانات المحلية. يمكنك بدء سجل متجر جديد."); } catch (error) { showToast(error.message, "error"); } }
 
 async function toggleTheme() { try { const theme = state.settings?.theme === "dark" ? "light" : "dark"; await db.saveSettings({ ...state.settings, theme }); state.settings = await db.getSettings(); applyTheme(); render(); showToast(theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح"); } catch (error) { showToast(error.message, "error"); } }
 
@@ -2222,28 +2228,41 @@ function openHoldInvoiceDialog() {
   overlay.querySelector("#hold-invoice-form").addEventListener("submit", (event) => {
     event.preventDefault();
     const note = String(new FormData(event.currentTarget).get("note") || "").trim() || defaultName;
-    const held = {
-      id: `held-${randomId()}`,
-      note,
-      cart: JSON.parse(JSON.stringify(state.cart)),
-      cartDiscount: state.cartDiscount || "",
-      total: totals.total,
-      itemsCount: state.cart.length,
-      heldAt: nowIso(),
-      heldByName: state.currentUser?.name || "الكاشير",
-    };
-    state.heldInvoices = [held, ...(state.heldInvoices || [])];
-    saveHeldInvoicesToStorage(state.heldInvoices);
-    state.cart = [];
-    state.cartDiscount = "";
-    closeDialog();
-    render();
-    showToast(`تم تعليق فاتورة «${escapeHtml(note)}». يمكنك خدمة الزبون التالي.`);
+    try {
+      const held = {
+        id: `held-${randomId()}`,
+        note,
+        cart: JSON.parse(JSON.stringify(state.cart)),
+        cartDiscount: state.cartDiscount || "",
+        total: totals.total,
+        itemsCount: state.cart.length,
+        heldAt: nowIso(),
+        heldByName: state.currentUser?.name || "الكاشير",
+      };
+      state.heldInvoices = [held, ...(Array.isArray(state.heldInvoices) ? state.heldInvoices : [])];
+      const persisted = saveHeldInvoicesToStorage(state.heldInvoices);
+      state.cart = [];
+      state.cartDiscount = "";
+      closeDialog();
+      render();
+      showToast(persisted
+        ? `تم تعليق فاتورة «${note}». يمكنك خدمة الزبون التالي.`
+        : `تم تعليق فاتورة «${note}» في هذه الجلسة فقط؛ تعذر حفظها في تخزين الجهاز.`, persisted ? "success" : "error");
+    } catch (error) {
+      console.error("[Hesabi hold invoice error]", error);
+      showToast(error?.message || "تعذر تعليق الفاتورة. لم تتغير السلة، حاول مرة أخرى.", "error");
+    }
   });
 }
 
+function heldInvoicesList() {
+  const list = Array.isArray(state.heldInvoices) ? state.heldInvoices : [];
+  state.heldInvoices = list;
+  return list;
+}
+
 function openHeldInvoicesDialog() {
-  const list = state.heldInvoices || [];
+  const list = heldInvoicesList();
   const overlay = openDialog(`
     <div class="dialog__head">
       <div>
@@ -2263,7 +2282,7 @@ function openHeldInvoicesDialog() {
                 <div class="held-icon">${icon("clock", 18)}</div>
                 <div>
                   <strong>${escapeHtml(held.note || "فاتورة معلقة")}</strong>
-                  <small>${formatTimeAgo(held.heldAt)} · ${formatDateTime(held.heldAt)} · ${escapeHtml(held.heldByName || "")}</small>
+                  <small>${formatTimeAgo(held.heldAt)} · ${dateTime(held.heldAt)} · ${escapeHtml(held.heldByName || "")}</small>
                 </div>
               </div>
               <strong class="held-invoice-card__total">${money(held.total)}</strong>
@@ -2290,34 +2309,44 @@ function openHeldInvoicesDialog() {
   overlay.querySelectorAll("[data-resume-held]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const heldId = btn.dataset.resumeHeld;
-      const held = state.heldInvoices.find((h) => h.id === heldId);
+      const held = heldInvoicesList().find((h) => h.id === heldId);
       if (!held) return;
       if (state.cart.length > 0) {
         if (!window.confirm("توجد أصناف حالية في السلة. هل تريد استبدالها بالفاتورة المعلقة؟ (يمكنك تعليق السلة الحالية أولاً)")) {
           return;
         }
       }
-      state.cart = JSON.parse(JSON.stringify(held.cart));
-      state.cartDiscount = held.cartDiscount || "";
-      state.heldInvoices = state.heldInvoices.filter((h) => h.id !== heldId);
-      saveHeldInvoicesToStorage(state.heldInvoices);
-      closeDialog();
-      render();
-      showToast(`تمت استعادة فاتورة «${escapeHtml(held.note)}» إلى السلة.`);
+      try {
+        state.cart = JSON.parse(JSON.stringify(Array.isArray(held.cart) ? held.cart : []));
+        state.cartDiscount = held.cartDiscount || "";
+        state.heldInvoices = heldInvoicesList().filter((h) => h.id !== heldId);
+        saveHeldInvoicesToStorage(state.heldInvoices);
+        closeDialog();
+        render();
+        showToast(`تمت استعادة فاتورة «${held.note || "معلقة"}» إلى السلة.`);
+      } catch (error) {
+        console.error("[Hesabi resume held invoice error]", error);
+        showToast(error?.message || "تعذرت استعادة الفاتورة المعلقة إلى السلة.", "error");
+      }
     });
   });
 
   overlay.querySelectorAll("[data-delete-held]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const heldId = btn.dataset.deleteHeld;
-      const held = state.heldInvoices.find((h) => h.id === heldId);
+      const held = heldInvoicesList().find((h) => h.id === heldId);
       if (!held) return;
       if (!window.confirm(`هل أنت متأكد من حذف الفاتورة المعلقة «${held.note}»؟`)) return;
-      state.heldInvoices = state.heldInvoices.filter((h) => h.id !== heldId);
-      saveHeldInvoicesToStorage(state.heldInvoices);
-      closeDialog();
-      openHeldInvoicesDialog();
-      showToast("تم حذف الفاتورة المعلقة.");
+      try {
+        state.heldInvoices = heldInvoicesList().filter((h) => h.id !== heldId);
+        saveHeldInvoicesToStorage(state.heldInvoices);
+        closeDialog();
+        openHeldInvoicesDialog();
+        showToast("تم حذف الفاتورة المعلقة.");
+      } catch (error) {
+        console.error("[Hesabi delete held invoice error]", error);
+        showToast(error?.message || "تعذر حذف الفاتورة المعلقة.", "error");
+      }
     });
   });
 }
@@ -2427,7 +2456,7 @@ function openCheckoutDialog() {
       cashChangeCard.innerHTML = `<span>المتبقي للزبون (الفكة):</span><strong>${money(diff)}</strong>`;
     } else {
       cashChangeCard.className = "cash-change-card cash-change-card--short";
-      cashChangeCard.innerHTML = `<span>المتبقي على الزبون (ناقص):</span><strong>${money(Math.abs(diff))}</strong>`;
+      cashChangeCard.innerHTML = `<span>${icon("alert", 15)} المتبقي على الزبون (ناقص):</span><strong>${money(Math.abs(diff))}</strong>`;
     }
   };
 

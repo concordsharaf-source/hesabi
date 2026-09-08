@@ -1,4 +1,4 @@
-const CACHE_NAME = "hesabi-pwa-v30"; // hesabi-pwa-v29 hesabi-pwa-v28 hesabi-pwa-v25
+const CACHE_NAME = "hesabi-pwa-v31"; // hesabi-pwa-v30 hesabi-pwa-v29 hesabi-pwa-v28 hesabi-pwa-v25
 const SCOPE_PATH = new URL(self.registration.scope).pathname;
 const APP_SHELL = [SCOPE_PATH, `${SCOPE_PATH}manifest.json`, `${SCOPE_PATH}service-worker.js`];
 const isSameOrigin = (request) => new URL(request.url).origin === self.location.origin;
@@ -53,8 +53,13 @@ self.addEventListener("fetch", (event) => {
     }).catch(() => caches.match(SCOPE_PATH).then((cached) => cached || Response.error())));
     return;
   }
-  event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
-    if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
-    return response;
-  }).catch(() => Response.error())));
+  /* مخزَن ثم حدّث في الخلفية: يفتح التطبيق فورًا دون اتصال، ويضمن وصول النسخة الجديدة في التحميل التالي
+     بدل بقاء كاش قديم يُخفي الإصلاحات (كان الاستراتيجية السابقة cache-first فتحبس أي ملف لا يتغير رابطه). */
+  event.respondWith(caches.match(event.request).then((cached) => {
+    const revalidate = fetch(event.request).then((response) => {
+      if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+      return response;
+    }).catch(() => null);
+    return cached || revalidate.then((response) => response || Response.error());
+  }));
 });

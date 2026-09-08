@@ -74,3 +74,40 @@ test("تتضمن أنماط CSS تنسيقات الفواتير المعلقة �
   assert.match(styleCssContent, /\.cash-change-card--short/, "تنسيق حالة المبلغ الناقص");
   assert.match(styleCssContent, /\[data-theme="dark"\] \.cash-calculator-section/, "تنسيق الحاسبة للوضع الداكن");
 });
+
+test("خانة المتبقي للزبون قرمزية الخلفية وبيضاء النص في الحالات الثلاث والوضعين", () => {
+  const rules = (selector) => {
+    const index = styleCssContent.indexOf(selector);
+    assert.notEqual(index, -1, `يجب وجود القاعدة ${selector}`);
+    return styleCssContent.slice(index, styleCssContent.indexOf("}", index) + 1);
+  };
+
+  const CRIMSON = /linear-gradient\(145deg,\s*#(?:c42a47|a51f38),\s*#(?:84132b|6b0f21)\)/;
+  for (const selector of [".cash-change-card {", ".cash-change-card--exact {", ".cash-change-card--change {", ".cash-change-card--short {"]) {
+    const rule = rules(selector);
+    assert.match(rule, CRIMSON, `${selector} يجب أن تكون بخلفية قرمزية`);
+    assert.match(rule, /color:\s*#fff/, `${selector} يجب أن يكون نصها أبيض`);
+  }
+
+  // النص الداخلي (العنوان والمبلغ) أبيض أيضًا
+  assert.match(rules(".cash-change-card span {"), /color:\s*#fff/, "عنوان الخانة أبيض");
+  assert.match(rules(".cash-change-card strong {"), /color:\s*#fff/, "المبلغ داخل الخانة أبيض");
+  assert.match(rules(".cash-change-card--change strong {"), /color:\s*#fff/, "مبلغ الفكة أبيض");
+  assert.match(rules(".cash-change-card--short strong {"), /color:\s*#fff/, "مبلغ الناقص أبيض");
+
+  // لا تبقى ألوان خضراء أو حمراء باهتة من التنسيق القديم في الوضع الداكن
+  for (const selector of ['[data-theme="dark"] .cash-change-card--exact {', '[data-theme="dark"] .cash-change-card--change {', '[data-theme="dark"] .cash-change-card--short {']) {
+    const rule = rules(selector);
+    assert.match(rule, CRIMSON, `${selector} يبقى قرمزيًا في الوضع الداكن`);
+    assert.match(rule, /color:\s*#fff/, `${selector} نصه أبيض في الوضع الداكن`);
+    assert.doesNotMatch(rule, /#8ce1ba|#86efac|#4ade80|#fca5a5|#f87171/, "أزيلت ألوان التنسيق القديم");
+  }
+});
+
+test("تبقى حالة الناقص مميزة عن الفكة رغم توحيد اللون القرمزي", () => {
+  assert.match(appJsContent, /\$\{icon\("alert", 15\)\} المتبقي على الزبون \(ناقص\):/, "أيقونة تنبيه لحالة الناقص");
+  assert.match(appJsContent, /cash-change-card--short/, "صنف حالة الناقص محفوظ");
+  const changeRule = styleCssContent.slice(styleCssContent.indexOf(".cash-change-card--change {"), styleCssContent.indexOf("}", styleCssContent.indexOf(".cash-change-card--change {")) + 1);
+  const shortRule = styleCssContent.slice(styleCssContent.indexOf(".cash-change-card--short {"), styleCssContent.indexOf("}", styleCssContent.indexOf(".cash-change-card--short {")) + 1);
+  assert.notEqual(changeRule.match(/linear-gradient[^;]*/)[0], shortRule.match(/linear-gradient[^;]*/)[0], "درجة قرمزية أغمق لحالة الناقص");
+});

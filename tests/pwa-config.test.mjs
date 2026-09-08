@@ -40,3 +40,31 @@ test("يستمر التطبيق محليًا بعد أول تحميل عبر ك�
   assert.match(worker, /cached \|\| Response\.error\(\)/);
   assert.match(worker, /cache\.put\(event\.request, response\.clone\(\)\)/);
 });
+
+test("يوصّل عامل الخدمة النسخة الجديدة بدل حبس الكاش القديم، ويعطّل نفسه في وضع التطوير", async () => {
+  const worker = await readFile(new URL("../client/public/service-worker.js", import.meta.url), "utf8");
+  const main = await readFile(new URL("../client/src/main.js", import.meta.url), "utf8");
+
+  // رقم إصدار الكاش مرفوع، مع إبقاء سجل الإصدارات السابقة في التعليق
+  assert.match(worker, /const CACHE_NAME = "hesabi-pwa-v(\d+)";/, "يجب تعريف إصدار كاش صريح");
+  const version = Number(worker.match(/const CACHE_NAME = "hesabi-pwa-v(\d+)";/)[1]);
+  assert.ok(version >= 31, `إصدار الكاش يجب أن يكون 31 أو أحدث، الحالي ${version}`);
+  assert.match(worker, /hesabi-pwa-v25/, "يبقى سجل الإصدارات السابقة في التعليق");
+
+  // استراتيجية «مخزَن ثم حدّث في الخلفية» للأصول بدل cache-first التي تحبس الكود القديم
+  assert.match(worker, /const revalidate = fetch\(event\.request\)\.then/, "يجب تجديد الأصل من الشبكة في الخلفية");
+  assert.match(worker, /return cached \|\| revalidate\.then\(\(response\) => response \|\| Response\.error\(\)\)/, "يُعرض المخزَّن فورًا ويُطلب الجديد عند غياب الكاش");
+  assert.doesNotMatch(worker, /cached \|\| fetch\(event\.request\)\.then/, "أُزيلت استراتيجية cache-first القديمة للأصول");
+  assert.match(worker, /cache\.put\(event\.request, response\.clone\(\)\)/, "يستمر حفظ الأصل الجديد في الكاش");
+
+  // يبقى العمل دون اتصال محفوظًا: التنقل من الشبكة مع رجوع للكاش، والأصول من الكاش عند فشل الشبكة
+  assert.match(worker, /if \(event\.request\.mode === "navigate"\)/);
+  assert.match(worker, /\.catch\(\(\) => caches\.match\(SCOPE_PATH\)\.then\(\(cached\) => cached \|\| Response\.error\(\)\)\)/);
+  assert.match(worker, /\.catch\(\(\) => null\)/, "فشل الشبكة أثناء التجديد لا يكسر العرض من الكاش");
+
+  // وضع التطوير لا يسجّل عامل خدمة ويزيل ما سبق تسجيله حتى تظهر التعديلات فورًا
+  assert.match(main, /if \(import\.meta\.env\.DEV\) \{/, "يفرق التسجيل بين التطوير والإنتاج");
+  assert.match(main, /registration\.unregister\(\)/, "يزيل عامل الخدمة القديم في التطوير");
+  assert.match(main, /caches\.delete\(key\)/, "يمسح كاش الواجهة في التطوير");
+  assert.match(main, /navigator\.serviceWorker\.register\("\/service-worker\.js"\)/, "يبقى التسجيل للإنتاج");
+});
