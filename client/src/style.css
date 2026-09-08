@@ -942,3 +942,89 @@ label { font-size:15px; }
 .cash-change-card--short strong { color: #991b1b; }
 [data-theme="dark"] .cash-change-card--short { background: rgba(239, 68, 68, 0.18); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5; }
 [data-theme="dark"] .cash-change-card--short strong { color: #f87171; }
+
+/* بطاقات المؤشرات والتقارير الذكية (Smart Analytics & Intelligence) */
+.smart-analytics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; margin: 12px 0 20px; }
+.smart-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px; box-shadow: var(--shadow-subtle); }
+.smart-card--full { grid-column: 1 / -1; }
+[data-theme="dark"] .smart-card { background: #172d25; border-color: #3b5a4d; }
+.smart-card__head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.smart-card__head h3 { margin: 0; font-size: 16px; color: var(--ink); display: flex; align-items: center; gap: 8px; }
+[data-theme="dark"] .smart-card__head h3 { color: #e4ffef; }
+.smart-card__body { display: flex; flex-direction: column; gap: 10px; flex: 1; }
+
+.top-ranking-list { display: flex; flex-direction: column; gap: 8px; }
+.ranking-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: rgba(0, 0, 0, 0.02); border-radius: 10px; border: 1px solid rgba(0, 0, 0, 0.04); }
+[data-theme="dark"] .ranking-row { background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.06); }
+.ranking-rank { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; background: var(--line); color: var(--muted); flex-shrink: 0; }
+.ranking-row:nth-child(1) .ranking-rank { background: #fef08a; color: #854d0e; }
+.ranking-row:nth-child(2) .ranking-rank { background: #e2e8f0; color: #475569; }
+.ranking-row:nth-child(3) .ranking-rank { background: #ffedd5; color: #9a3412; }
+[data-theme="dark"] .ranking-row:nth-child(1) .ranking-rank { background: #713f12; color: #fef08a; }
+[data-theme="dark"] .ranking-row:nth-child(2) .ranking-rank { background: #334155; color: #cbd5e1; }
+[data-theme="dark"] .ranking-row:nth-child(3) .ranking-rank { background: #7c2d12; color: #fed7aa; }
+.ranking-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.ranking-info strong { font-size: 13px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ranking-info small { font-size: 11px; color: var(--muted); }
+.ranking-stat { text-align: left; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.ranking-stat strong { font-size: 13px; color: var(--green-deep); font-weight: 700; }
+[data-theme="dark"] .ranking-stat strong { color: #8ce1ba; }
+.ranking-stat small { font-size: 11px; color: var(--muted); }
+
+/* أوقات الذروة والمبيعات بالساعات */
+.hourly-chart-container { display: flex; align-items: flex-end; justify-content: space-between; gap: 6px; height: 160px; padding: 16px 8px 0; border-bottom: 2px solid var(--line); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.hourly-bar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; flex: 1; min-width: 28px; height: 100%; position: relative; }
+.hourly-bar { width: 100%; max-width: 22px; background: rgba(31, 107, 89, 0.25); border-radius: 4px 4px 0 0; transition: height .3s cubic-bezier(0.4, 0, 0.2, 1), background .2s; min-height: 4px; }
+.hourly-bar-col:hover .hourly-bar, .hourly-bar-col.is-peak .hourly-bar { background: var(--green); }
+.hourly-bar-col.is-peak .hourly-bar { background: linear-gradient(180deg, #e08a2e, #1f6b59); }
+.hourly-label { font-size: 10px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.hourly-val { position: absolute; top: -16px; font-size: 10px; font-weight: 700; color: var(--green-deep); white-space: nowrap; }
+[data-theme="dark"] .hourly-bar { background: rgba(133, 207, 166, 0.25); }
+[data-theme="dark"] .hourly-bar-col:hover .hourly-bar, [data-theme="dark"] .hourly-bar-col.is-peak .hourly-bar { background: #4ade80; }
+[data-theme="dark"] .hourly-val { color: #8ce1ba; }
+
+/* المخزون الراكد والرصيد المجمد */
+.dead-stock-banner { display: flex; align-items: center; justify-content: space-between; background: rgba(220, 38, 38, 0.06); border: 1px solid rgba(220, 38, 38, 0.2); border-radius: 12px; padding: 12px 16px; margin-bottom: 12px; }
+[data-theme="dark"] .dead-stock-banner { background: rgba(220, 38, 38, 0.14); border-color: rgba(220, 38, 38, 0.3); }
+.dead-stock-banner strong { color: #dc2626; font-size: 15px; }
+[data-theme="dark"] .dead-stock-banner strong { color: #fca5a5; }
+
+/* سجل العمليات والأمان (Activity Log) */
+.activity-log-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: right; }
+.activity-log-table th, .activity-log-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); }
+.activity-log-table th { background: rgba(0, 0, 0, 0.02); font-weight: 700; color: var(--muted); }
+[data-theme="dark"] .activity-log-table th { background: rgba(255, 255, 255, 0.03); }
+.activity-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+.activity-badge--sale { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
+.activity-badge--return { background: rgba(234, 88, 12, 0.12); color: #ea580c; }
+.activity-badge--payment { background: rgba(37, 99, 235, 0.12); color: #2563eb; }
+.activity-badge--stock { background: rgba(147, 51, 234, 0.12); color: #9333ea; }
+.activity-badge--salary { background: rgba(217, 119, 6, 0.12); color: #d97706; }
+.activity-badge--auth { background: rgba(75, 85, 99, 0.12); color: #4b5563; }
+
+/* تاريخ استحقاق الديون والأزرار السريعة */
+.due-preset-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.due-chip { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: var(--ink-secondary); cursor: pointer; transition: all .15s ease; }
+.due-chip:hover { background: var(--green); color: #fff; border-color: var(--green); }
+[data-theme="dark"] .due-chip { background: #1e392f; border-color: #3f6052; color: #bde8d4; }
+[data-theme="dark"] .due-chip:hover { background: var(--green); color: #fff; }
+
+/* قفل الشاشة السريع (Screen Quick-Lock) */
+.lock-dialog-card { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 14px; padding: 10px 0; }
+.lock-avatar-icon { width: 56px; height: 56px; border-radius: 50%; background: rgba(31, 107, 89, 0.1); color: var(--green-deep); display: grid; place-items: center; }
+[data-theme="dark"] .lock-avatar-icon { background: rgba(133, 207, 166, 0.15); color: #8ce1ba; }
+.lock-dialog-card h3 { margin: 0; font-size: 18px; color: var(--ink); }
+.lock-dialog-card p { margin: 0; font-size: 13px; color: var(--muted); }
+.lock-pin-input { width: 100%; max-width: 220px; font-size: 24px !important; letter-spacing: 6px; text-align: center; }
+
+/* سندات القبض والصرف وإيصالات الدفع */
+.payment-receipt__badge { background: rgba(31, 107, 89, 0.08); border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 700; color: var(--green-deep); text-align: center; margin-bottom: 8px; }
+[data-theme="dark"] .payment-receipt__badge { background: rgba(133, 207, 166, 0.12); color: #8ce1ba; }
+.payment-receipt__highlight { background: rgba(22, 163, 74, 0.08); border-radius: 8px; padding: 8px 10px; border: 1px solid rgba(22, 163, 74, 0.2); }
+.payment-receipt__highlight strong { font-size: 18px; color: #16a34a; }
+[data-theme="dark"] .payment-receipt__highlight strong { color: #4ade80; }
+
+/* زر واتساب */
+.button--whatsapp { background: #25d366; color: #fff; border-color: #128c7e; }
+.button--whatsapp:hover { background: #128c7e; color: #fff; }
+

@@ -58,6 +58,9 @@ const icon = (name, size = 20) => {
     phone: '<path d="M22 16.9v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.8a2 2 0 0 1-.45 2.11L8.11 9.89a16 16 0 0 0 6 6l1.26-1.26a2 2 0 0 1 2.11-.45c.9.35 1.84.59 2.8.72A2 2 0 0 1 22 16.9Z"/>',
     moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
+    lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
+    shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+    whatsapp: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
   };
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || ""}</svg>`;
 };
@@ -161,10 +164,38 @@ const phoneHref = (phone) => {
   const digits = raw.replace(/\D/g, "");
   return digits ? `tel:${raw.startsWith("+") ? "+" : ""}${digits}` : "";
 };
+const whatsAppHref = (phone, text = "") => {
+  const raw = String(phone || "").trim();
+  const digits = raw.replace(/[^0-9+]/g, "");
+  if (!digits) return "";
+  const normalized = digits.replace(/^00/, "+");
+  return `https://wa.me/${encodeURIComponent(normalized)}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+};
 const phoneCallButton = (phone, name) => {
   const href = phoneHref(phone);
   return href ? `<a class="icon-button icon-button--call" href="${href}" aria-label="اتصال بـ ${escapeHtml(name)}" title="اتصال">${icon("phone", 18)}</a>` : "";
 };
+const whatsAppButton = (phone, name, text = "") => {
+  const href = whatsAppHref(phone, text);
+  return href ? `<a class="icon-button icon-button--whatsapp" href="${href}" target="_blank" rel="noopener noreferrer" aria-label="مراسلة ${escapeHtml(name)} عبر واتساب" title="واتساب">${icon("whatsapp", 18)}</a>` : "";
+};
+function sendWhatsAppMessage(phone, text) {
+  if (!phone) {
+    showToast("لا يوجد رقم هاتف مسجل لهذا الحساب.", "error");
+    return;
+  }
+  const href = whatsAppHref(phone, text);
+  if (href) window.open(href, "_blank", "noopener,noreferrer");
+  else showToast("رقم الهاتف غير صالح للمراسلة عبر واتساب.", "error");
+}
+function generateDebtReminderMessage(customer, storeName = "") {
+  const store = storeName || state.settings?.storeName || "متجرنا";
+  const storePhone = state.settings?.storePhone ? `\nللتواصل والاستفسار: ${state.settings.storePhone}` : "";
+  return `السلام عليكم ورحمة الله وبركاته،\nالأخ/الأخت: ${customer.name}\n\nنود تذكيركم بأن الرصيد المستحق في حسابكم لدى ${store} هو: ${money(customer.balance)}.\n\nشاكرين ومقدرين حسن تعاملكم وتعاونكم الدائم.${storePhone}`;
+}
+function generateInvoiceWhatsAppMessage(invoice) {
+  return invoiceShareText(invoice);
+}
 const canPickContacts = () => typeof navigator !== "undefined" && typeof navigator.contacts?.select === "function";
 const phoneFieldMarkup = (inputId, value = "") => `<label>رقم الهاتف<div class="phone-field__control"><input id="${inputId}" name="phone" type="tel" inputmode="tel" dir="ltr" value="${escapeHtml(value)}" />${canPickContacts() ? `<button id="${inputId}-contact-picker" class="button button--secondary phone-field__picker" type="button">${icon("users", 17)}<span>جهات الاتصال</span></button>` : ""}</div><small class="phone-field__hint">${canPickContacts() ? "اختر رقمًا من جهات اتصال الجهاز أو أدخله يدويًا." : "أدخل الرقم يدويًا؛ اختيار جهات الاتصال غير مدعوم في هذا الجهاز."}</small></label>`;
 async function pickContactPhone(phoneInput, nameInput) {
@@ -341,6 +372,52 @@ function openAccountSessionDialog() {
   overlay.querySelector("#open-local-logout-confirm").addEventListener("click", openLogoutConfirmDialog);
 }
 
+function openScreenLockDialog() {
+  state.isScreenLocked = true;
+  const overlay = openDialog(`
+    <div class="dialog__head screen-lock-head">
+      <div class="screen-lock-user-info">
+        <div class="screen-lock-icon">${icon("lock", 26)}</div>
+        <div>
+          <span class="eyebrow">قفل الشاشة السريع</span>
+          <h2>${escapeHtml(state.currentUser?.name || "المستخدم")}</h2>
+          <small>${roleLabel(state.currentUser?.role)} · ${escapeHtml(storeDisplayName())}</small>
+        </div>
+      </div>
+    </div>
+    <form id="screen-lock-form" class="form-grid">
+      <label class="form-full">
+        رمز الدخول لفتح الشاشة
+        <input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="••••" required autofocus maxlength="12" />
+      </label>
+      <div class="dialog__actions form-full">
+        <button type="button" class="button button--secondary" id="switch-account-from-lock">تبديل الحساب</button>
+        <button type="submit" class="button button--primary">${icon("check", 17)} فتح الشاشة</button>
+      </div>
+    </form>
+  `);
+  const form = overlay.querySelector("#screen-lock-form");
+  overlay.querySelector("#switch-account-from-lock")?.addEventListener("click", () => {
+    state.isScreenLocked = false;
+    closeDialog();
+    openAccountSessionDialog();
+  });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const pin = new FormData(event.currentTarget).get("pin");
+    try {
+      await db.verifyAccountPin(state.currentUser.id, pin);
+      state.isScreenLocked = false;
+      closeDialog();
+      showToast("تم فتح الشاشة بنجاح.");
+    } catch {
+      showToast("رمز الدخول غير صحيح. أعد المحاولة.", "error");
+      form.pin.value = "";
+      form.pin.focus();
+    }
+  });
+}
+
 function formatStatus(product) {
   const status = stockStatus(product.quantity, product.minimumStock);
   return `<span class="status status--${status === "متوفر" ? "available" : status === "منخفض" ? "low" : "empty"}">${status}</span>`;
@@ -420,7 +497,7 @@ function themeToggleMarkup() { const dark = state.settings?.theme === "dark"; re
 function salesScannerFabMarkup() { return `<button class="sales-scanner-fab" data-action="open-sales-scanner" data-mode="sale" aria-label="فتح المبيعات ومسح الباركود" title="بيع ومسح باركود">${icon("cart", 22)}<span>بيع</span></button>`; }
 
 function topbarMarkup(title, description, action = "", modifierClass = "") {
-  return `<header class="topbar${modifierClass ? ` ${modifierClass}` : ""}"><div><p class="eyebrow topbar__store"><img src="${storeLogoUrl()}" alt="" />${escapeHtml(storeDisplayName())}</p><h1>${title}</h1>${description ? `<p class="topbar__description">${description}</p>` : ""}</div><div class="topbar__actions"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span>${action}${themeToggleMarkup()}<button class="icon-button" data-action="account-session" aria-label="تبديل المستخدمين أو تسجيل الخروج" title="تبديل المستخدمين أو تسجيل الخروج">${icon("users", 18)}</button></div></header>`;
+  return `<header class="topbar${modifierClass ? ` ${modifierClass}` : ""}"><div><p class="eyebrow topbar__store"><img src="${storeLogoUrl()}" alt="" />${escapeHtml(storeDisplayName())}</p><h1>${title}</h1>${description ? `<p class="topbar__description">${description}</p>` : ""}</div><div class="topbar__actions"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span>${action}${themeToggleMarkup()}<button class="icon-button lock-screen-btn" data-action="quick-lock" aria-label="قفل الشاشة السريع" title="قفل الشاشة السريع">${icon("lock", 18)}</button><button class="icon-button" data-action="account-session" aria-label="تبديل المستخدمين أو تسجيل الخروج" title="تبديل المستخدمين أو تسجيل الخروج">${icon("users", 18)}</button></div></header>`;
 }
 
 function dashboardMarkup() {
@@ -664,16 +741,131 @@ function expensesMarkup({ embedded = false } = {}) {
   <section class="expense-period-grid"><section class="panel entity-list"><div class="panel__head"><div><span class="eyebrow">تشغيل يومي</span><h2>مصروفات يومية</h2></div><small>المصروفات التشغيلية اليومية فقط</small></div>${expenseRows(dailyExpenses, "daily")}</section><section class="panel entity-list"><div class="panel__head"><div><span class="eyebrow">التزام شهري</span><h2>مصروفات شهرية</h2></div><small>الإيجار والكهرباء والماء والالتزامات التشغيلية</small></div>${expenseRows(monthlyExpenses, "monthly")}</section></section><section class="panel entity-list salary-expense-section"><div class="panel__head"><div><span class="eyebrow">رواتب الموظفين</span><h2>السلف والرواتب المسلمة</h2></div><small>لا يدخل الراتب كاملًا في المصروفات إلا بعد تسليمه</small></div>${expenseRows(salaryEntries, "salary")}</section><section class="panel expense-page__bottom-action"><div><span class="eyebrow">سلفة موظف</span><strong>تسجيل سلفة جديدة</strong><small>تخرج نقدًا وتخصم من الراتب المتبقي دون احتساب الراتب كاملًا</small></div><button class="button button--secondary" data-action="new-cashier-salary-advance">${icon("wallet", 17)}<span>سلفة موظف</span></button></section>`;
 }
 
+function smartTopMoversMarkup(topByVolume = [], topByProfit = []) {
+  return `
+    <section class="smart-analytics-section">
+      <div class="smart-section-head">
+        <div>
+          <span class="eyebrow">${icon("chart", 15)} تحليلات ذكية</span>
+          <h2>حركة المنتجات والأرباح</h2>
+        </div>
+        <small>الترتيب بحسب المبيعات المحققة ضمن الفترة المحددة</small>
+      </div>
+      <div class="smart-analytics-grid">
+        <article class="panel smart-card">
+          <div class="panel__head">
+            <div>
+              <span class="eyebrow">الأكثر طلباً</span>
+              <h3>الأعلى مبيعاً بالكمية</h3>
+            </div>
+          </div>
+          <div class="smart-card__list">
+            ${topByVolume.length ? topByVolume.map((item, idx) => `
+              <div class="smart-rank-row">
+                <span class="rank-badge">#${idx + 1}</span>
+                <div class="rank-info">
+                  <strong>${escapeHtml(item.name)}</strong>
+                  <small>إجمالي المبيعات: ${money(item.revenue)}</small>
+                </div>
+                <strong class="rank-value">${amount(item.quantity)} قطعة</strong>
+              </div>
+            `).join("") : `<p class="panel__empty">لا توجد مبيعات منتجات ضمن الفترة.</p>`}
+          </div>
+        </article>
+        <article class="panel smart-card">
+          <div class="panel__head">
+            <div>
+              <span class="eyebrow">أبطال الربحية</span>
+              <h3>الأعلى مساهمة في الأرباح</h3>
+            </div>
+          </div>
+          <div class="smart-card__list">
+            ${topByProfit.length ? topByProfit.map((item, idx) => `
+              <div class="smart-rank-row">
+                <span class="rank-badge rank-badge--profit">#${idx + 1}</span>
+                <div class="rank-info">
+                  <strong>${escapeHtml(item.name)}</strong>
+                  <small>الكمية: ${amount(item.quantity)}</small>
+                </div>
+                <strong class="rank-value text-success">${money(item.profit)}</strong>
+              </div>
+            `).join("") : `<p class="panel__empty">لا توجد أرباح محسوبة ضمن الفترة.</p>`}
+          </div>
+        </article>
+      </div>
+    </section>
+  `;
+}
+
+function smartHourlyPeakMarkup(hourlyDistribution = []) {
+  const maxTotal = Math.max(1, ...hourlyDistribution.map((h) => h.total));
+  const peakHour = hourlyDistribution.reduce((max, h) => h.total > max.total ? h : max, { hour: 0, count: 0, total: 0 });
+  const formatHour = (h) => {
+    const period = h >= 12 ? "م" : "ص";
+    const hr = h % 12 === 0 ? 12 : h % 12;
+    return `${hr} ${period}`;
+  };
+
+  return `
+    <article class="panel peak-hours-card">
+      <div class="panel__head">
+        <div>
+          <span class="eyebrow">تحليل ساعات الذروة</span>
+          <h2>توزيع المبيعات على ساعات اليوم</h2>
+        </div>
+        ${peakHour.total > 0 ? `<span class="peak-hour-badge">ذروة المبيعات: ${formatHour(peakHour.hour)} (${money(peakHour.total)})</span>` : ""}
+      </div>
+      <div class="hourly-bars-chart">
+        ${hourlyDistribution.map((h) => {
+          const heightPct = Math.max(6, Math.round((h.total / maxTotal) * 100));
+          const isPeak = peakHour.total > 0 && h.hour === peakHour.hour;
+          return `
+            <div class="hourly-bar-col ${isPeak ? "is-peak" : ""}" title="الساعة ${formatHour(h.hour)}: ${amount(h.count)} فاتورة · ${money(h.total)}">
+              <div class="hourly-bar-fill" style="height: ${heightPct}%"></div>
+              <span class="hourly-bar-label">${h.hour % 4 === 0 ? formatHour(h.hour) : "·"}</span>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </article>
+  `;
+}
+
+function smartDeadStockMarkup(deadStock) {
+  if (!deadStock || !deadStock.count) return "";
+  return `
+    <article class="panel dead-stock-card">
+      <div class="panel__head">
+        <div>
+          <span class="eyebrow">البضاعة الراكدة</span>
+          <h2>بضائع بدون حركة بيع في هذه الفترة (${amount(deadStock.count)} صنف)</h2>
+          <small>رأس المال في المخزون الراكد: <strong>${money(deadStock.value)}</strong></small>
+        </div>
+      </div>
+      <div class="dead-stock-items-chips">
+        ${(deadStock.products || []).map((p) => `<button type="button" class="dead-stock-chip" data-action="open-product" data-id="${p.id}">${escapeHtml(p.name)} (${amount(p.quantity)} ${escapeHtml(p.unit)})</button>`).join("")}
+      </div>
+    </article>
+  `;
+}
+
 function reportsMarkup() {
-  const data = state.analytics || { sales: {}, purchases: {}, expenses: {}, profit: {} };
+  const data = state.analytics || { sales: {}, purchases: {}, expenses: {}, profit: {}, topByVolume: [], topByProfit: [], hourlyDistribution: [], deadStock: null };
   const categories = Object.entries(data.expenses.byCategory || {});
   const debtQuery = state.debtQuery.trim().toLocaleLowerCase("ar");
   const debtors = state.customers.filter((customer) => toNumber(customer.balance) > 0 && (!debtQuery || [customer.name, customer.phone].some((value) => value?.toLocaleLowerCase("ar").includes(debtQuery)))).sort((a, b) => state.debtSort === "lowest" ? toNumber(a.balance) - toNumber(b.balance) : state.debtSort === "name" ? a.name.localeCompare(b.name, "ar") : toNumber(b.balance) - toNumber(a.balance));
-  const debtReport = `<section class="panel debt-report"><div class="panel__head"><div><span class="eyebrow">تقرير ديون العملاء</span><h2>الأرصدة المستحقة</h2></div><strong>${money(debtors.reduce((sum, customer) => sum + toNumber(customer.balance), 0))}</strong></div><div class="toolbar debt-report__toolbar"><label class="search-field">${icon("search", 18)}<input id="debt-search" autocomplete="off" placeholder="ابحث عن عميل..." value="${escapeHtml(state.debtQuery)}" /></label><select id="debt-sort"><option value="highest" ${state.debtSort === "highest" ? "selected" : ""}>الأعلى مديونية</option><option value="lowest" ${state.debtSort === "lowest" ? "selected" : ""}>الأقل مديونية</option><option value="name" ${state.debtSort === "name" ? "selected" : ""}>اسم العميل</option></select></div><div class="debt-report__list">${debtors.length ? debtors.map((customer) => `<button class="debtor-row" data-action="open-customer" data-id="${customer.id}"><span><strong>${escapeHtml(customer.name)}</strong><small>${escapeHtml(customer.phone || "لا يوجد هاتف")}</small></span><strong>${money(customer.balance)}</strong></button>`).join("") : `<div class="inline-empty">لا توجد ديون عملاء ضمن البحث الحالي.</div>`}</div></section>`;
+  const debtReport = `<section class="panel debt-report"><div class="panel__head"><div><span class="eyebrow">تقرير ديون العملاء</span><h2>الأرصدة المستحقة (${amount(debtors.length)} عميل)</h2></div><strong>${money(debtors.reduce((sum, customer) => sum + toNumber(customer.balance), 0))}</strong></div><div class="toolbar debt-report__toolbar"><label class="search-field">${icon("search", 18)}<input id="debt-search" autocomplete="off" placeholder="ابحث عن عميل..." value="${escapeHtml(state.debtQuery)}" /></label><select id="debt-sort"><option value="highest" ${state.debtSort === "highest" ? "selected" : ""}>الأعلى مديونية</option><option value="lowest" ${state.debtSort === "lowest" ? "selected" : ""}>الأقل مديونية</option><option value="name" ${state.debtSort === "name" ? "selected" : ""}>اسم العميل</option></select></div><div class="debt-report__list">${debtors.length ? debtors.map((customer) => {
+    const reminderMsg = generateDebtReminderMessage(customer);
+    return `<div class="debtor-row-wrap"><button class="debtor-row" data-action="open-customer" data-id="${customer.id}"><span><strong>${escapeHtml(customer.name)}</strong><small>${escapeHtml(customer.phone || "لا يوجد هاتف")}</small></span><strong>${money(customer.balance)}</strong></button><div class="debtor-quick-actions">${phoneCallButton(customer.phone, customer.name)}${whatsAppButton(customer.phone, customer.name, reminderMsg)}</div></div>`;
+  }).join("") : `<div class="inline-empty">لا توجد ديون عملاء ضمن البحث الحالي.</div>`}</div></section>`;
   return `${topbarMarkup("التقارير", "ملخص تشغيلي للمبيعات والمشتريات والمصروفات والأرباح.", `<div class="topbar__actions"><button class="button button--secondary" data-action="navigate" data-view="periodic-inventory">${icon("layers", 17)}<span>الجرد</span></button><button class="button button--secondary" data-action="export-report">${icon("receipt", 17)}<span>تصدير التقرير</span></button></div>`)}${debtReport}
   <section class="toolbar toolbar--filter"><form id="report-filter" class="date-filter"><label>من<input name="from" type="date" value="${state.reportFrom}" /></label><label>إلى<input name="to" type="date" value="${state.reportTo}" /></label></form></section>
   <section class="metric-grid metric-grid--reports">${metricCard("صافي المبيعات", money(data.profit.netSales || 0), "trend", "بعد مرتجعات البيع", data.profit.netSales)}${metricCard("تكلفة البضاعة", money(data.profit.netCostOfGoods || 0), "package", "تكلفة وقت البيع", data.profit.netCostOfGoods)}${metricCard("إجمالي المصروفات", money(data.expenses.total || 0), "wallet", "ضمن الفترة", data.expenses.total)}${metricCard("صافي الربح", money(data.profit.netProfit || 0), "chart", "ليس المبيعات", data.profit.netProfit)}</section>
-  <section class="report-grid"><article class="panel report-card"><span class="eyebrow">تقرير المبيعات</span><h2 class="${toNumber(data.sales.total) < 0 ? "is-negative" : ""}">${money(data.sales.total || 0)}</h2><div><span>الفواتير</span><strong>${amount(data.sales.invoices || 0)}</strong></div><div><span>الخصومات</span>${signedMoney(data.sales.discounts || 0)}</div><div><span>مرتجع البيع</span>${signedMoney(data.sales.returns || 0)}</div></article><article class="panel report-card"><span class="eyebrow">تقرير المشتريات</span><h2 class="${toNumber(data.purchases.net) < 0 ? "is-negative" : ""}">${money(data.purchases.net || 0)}</h2><div><span>الفواتير</span><strong>${amount(data.purchases.invoices || 0)}</strong></div><div><span>المنتجات المشتراة</span><strong>${amount(data.purchases.products || 0)}</strong></div><div><span>مرتجع الشراء</span>${signedMoney(data.purchases.returns || 0)}</div></article><article class="panel report-card"><span class="eyebrow">المصروفات حسب النوع</span>${categories.length ? categories.map(([category, total]) => `<div><span>${escapeHtml(category)}</span>${signedMoney(total)}</div>`).join("") : `<p>لا توجد مصروفات ضمن الفترة.</p>`}</article><article class="panel report-card report-card--profit"><span class="eyebrow">معادلة الربح</span><div><span>المبيعات</span>${signedMoney(data.profit.netSales || 0)}</div><div><span>− تكلفة البضاعة</span>${signedMoney(data.profit.netCostOfGoods || 0)}</div><div><span>= الربح الإجمالي</span>${signedMoney(data.profit.grossProfit || 0)}</div><div><span>− المصروفات</span>${signedMoney(data.expenses.total || 0)}</div><div class="report-card__final"><span>= صافي الربح</span>${signedMoney(data.profit.netProfit || 0)}</div></article></section><section class="reports-bottom-action"><div><span class="eyebrow">التقارير المالية</span><strong>قائمة التقارير والتصدير PDF</strong><small>حركة الصندوق، قائمة الدخل، المركز المالي، وميزان المراجعة.</small></div><button class="button button--primary" data-action="export-report">${icon("receipt", 19)}<span>فتح قائمة التقارير</span></button></section><section class="sales-bottom-action reports-inventory-action"><div><span class="eyebrow">إدارة المخزون</span><strong>الجرد الدوري</strong><small>راجع الكميات الفعلية وقارنها بالأرصدة المسجلة واحفظ نتيجة الجرد.</small></div><button class="button button--primary" data-action="navigate" data-view="periodic-inventory">${icon("layers", 22)}<span>الانتقال إلى الجرد</span></button></section>`;
+  <section class="report-grid"><article class="panel report-card"><span class="eyebrow">تقرير المبيعات</span><h2 class="${toNumber(data.sales.total) < 0 ? "is-negative" : ""}">${money(data.sales.total || 0)}</h2><div><span>الفواتير</span><strong>${amount(data.sales.invoices || 0)}</strong></div><div><span>الخصومات</span>${signedMoney(data.sales.discounts || 0)}</div><div><span>مرتجع البيع</span>${signedMoney(data.sales.returns || 0)}</div></article><article class="panel report-card"><span class="eyebrow">تقرير المشتريات</span><h2 class="${toNumber(data.purchases.net) < 0 ? "is-negative" : ""}">${money(data.purchases.net || 0)}</h2><div><span>الفواتير</span><strong>${amount(data.purchases.invoices || 0)}</strong></div><div><span>المنتجات المشتراة</span><strong>${amount(data.purchases.products || 0)}</strong></div><div><span>مرتجع الشراء</span>${signedMoney(data.purchases.returns || 0)}</div></article><article class="panel report-card"><span class="eyebrow">المصروفات حسب النوع</span>${categories.length ? categories.map(([category, total]) => `<div><span>${escapeHtml(category)}</span>${signedMoney(total)}</div>`).join("") : `<p>لا توجد مصروفات ضمن الفترة.</p>`}</article><article class="panel report-card report-card--profit"><span class="eyebrow">معادلة الربح</span><div><span>المبيعات</span>${signedMoney(data.profit.netSales || 0)}</div><div><span>− تكلفة البضاعة</span>${signedMoney(data.profit.netCostOfGoods || 0)}</div><div><span>= الربح الإجمالي</span>${signedMoney(data.profit.grossProfit || 0)}</div><div><span>− المصروفات</span>${signedMoney(data.expenses.total || 0)}</div><div class="report-card__final"><span>= صافي الربح</span>${signedMoney(data.profit.netProfit || 0)}</div></article></section>
+  ${smartTopMoversMarkup(data.topByVolume, data.topByProfit)}
+  ${smartHourlyPeakMarkup(data.hourlyDistribution)}
+  ${smartDeadStockMarkup(data.deadStock)}
+  <section class="reports-bottom-action"><div><span class="eyebrow">التقارير المالية</span><strong>قائمة التقارير والتصدير PDF</strong><small>حركة الصندوق، قائمة الدخل، المركز المالي، وميزان المراجعة.</small></div><button class="button button--primary" data-action="export-report">${icon("receipt", 19)}<span>فتح قائمة التقارير</span></button></section><section class="sales-bottom-action reports-inventory-action"><div><span class="eyebrow">إدارة المخزون</span><strong>الجرد الدوري</strong><small>راجع الكميات الفعلية وقارنها بالأرصدة المسجلة واحفظ نتيجة الجرد.</small></div><button class="button button--primary" data-action="navigate" data-view="periodic-inventory">${icon("layers", 22)}<span>الانتقال إلى الجرد</span></button></section>`;
 }
 
 function cashboxMarkup() {
@@ -761,6 +953,7 @@ function settingsMarkup() {
     { view: "general-settings", iconName: "box", eyebrow: "المتجر", title: "إعدادات عامة", description: "الاسم والنشاط والعملة ورصيد البداية" },
     { view: "brand-settings", iconName: "layers", eyebrow: "الهوية", title: "شعار المتجر", description: "اختر شعارًا محفوظًا محليًا وضمن PDF" },
     { view: "accounts", iconName: "users", eyebrow: "الفريق", title: "إدارة الحسابات", description: "أضف الحسابات وحدد الأدوار والرواتب" },
+    { view: "activity-log", iconName: "shield", eyebrow: "الأمان والرقابة", title: "سجل العمليات والتدقيق", description: "مراقبة حركات الدخول والمبيعات والمخزون" },
     { view: "navigation-settings", iconName: "grid", eyebrow: "الهاتف", title: "ترتيب الأيقونات", description: "غيّر أولوية شريط التنقل حسب متجرِك" },
     { view: "data-management", iconName: "restore", eyebrow: "الحفظ", title: "إدارة البيانات", description: "نسخ محلية وسحابية واستعادة آمنة" },
   ];
@@ -804,6 +997,47 @@ function accountsMarkup() {
   <section class="panel account-list"><div class="panel__head"><div><span class="eyebrow">فريق المتجر</span><h2>الحسابات المحلية</h2></div><small>الأدمن: كامل الصلاحيات · الكاشير: صلاحيات مخصصة (الافتراضي مبيعات وفواتيرها فقط) · لكل حساب راتب شهري اختياري</small></div>${accounts.map((account) => { const salary = salaryByStaff.get(account.id); const isPayrollAccount = ["admin", "cashier", "employee"].includes(account.role); const salaryAction = isPayrollAccount && account.isActive && toNumber(salary?.monthlySalary) > 0 ? (salary?.salaryDelivered ? `<small class="status status--available">تم تسليم الراتب</small>` : `<button class="button button--secondary button--compact" data-action="settle-staff-salary" data-id="${account.id}">تسليم الراتب</button>`) : ""; return `<article class="account-row"><div class="account-row__icon">${icon("users", 20)}</div><div class="account-row__main"><strong>${escapeHtml(account.name)}</strong><small dir="ltr">${escapeHtml(account.username)}</small>${account.jobTitle ? `<small class="account-job-title">${escapeHtml(account.jobTitle)}</small>` : ""}${isPayrollAccount ? `<small class="account-salary-note">راتب الشهر ${money(salary?.monthlySalary ?? account.monthlySalary ?? 0)} · السلف ${money(salary?.advances || 0)} · خصم العجز ${money(salary?.shortageDeductions || 0)} · المتبقي ${money(salary?.remainingSalary || 0)}</small>` : ""}${cashierPermissionsSummaryMarkup(account)}</div><span class="account-badge account-badge--${account.role}">${roleLabel(account.role)}</span><span class="status status--${account.isActive ? "available" : "empty"}">${account.isActive ? "نشط" : "موقوف"}</span><div class="entity-row__actions">${salaryAction}<button class="icon-button" data-action="reset-account-pin" data-id="${account.id}" aria-label="إعادة تعيين رمز دخول ${escapeHtml(account.name)}">${icon("key", 18)}</button><button class="icon-button" data-action="open-account" data-id="${account.id}" aria-label="تعديل ${escapeHtml(account.name)}">${icon("dots", 18)}</button>${account.role === "cashier" && account.isActive ? `<button class="icon-button icon-button--danger" data-action="delete-cashier-account" data-id="${account.id}" aria-label="حذف الكاشير ${escapeHtml(account.name)}">${icon("trash", 18)}</button>` : ""}</div></article>`; }).join("")}</section>`;
 }
 
+function activityLogMarkup() {
+  const query = (state.activityQuery || "").trim().toLocaleLowerCase("ar");
+  const typeFilter = state.activityType || "الكل";
+  const types = ["الكل", "مبيعات", "مرتجع", "منتجات", "تعديل مخزون", "سند قبض", "سند صرف", "ورديات"];
+  const list = (state.activityLogs || []).filter((log) => {
+    if (typeFilter !== "الكل" && log.type !== typeFilter) return false;
+    if (query && !`${log.details} ${log.accountName} ${log.type}`.toLocaleLowerCase("ar").includes(query)) return false;
+    return true;
+  });
+
+  return `${topbarMarkup("سجل العمليات والتدقيق", "متابعة وتدقيق كافة الحركات التشغيلية والأمنية في النظام.", settingsBackAction())}
+  <div class="settings-page settings-subpage">
+    <section class="inventory-summary">
+      <div><span>إجمالي الحركات</span><strong>${amount(state.activityLogs?.length || 0)} عملية</strong></div>
+      <div><span>حركات اليوم</span><strong>${amount((state.activityLogs || []).filter((l) => dateKey(l.date) === dateKey()).length)} عملية</strong></div>
+      <div><span>النوع المحدد</span><strong>${escapeHtml(typeFilter)}</strong></div>
+    </section>
+    <section class="toolbar toolbar--filter">
+      <label class="search-field">${icon("search", 19)}<input id="activity-search" dir="rtl" autocomplete="off" placeholder="ابحث في سجل التدقيق..." value="${escapeHtml(state.activityQuery || "")}" /></label>
+      <div class="category-chips">
+        ${types.map((t) => `<button type="button" class="category-chip ${typeFilter === t ? "is-active" : ""}" data-action="filter-activity-type" data-type="${escapeHtml(t)}">${escapeHtml(t)}</button>`).join("")}
+      </div>
+    </section>
+    <section class="panel entity-list activity-log-list">
+      ${list.length ? list.map((log) => {
+        const typeIcon = log.type === "مبيعات" ? "cart" : log.type === "منتجات" ? "package" : log.type.includes("مخزون") ? "layers" : log.type.includes("قبض") || log.type.includes("صرف") ? "wallet" : log.type.includes("ورديات") ? "clock" : "shield";
+        return `
+          <article class="entity-row activity-row">
+            <div class="entity-row__icon">${icon(typeIcon, 20)}</div>
+            <div class="entity-row__main">
+              <strong>${escapeHtml(log.details || "عملية")}</strong>
+              <small>${dateTime(log.date)} · المنفذ: <span class="activity-user-badge">${escapeHtml(log.accountName || "النظام")}</span></small>
+            </div>
+            <span class="activity-type-tag activity-type-tag--${escapeHtml(log.type)}">${escapeHtml(log.type)}</span>
+          </article>
+        `;
+      }).join("") : `<div class="inline-empty">لا توجد حركات مسجلة تطابق البحث الحالي.</div>`}
+    </section>
+  </div>`;
+}
+
 function recoveryNoticeMarkup(failedView) {
   const label = NAV_ITEMS.find((item) => item.id === failedView)?.label || "القسم";
   return `<section class="runtime-recovery" role="alert"><div>${icon("alert", 19)}<div><strong>تعذر فتح ${escapeHtml(label)} مؤقتًا</strong><small>تم إبقاؤك في قسم يعمل وبياناتك المحلية لم تتغير.</small></div></div><button class="button button--secondary" type="button" data-runtime-retry="${escapeHtml(failedView)}">إعادة المحاولة</button></section>`;
@@ -839,7 +1073,7 @@ function renderApplication() {
   if (!state.currentUser) { root.innerHTML = loginMarkup(); bindEvents(); return; }
   if (state.currentUser.mustChangePin) { root.innerHTML = requiredPinMarkup(); bindEvents(); return; }
   if (!canAccessView(state.currentUser, state.view)) state.view = isAdmin(state.currentUser) ? "dashboard" : "sales";
-  const body = { dashboard: dashboardMarkup, products: productsMarkup, inventory: inventoryMarkup, sales: salesMarkup, invoices: invoicesMarkup, customers: customersMarkup, "customer-payments": customerPaymentsMarkup, suppliers: suppliersMarkup, "supplier-payments": supplierPaymentsMarkup, purchases: purchasesMarkup, expenses: expensesMarkup, cashbox: cashboxMarkup, transfers: transfersMarkup, reports: reportsMarkup, "periodic-inventory": periodicInventoryMarkup, accounts: accountsMarkup, settings: settingsMarkup, "general-settings": generalSettingsMarkup, "brand-settings": brandSettingsMarkup, "navigation-settings": navigationSettingsMarkup, "data-management": dataManagementMarkup }[state.view]?.() || dashboardMarkup();
+  const body = { dashboard: dashboardMarkup, products: productsMarkup, inventory: inventoryMarkup, sales: salesMarkup, invoices: invoicesMarkup, customers: customersMarkup, "customer-payments": customerPaymentsMarkup, suppliers: suppliersMarkup, "supplier-payments": supplierPaymentsMarkup, purchases: purchasesMarkup, expenses: expensesMarkup, cashbox: cashboxMarkup, transfers: transfersMarkup, reports: reportsMarkup, "periodic-inventory": periodicInventoryMarkup, accounts: accountsMarkup, "activity-log": activityLogMarkup, settings: settingsMarkup, "general-settings": generalSettingsMarkup, "brand-settings": brandSettingsMarkup, "navigation-settings": navigationSettingsMarkup, "data-management": dataManagementMarkup }[state.view]?.() || dashboardMarkup();
   root.innerHTML = `<div class="app-shell">${navMarkup()}<main class="workspace">${body}</main>${salesScannerFabMarkup()}</div>`;
   if (state.view === "cashbox" && isAdmin(state.currentUser)) root.querySelector(".workspace")?.insertAdjacentHTML("beforeend", `${cashierShiftSummaryMarkup()}${cashierDifferenceStatisticsMarkup()}${cashierSalarySummaryMarkup()}`);
   bindEvents();
@@ -1027,6 +1261,7 @@ function bindEvents() {
   bindSearchInput("#supplier-payment-search", "supplierPaymentQuery");
   root.querySelector("#supplier-payment-filter")?.addEventListener("change", (event) => { state.supplierPaymentFrom = event.currentTarget.querySelector("[name=from]").value; state.supplierPaymentTo = event.currentTarget.querySelector("[name=to]").value; render(); });
   bindSearchInput("#debt-search", "debtQuery");
+  bindSearchInput("#activity-search", "activityQuery");
   root.querySelector("#debt-sort")?.addEventListener("change", (event) => { state.debtSort = event.target.value; render(); });
   bindSearchInput("#expense-search", "expenseQuery");
   root.querySelector("#expense-filter")?.addEventListener("change", async (event) => { state.expenseFrom = event.currentTarget.querySelector("[name=from]").value; state.expenseTo = event.currentTarget.querySelector("[name=to]").value; try { await refresh(); render(); } catch (error) { showToast(error.message || "تعذر تحديث المصروفات.", "error"); } });
@@ -1125,6 +1360,8 @@ async function handleActionUnsafe(event) {
   if (action === "move-mobile-nav") { await updateMobileNavigationOrder(id, event.currentTarget.dataset.direction); return; }
   if (action === "reset-mobile-nav") { await resetMobileNavigationOrder(); return; }
   if (action === "toggle-theme") { toggleTheme(); return; }
+  if (action === "quick-lock") { openScreenLockDialog(); return; }
+  if (action === "filter-activity-type") { state.activityType = event.currentTarget.dataset.type; render(); return; }
   if (action === "open-reorder-list") { openReorderDialog(); return; }
   if (action === "new-product") { openProductDialog(); return; }
   if (action === "open-product") { openProductDialog(await db.getProduct(id)); return; }
@@ -2112,11 +2349,12 @@ function openCheckoutDialog() {
       </div>
     </div>
   `;
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تثبيت الفاتورة</span><h2>مراجعة البيع</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="checkout-lines">${initial.lines.map((line) => `<div><span>${escapeHtml(line.name)} × ${amount(line.quantity)}</span><strong>${money(line.total)}</strong></div>`).join("")}</div><form id="checkout-form" class="form-grid"><label>الخصم العام<input name="discount" type="text" inputmode="decimal" placeholder="0 أو 20%" value="" autocomplete="off" /><small class="field-hint">أدخل مبلغًا مثل 100 أو نسبة مثل 20%</small></label><div class="delivery-charge-type delivery-compact form-full"><label class="delivery-compact__amount">خدمة التوصيل<input name="deliveryFee" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" /></label><div class="delivery-compact__choices" role="radiogroup" aria-label="خدمة التوصيل على"><label class="delivery-choice delivery-choice--store"><input name="deliveryChargeType" type="radio" value="store" checked /> <span>على المحل</span></label><label class="delivery-choice delivery-choice--customer"><input name="deliveryChargeType" type="radio" value="customer" /> <span>على العميل</span></label></div></div>${paymentMethodToggle}<fieldset class="payment-type form-full"><legend>نوع الدفع</legend><label><input name="paymentType" type="radio" value="نقدي" checked /> نقدي</label><label><input name="paymentType" type="radio" value="آجل" /> آجل</label></fieldset><label id="credit-customer-field" class="form-full" hidden>العميل<select name="customerId"><option value="">اختر العميل</option>${state.customers.map((customer) => `<option value="${customer.id}">${escapeHtml(customer.name)}${toNumber(customer.balance) ? ` — رصيد ${money(customer.balance)}` : ""}</option>`).join("")}</select></label>${cashCalcMarkup}<label class="form-full">المبلغ المدفوع<input id="paid-amount" name="paidAmount" type="number" inputmode="decimal" min="0" max="${initial.total}" step="0.01" value="${initial.total}" required /></label><div class="credit-summary form-full" id="credit-summary" hidden><span>المبلغ المتبقي</span><strong id="remaining-amount">${money(0)}</strong><small id="payment-status">مدفوعة</small></div><div class="checkout-total form-full"><span>الإجمالي النهائي</span><strong id="checkout-total">${money(initial.total)}</strong></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>رجوع</button><button type="submit" class="button button--primary checkout-submit">تأكيد البيع ${icon("check", 17)}</button></div></form>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تثبيت الفاتورة</span><h2>مراجعة البيع</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="checkout-lines">${initial.lines.map((line) => `<div><span>${escapeHtml(line.name)} × ${amount(line.quantity)}</span><strong>${money(line.total)}</strong></div>`).join("")}</div><form id="checkout-form" class="form-grid"><label>الخصم العام<input name="discount" type="text" inputmode="decimal" placeholder="0 أو 20%" value="" autocomplete="off" /><small class="field-hint">أدخل مبلغًا مثل 100 أو نسبة مثل 20%</small></label><div class="delivery-charge-type delivery-compact form-full"><label class="delivery-compact__amount">خدمة التوصيل<input name="deliveryFee" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0" /></label><div class="delivery-compact__choices" role="radiogroup" aria-label="خدمة التوصيل على"><label class="delivery-choice delivery-choice--store"><input name="deliveryChargeType" type="radio" value="store" checked /> <span>على المحل</span></label><label class="delivery-choice delivery-choice--customer"><input name="deliveryChargeType" type="radio" value="customer" /> <span>على العميل</span></label></div></div>${paymentMethodToggle}<fieldset class="payment-type form-full"><legend>نوع الدفع</legend><label><input name="paymentType" type="radio" value="نقدي" checked /> نقدي</label><label><input name="paymentType" type="radio" value="آجل" /> آجل</label></fieldset><label id="credit-customer-field" class="form-full" hidden>العميل<select name="customerId"><option value="">اختر العميل</option>${state.customers.map((customer) => `<option value="${customer.id}">${escapeHtml(customer.name)}${toNumber(customer.balance) ? ` — رصيد ${money(customer.balance)}` : ""}</option>`).join("")}</select></label><div id="credit-due-date-field" class="form-full" hidden><label>تاريخ استحقاق السداد (أجل اختياري)<input id="credit-due-date-input" name="dueDate" type="date" min="${dateKey()}" value="" /><small class="field-hint">حدد أجل السداد لتتبع الديون المتأخرة وإرسال التذكيرات.</small></label><div class="due-preset-chips"><button type="button" class="due-chip" data-due-days="7">+ 7 أيام</button><button type="button" class="due-chip" data-due-days="15">+ 15 يومًا</button><button type="button" class="due-chip" data-due-days="30">+ 30 يومًا</button></div></div>${cashCalcMarkup}<label class="form-full">المبلغ المدفوع<input id="paid-amount" name="paidAmount" type="number" inputmode="decimal" min="0" max="${initial.total}" step="0.01" value="${initial.total}" required /></label><div class="credit-summary form-full" id="credit-summary" hidden><span>المبلغ المتبقي</span><strong id="remaining-amount">${money(0)}</strong><small id="payment-status">مدفوعة</small></div><div class="checkout-total form-full"><span>الإجمالي النهائي</span><strong id="checkout-total">${money(initial.total)}</strong></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>رجوع</button><button type="submit" class="button button--primary checkout-submit">تأكيد البيع ${icon("check", 17)}</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   const form = overlay.querySelector("#checkout-form");
   const paidInput = overlay.querySelector("#paid-amount");
   const creditField = overlay.querySelector("#credit-customer-field");
+  const dueDateField = overlay.querySelector("#credit-due-date-field");
   const creditSummary = overlay.querySelector("#credit-summary");
   const submitButton = form.querySelector(".checkout-submit");
   const cashCalcSection = overlay.querySelector("#cash-calculator-section");
@@ -2125,6 +2363,18 @@ function openCheckoutDialog() {
   const cashChangeCard = overlay.querySelector(".cash-change-card");
 
   let lastKnownTotal = initial.total;
+
+  overlay.querySelectorAll("[data-due-days]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const days = parseInt(btn.dataset.dueDays, 10);
+      const targetDate = new Date(Date.now() + days * 86400000);
+      const yyyy = targetDate.getFullYear();
+      const mm = String(targetDate.getMonth() + 1).padStart(2, "0");
+      const dd = String(targetDate.getDate()).padStart(2, "0");
+      const dueInput = overlay.querySelector("#credit-due-date-input");
+      if (dueInput) dueInput.value = `${yyyy}-${mm}-${dd}`;
+    });
+  });
 
   const cashierLimitNote = document.createElement("p");
   cashierLimitNote.id = "cashier-discount-limit";
@@ -2204,6 +2454,7 @@ function openCheckoutDialog() {
     }
     submitButton.disabled = exceedsCashierLimit;
     creditField.hidden = !isCredit;
+    if (dueDateField) dueDateField.hidden = !isCredit;
     creditSummary.hidden = !isCredit;
 
     if (cashTenderedInput && (toNumber(cashTenderedInput.value) === lastKnownTotal || toNumber(cashTenderedInput.value) <= 0)) {
@@ -2258,9 +2509,19 @@ async function openInvoiceDialog(saleId) {
   const channel = paymentChannelLabel(invoice);
   overlay.querySelector(".dialog__subtext").textContent = `${dateTime(invoice.date)} · ${channel} · ${invoice.paymentStatus || "مدفوعة"}`;
   overlay.querySelector(".invoice-detail").insertAdjacentHTML("beforeend", `<div><span>طريقة السداد</span><strong>${channel}</strong></div>${invoice.paymentType === "آجل" && toNumber(invoice.paidAmount) > 0 ? `<div><span>وسيلة الدفعة الأولى</span><strong>${invoice.paymentMethod === "تحويل" ? "تحويل" : "كاش"}</strong></div>` : ""}`);
-  overlay.querySelector(".dialog__actions").insertAdjacentHTML("afterbegin", `<button id="share-invoice" class="button button--secondary" type="button">مشاركة PDF</button><button id="thermal-print-invoice" class="button button--secondary" type="button">طباعة حرارية</button>`);
+  overlay.querySelector(".dialog__actions").insertAdjacentHTML("afterbegin", `<button id="share-invoice" class="button button--secondary" type="button">مشاركة PDF</button><button id="whatsapp-invoice" class="button button--secondary" type="button">${icon("whatsapp", 17)} واتساب</button><button id="thermal-print-invoice" class="button button--secondary" type="button">طباعة حرارية</button>`);
   overlay.querySelector("#share-invoice").addEventListener("click", () => shareInvoice(invoice));
   overlay.querySelector("#thermal-print-invoice").addEventListener("click", () => printInvoiceThermal(invoice));
+  overlay.querySelector("#whatsapp-invoice")?.addEventListener("click", () => {
+    const text = generateInvoiceWhatsAppMessage(invoice);
+    const phone = customer?.phone || "";
+    if (phone) {
+      sendWhatsAppMessage(phone, text);
+    } else {
+      const manualPhone = window.prompt("أدخل رقم هاتف العميل للمراسلة عبر واتساب:");
+      if (manualPhone) sendWhatsAppMessage(manualPhone, text);
+    }
+  });
 }
 
 function invoiceShareText(invoice) {
@@ -2337,7 +2598,32 @@ async function openSupplierPaymentDialog(supplierId = "") {
 }
 
 function openSupplierPaymentReceipt(payment) {
-  const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">إيصال دفعة مورد</span><h2>${escapeHtml(storeDisplayName())}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="supplier-payment-receipt" class="payment-receipt"><div><span>المورد</span><strong>${escapeHtml(payment.supplierName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>طريقة الدفع</span><strong>${escapeHtml(payment.paymentMethod)}</strong></div></section><div class="dialog__actions"><button id="print-supplier-receipt" class="button button--primary">طباعة الإيصال</button></div>`); overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); overlay.querySelector("#print-supplier-receipt").addEventListener("click", () => window.print());
+  const supplier = state.suppliers.find((item) => item.id === payment.supplierId);
+  const phone = supplier?.phone || "";
+  const voucherText = `🧾 سند صرف دفعة مورد من ${storeDisplayName()}\n🏢 المورد: ${payment.supplierName}\n💰 المبلغ المدفوع: ${money(payment.amount)}\n💳 طريقة الدفع: ${payment.paymentMethod}\n📊 الرصيد السابق: ${money(payment.balanceBefore)}\n✅ المستحق المتبقي: ${money(payment.balanceAfter)}\n📅 التاريخ: ${payment.date}`;
+
+  const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">سند صرف / دفعة مورد</span><h2>${escapeHtml(storeDisplayName())}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="supplier-payment-receipt" class="payment-receipt"><div class="payment-receipt__badge">سند صرف للمورد: ${escapeHtml(payment.id || "PAY-" + Date.now().toString().slice(-6))}</div><div><span>المورد</span><strong>${escapeHtml(payment.supplierName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div class="payment-receipt__highlight"><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>طريقة الدفع</span><strong>${escapeHtml(payment.paymentMethod)}</strong></div>${payment.notes ? `<div><span>ملاحظات</span><strong>${escapeHtml(payment.notes)}</strong></div>` : ""}</section><div class="dialog__actions"><button id="whatsapp-supplier-receipt" class="button button--secondary" type="button">${icon("whatsapp", 17)} واتساب</button><button id="share-supplier-receipt" class="button button--secondary" type="button">مشاركة نصية</button><button id="print-supplier-receipt" class="button button--primary" type="button">طباعة الإيصال ${icon("printer", 17)}</button></div>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  overlay.querySelector("#print-supplier-receipt").addEventListener("click", () => window.print());
+  overlay.querySelector("#share-supplier-receipt")?.addEventListener("click", async () => {
+    try {
+      if (navigator.share) await navigator.share({ title: `سند صرف - ${payment.supplierName}`, text: voucherText });
+      else {
+        await copyTextForSharing(voucherText);
+        showToast("تم نسخ السند للحافظة");
+      }
+    } catch {
+      showToast("تعذرت مشاركة السند الآن.", "error");
+    }
+  });
+  overlay.querySelector("#whatsapp-supplier-receipt")?.addEventListener("click", () => {
+    if (phone) {
+      sendWhatsAppMessage(phone, voucherText);
+    } else {
+      const manualPhone = window.prompt("أدخل رقم هاتف المورد للمراسلة عبر واتساب:");
+      if (manualPhone) sendWhatsAppMessage(manualPhone, voucherText);
+    }
+  });
 }
 
 function openCustomerDialog(customer = null) {
@@ -2379,10 +2665,32 @@ async function openCustomerPaymentDialog(customerId) {
 }
 
 function openPaymentReceipt(payment) {
-  const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">إيصال دفعة</span><h2>${escapeHtml(storeDisplayName())}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="payment-receipt" class="payment-receipt"><div><span>العميل</span><strong>${escapeHtml(payment.customerName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>طريقة التحصيل</span><strong>${payment.paymentMethod === "تحويل" ? "تحويل" : "كاش"}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>العملة</span><strong>${escapeHtml(state.settings?.currency || "YER")}</strong></div></section><div class="dialog__actions"><button id="share-receipt" class="button button--secondary">مشاركة الإيصال</button><button id="print-receipt" class="button button--primary">طباعة إيصال</button></div>`);
+  const customer = state.customers.find((item) => item.id === payment.customerId);
+  const phone = customer?.phone || payment.customerPhone || "";
+  const voucherText = `🧾 سند قبض من ${storeDisplayName()}\n👤 العميل: ${payment.customerName}\n💰 المبلغ المستلم: ${money(payment.amount)}\n💳 طريقة التحصيل: ${payment.paymentMethod === "تحويل" ? "تحويل" : "كاش"}\n📊 الرصيد السابق: ${money(payment.balanceBefore)}\n✅ الرصيد المتبقي بعد الدفعة: ${money(payment.balanceAfter)}\n📅 التاريخ: ${dateTime(payment.date || payment.createdAt || nowIso())}\nشكراً لتعاملكم معنا!`;
+
+  const overlay = openDialog(`<div class="dialog__head receipt-head"><div><span class="eyebrow">سند قبض / إيصال دفعة</span><h2>${escapeHtml(storeDisplayName())}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><section id="payment-receipt" class="payment-receipt"><div class="payment-receipt__badge">سند تحصيل رقم: ${escapeHtml(payment.id || "REC-" + Date.now().toString().slice(-6))}</div><div><span>العميل</span><strong>${escapeHtml(payment.customerName)}</strong></div><div><span>التاريخ</span><strong>${payment.date}</strong></div><div class="payment-receipt__highlight"><span>المبلغ المدفوع</span><strong>${money(payment.amount)}</strong></div><div><span>طريقة التحصيل</span><strong>${payment.paymentMethod === "تحويل" ? "تحويل" : "كاش"}</strong></div><div><span>الرصيد قبل الدفع</span><strong>${money(payment.balanceBefore)}</strong></div><div><span>الرصيد بعد الدفع</span><strong>${money(payment.balanceAfter)}</strong></div><div><span>العملة</span><strong>${escapeHtml(state.settings?.currency || "YER")}</strong></div>${payment.notes ? `<div><span>ملاحظات</span><strong>${escapeHtml(payment.notes)}</strong></div>` : ""}</section><div class="dialog__actions"><button id="whatsapp-receipt" class="button button--secondary" type="button">${icon("whatsapp", 17)} واتساب</button><button id="share-receipt" class="button button--secondary">مشاركة نصية</button><button id="print-receipt" class="button button--primary">طباعة إيصال ${icon("printer", 17)}</button></div>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelector("#print-receipt").addEventListener("click", () => window.print());
-  overlay.querySelector("#share-receipt").addEventListener("click", async () => { const text = `${storeDisplayName()}\nإيصال دفعة\nالعميل: ${payment.customerName}\nالمبلغ: ${money(payment.amount)}\nالرصيد بعد الدفع: ${money(payment.balanceAfter)}`; try { if (navigator.share) await navigator.share({ title: "إيصال دفعة", text }); else { await copyTextForSharing(text); showToast("تم نسخ الإيصال للمشاركة"); } } catch { showToast("تعذرت مشاركة الإيصال الآن.", "error"); } });
+  overlay.querySelector("#share-receipt").addEventListener("click", async () => {
+    try {
+      if (navigator.share) await navigator.share({ title: "إيصال دفعة", text: voucherText });
+      else {
+        await copyTextForSharing(voucherText);
+        showToast("تم نسخ الإيصال للمشاركة");
+      }
+    } catch {
+      showToast("تعذرت مشاركة الإيصال الآن.", "error");
+    }
+  });
+  overlay.querySelector("#whatsapp-receipt")?.addEventListener("click", () => {
+    if (phone) {
+      sendWhatsAppMessage(phone, voucherText);
+    } else {
+      const manualPhone = window.prompt("أدخل رقم هاتف العميل للمراسلة عبر واتساب:");
+      if (manualPhone) sendWhatsAppMessage(manualPhone, voucherText);
+    }
+  });
 }
 
 async function settleStaffSalary(accountId) {

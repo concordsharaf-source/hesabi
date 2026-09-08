@@ -33,7 +33,7 @@ export const canAccessView = (user, view) => {
 
   const strictlyAdminViews = new Set([
     "dashboard", "settings", "general-settings", "brand-settings",
-    "navigation-settings", "data-management", "accounts", "periodic-inventory"
+    "navigation-settings", "data-management", "accounts", "periodic-inventory", "activity-log"
   ]);
   if (strictlyAdminViews.has(effectiveView)) return false;
 
