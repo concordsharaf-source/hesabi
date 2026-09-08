@@ -542,3 +542,33 @@ test("فاتورة الشراء تسمح بدفع جزء من المبلغ وت�
   assert.equal(account.balance, 60);
   await db.resetAllData();
 });
+
+test("ينشئ حساب الكاشير بصلاحيات افتراضية مبيعات وفواتيرها فقط ويتيح تعديلها بمفاتيح التبديل", async () => {
+  await db.resetAllData();
+  const defaultCashier = await db.createAccount({
+    username: "pos-cashier",
+    name: "كاشير المبيعات فقط",
+    role: "cashier",
+    pin: "1234",
+  });
+  assert.deepEqual(defaultCashier.allowedViews, ["sales", "invoices"]);
+
+  const customCashier = await db.createAccount({
+    username: "custom-cashier",
+    name: "كاشير مخصص",
+    role: "cashier",
+    pin: "5678",
+    allowedViews: ["sales", "invoices", "products", "inventory"],
+  });
+  assert.deepEqual(customCashier.allowedViews, ["sales", "invoices", "products", "inventory"]);
+
+  const updatedCashier = await db.updateAccount(defaultCashier.id, {
+    allowedViews: ["sales", "invoices", "customers"],
+  });
+  assert.deepEqual(updatedCashier.allowedViews, ["sales", "invoices", "customers"]);
+
+  const fetched = (await db.listAccounts()).find((a) => a.id === defaultCashier.id);
+  assert.deepEqual(fetched.allowedViews, ["sales", "invoices", "customers"]);
+
+  await db.resetAllData();
+});

@@ -8,6 +8,28 @@ test("تحفظ الجلسة هوية الحساب وصلاحياته دون أي
   assert.equal(ACTIVE_SESSION_META_ID, "active-account-session");
 });
 
+test("تحفظ الجلسة صلاحيات الكاشير المخصصة عند توفرها", () => {
+  const cashierSession = toPersistentSessionUser({
+    id: "account-cashier-1",
+    username: "cashier1",
+    name: "كاشير الصباح",
+    role: "cashier",
+    mustChangePin: false,
+    isActive: true,
+    allowedViews: ["sales", "invoices", "products"],
+    pinHash: "secret",
+    pinSalt: "salt",
+  });
+  assert.deepEqual(cashierSession, {
+    id: "account-cashier-1",
+    username: "cashier1",
+    name: "كاشير الصباح",
+    role: "cashier",
+    mustChangePin: false,
+    allowedViews: ["sales", "invoices", "products"],
+  });
+});
+
 test("لا تستعيد الجلسة حسابًا موقوفًا أو ناقص البيانات", () => {
   assert.equal(toPersistentSessionUser({ id: "account-2", isActive: false }), null);
   assert.equal(toPersistentSessionUser(null), null);

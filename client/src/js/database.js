@@ -27,6 +27,7 @@ import {
   normalizeCreditLimit,
 } from "./domain.js";
 import { ACTIVE_SESSION_META_ID, ACTIVE_SESSION_STORAGE_KEY, toPersistentSessionUser } from "./session.js";
+import { DEFAULT_CASHIER_ALLOWED_VIEWS } from "./permissions.js";
 import { randomId } from "./ids.js";
 
 const DB_NAME = "hesabi-pwa";
@@ -95,6 +96,14 @@ async function createAccountRecord(values) {
   if (!validatePin(values.pin)) throw new Error("رمز الدخول يجب أن يتكون من 4 إلى 12 رقمًا.");
   const role = accountRole(values.role);
   const pinSalt = makeSalt();
+  let allowedViews = undefined;
+  if (role === "cashier") {
+    if (Array.isArray(values.allowedViews)) {
+      allowedViews = values.allowedViews.filter((v) => typeof v === "string" && v);
+    } else {
+      allowedViews = [...DEFAULT_CASHIER_ALLOWED_VIEWS];
+    }
+  }
   return {
     id: uid("account"),
     username,
@@ -106,6 +115,7 @@ async function createAccountRecord(values) {
     isActive: values.isActive !== false,
     jobTitle: normalize(values.jobTitle),
     monthlySalary: Math.max(0, toNumber(values.monthlySalary)),
+    allowedViews,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
@@ -293,7 +303,17 @@ export const db = {
     const name = normalize(values.name ?? current.name); if (!name) throw new Error("اسم الحساب مطلوب.");
     const jobTitle = normalize(values.jobTitle ?? current.jobTitle);
     const monthlySalary = Math.max(0, toNumber(values.monthlySalary ?? current.monthlySalary));
-    const updated = { ...current, username: nextUsername, name, role: nextRole, jobTitle, monthlySalary, isActive: nextActive, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
+    let allowedViews = current.allowedViews;
+    if (nextRole === "cashier") {
+      if (Array.isArray(values.allowedViews)) {
+        allowedViews = values.allowedViews.filter((v) => typeof v === "string" && v);
+      } else if (!allowedViews) {
+        allowedViews = [...DEFAULT_CASHIER_ALLOWED_VIEWS];
+      }
+    } else if (nextRole === "admin") {
+      allowedViews = undefined;
+    }
+    const updated = { ...current, username: nextUsername, name, role: nextRole, jobTitle, monthlySalary, allowedViews, isActive: nextActive, updatedAt: nowIso() }; accounts.put(updated); await transactionDone(transaction); return updated;
   },
   async deleteCashierAccount(accountId) {
     const database = await this.open(); const transaction = database.transaction("accounts", "readwrite"); const accounts = transaction.objectStore("accounts"); const current = await requestAsPromise(accounts.get(accountId));

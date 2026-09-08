@@ -202,6 +202,45 @@ tbody tr:nth-child(even) td:first-child,.inventory-list .inventory-row:nth-child
 
 /* الحسابات والصلاحيات: واجهة دخول هادئة، وأدوار واضحة على الهاتف وسطح المكتب. */
 .sidebar__account { display:grid; gap:6px; margin-top:18px; padding:12px 10px; background:rgba(31,107,89,.06); border:1px solid rgba(31,107,89,.14); border-radius:12px; }.sidebar__account strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; }.account-badge { display:inline-flex; align-items:center; justify-content:center; width:max-content; padding:4px 8px; border-radius:7px; font-size:10px; font-weight:800; white-space:nowrap; }.account-badge--admin { color:#174c3f; background:var(--gold-pale); border:1px solid rgba(197,154,85,.32); }.account-badge--cashier { color:#176143; background:#e4f3e8; border:1px solid rgba(31,107,89,.18); }.account-badge--employee { color:#5d4a1c; background:var(--gold-pale); border:1px solid rgba(197,154,85,.32); }.logout-button { transform:rotate(180deg); }.account-hints { display:grid; gap:7px; margin-top:18px; }.account-hints>strong { color:var(--muted); font-size:11px; }.account-hint { display:flex; justify-content:space-between; align-items:center; min-width:0; gap:10px; padding:10px 11px; color:var(--ink); text-align:right; background:rgba(31,107,89,.055); border:1px solid rgba(31,107,89,.13); border-radius:10px; }.account-hint span,.account-hint small { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.account-hint span { font-size:12px; font-weight:800; }.account-hint small { color:var(--muted); font-size:9px; direction:ltr; }.account-list { padding:4px 14px; }.account-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto auto auto; align-items:center; gap:9px; padding:13px 4px; border-bottom:1px solid var(--line); }.account-row:last-child { border:0; }.account-row__icon { display:grid; place-items:center; width:38px; height:38px; color:var(--green); background:var(--green-pale); border-radius:10px; }.account-row__main { min-width:0; }.account-row__main strong,.account-row__main small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.account-row__main strong { font-size:12px; }.account-row__main small { margin-top:2px; color:var(--muted); font-size:10px; }.checkbox-field { display:flex; align-items:center; gap:8px; min-height:45px; padding:0 12px; background:#f4f6f1; border:1px solid var(--line); border-radius:11px; }.checkbox-field input { flex:0 0 auto; width:17px; height:17px; accent-color:var(--green); }.checkbox-field span { font-size:12px; }.login-page .setup-art__copy { margin-top:38px; }
+
+/* مفاتيح تبديل صلاحيات الكاشير والتحكم في الشاشات */
+.cashier-permissions-section { margin-top:10px; padding:14px; background:rgba(31,107,89,.04); border:1px solid var(--line); border-radius:14px; }
+.cashier-permissions-header { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.cashier-permissions-header>div { min-width:0; }
+.cashier-permissions-title { display:block; font-size:13px; font-weight:800; color:var(--ink); margin-top:2px; }
+.cashier-permissions-presets { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+.cashier-permissions-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:8px; }
+.permission-toggle-card { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 12px; background:var(--paper); border:1px solid var(--line); border-radius:12px; cursor:pointer; transition:all .2s ease; }
+.permission-toggle-card:hover { border-color:var(--green); background:rgba(31,107,89,.04); }
+.permission-toggle-card.is-active { border-color:rgba(31,107,89,.38); background:rgba(31,107,89,.08); }
+.permission-toggle-info { display:flex; align-items:center; gap:9px; min-width:0; }
+.permission-toggle-icon { display:grid; place-items:center; width:34px; height:34px; border-radius:8px; color:var(--green); background:var(--green-pale); flex-shrink:0; }
+.permission-toggle-text { min-width:0; display:grid; gap:1px; }
+.permission-toggle-label { font-size:12px; font-weight:800; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.permission-toggle-desc { font-size:10px; color:var(--muted); line-height:1.35; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.switch-control { position:relative; width:44px; height:24px; flex-shrink:0; display:inline-block; }
+.switch-input { position:absolute; opacity:0; width:0; height:0; margin:0; }
+.switch-slider { position:absolute; inset:0; background:#cbd5e1; border-radius:24px; transition:.25s ease; cursor:pointer; }
+.switch-slider::before { content:""; position:absolute; height:18px; width:18px; right:3px; bottom:3px; background:#fff; border-radius:50%; transition:.25s ease; box-shadow:0 1px 3px rgba(0,0,0,.25); }
+.switch-input:checked + .switch-slider { background:var(--green); }
+.switch-input:checked + .switch-slider::before { transform:translateX(-20px); }
+.switch-input:focus-visible + .switch-slider { outline:2px solid var(--green); outline-offset:2px; }
+.switch-input:disabled + .switch-slider { opacity:.5; cursor:not-allowed; }
+.account-row__permissions { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:4px; }
+.account-permissions-title { font-size:10px; color:var(--muted); font-weight:700; }
+.perm-pills-list { display:inline-flex; gap:4px; flex-wrap:wrap; }
+.perm-pill { display:inline-block; font-size:9px; font-weight:800; padding:2px 7px; background:rgba(31,107,89,.09); color:var(--green); border-radius:6px; }
+.perm-badge-default { font-size:9px; font-weight:700; color:var(--muted); background:rgba(0,0,0,.05); padding:2px 6px; border-radius:6px; }
+@media (max-width:599px) { .cashier-permissions-grid { grid-template-columns:1fr; } .cashier-permissions-header { flex-direction:column; align-items:stretch; } .cashier-permissions-presets { justify-content:flex-start; } }
+[data-theme="dark"] .cashier-permissions-section { background:rgba(36,75,61,.4); border-color:#58756a; }
+[data-theme="dark"] .permission-toggle-card { background:#1a2d26; border-color:#58756a; }
+[data-theme="dark"] .permission-toggle-card.is-active { background:rgba(36,75,61,.75); border-color:var(--green); }
+[data-theme="dark"] .switch-slider { background:#475569; }
+[data-theme="dark"] .switch-slider::before { background:#f2faf5; }
+[data-theme="dark"] .switch-input:checked + .switch-slider { background:var(--green); }
+[data-theme="dark"] .switch-input:checked + .switch-slider::before { background:#101d18; }
+[data-theme="dark"] .perm-pill { background:rgba(123,216,170,.18); color:#8df2be; }
+[data-theme="dark"] .perm-badge-default { background:rgba(255,255,255,.08); color:var(--muted); }
 @media (max-width:599px) { .topbar__actions .account-badge { display:none; }.account-row { grid-template-columns:auto minmax(0,1fr) auto; }.account-row .account-badge { grid-column:2; width:max-content; }.account-row .status { grid-column:3; grid-row:1; }.account-row .entity-row__actions { grid-column:2 / -1; justify-content:flex-end; }.account-hint { align-items:flex-start; flex-direction:column; gap:2px; }.account-hint small { max-width:100%; }.sidebar__account { display:none; } }
 @media (min-width:960px) { .sidebar__account { display:grid; }.login-page .setup-sheet { max-width:520px; } }
 

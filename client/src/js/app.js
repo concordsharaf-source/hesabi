@@ -12,7 +12,7 @@ import { renderPurchaseInvoiceHtml } from "./purchase-invoice-print.js";
 import { getExitGuardAction, leaveAfterExitConfirmation, primeExitGuardHistory } from "./navigation-guard.js";
 import { randomId } from "./ids.js";
 import { createPdfFileFromHtml, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf, shareOrDownloadPurchaseInvoicePdf } from "./pdf-export.js";
-import { canAccessView, canUseAction, isAdmin } from "./permissions.js";
+import { CASHIER_CONFIGURABLE_PERMISSIONS, DEFAULT_CASHIER_ALLOWED_VIEWS, canAccessView, canUseAction, isAdmin } from "./permissions.js";
 import { shortRandomId } from "./ids.js";
 import { createBarcodeWorkbook, createPurchaseWorkbook, parseBarcodeFile } from "./barcode-file.js";
 import { createReportWorkbook, reportWorkbookMimeType } from "./report-file.js";
@@ -742,11 +742,25 @@ function requiredPinMarkup() {
   return `<main class="setup-page login-page"><section class="setup-art"><div class="setup-art__brand"><img src="${storeLogoUrl()}" alt="شعار ${escapeHtml(state.settings?.storeName || "المتجر")}" /><span class="brand-wordmark">حسابي</span><small>حماية الحساب</small></div><div class="setup-art__copy"><p class="eyebrow">خطوة أمنية</p><h1>غيّر رمز الدخول<br />قبل متابعة العمل.</h1><p>تم إنشاء الحساب برمز مؤقت. اختر رمزًا خاصًا من 4 إلى 12 رقمًا.</p></div></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-form"><span class="eyebrow">مرحبًا ${escapeHtml(state.currentUser?.name || "")}</span><h2>تعيين رمز دخول جديد</h2><form id="required-pin-form"><label>رمز الدخول الجديد<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" autofocus /></label><label>تأكيد الرمز<input name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" required minlength="4" maxlength="12" /></label><button class="button button--primary button--wide" type="submit">حفظ ومتابعة ${icon("check", 18)}</button></form></div></div></section></main>`;
 }
 
+function cashierPermissionsSummaryMarkup(account) {
+  if (account.role !== "cashier") return "";
+  const allowed = Array.isArray(account.allowedViews) && account.allowedViews.length
+    ? account.allowedViews
+    : DEFAULT_CASHIER_ALLOWED_VIEWS;
+  const isDefaultOnly = allowed.length === 2 && allowed.includes("sales") && allowed.includes("invoices");
+  const badges = CASHIER_CONFIGURABLE_PERMISSIONS
+    .filter((perm) => allowed.includes(perm.id))
+    .map((perm) => `<span class="perm-pill">${escapeHtml(perm.label.split(" ")[0])}</span>`)
+    .join("");
+
+  return `<div class="account-row__permissions"><small class="account-permissions-title">الشاشات المتاحة:</small><div class="perm-pills-list">${badges}</div>${isDefaultOnly ? `<span class="perm-badge-default">مبيعات وفواتير فقط (افتراضي)</span>` : ""}</div>`;
+}
+
 function accountsMarkup() {
   const accounts = state.accounts;
   const salaryByStaff = new Map((state.cashierSalarySummaries || []).map((summary) => [summary.accountId, summary]));
   return `${topbarMarkup("الحسابات والصلاحيات", "أدر حسابات فريقك وحدد من يرى البيانات المالية ومن يقتصر على البيع.", `<button class="button button--primary" data-action="new-account">${icon("plus", 18)}<span>إضافة حساب</span></button>`)}
-  <section class="panel account-list"><div class="panel__head"><div><span class="eyebrow">فريق المتجر</span><h2>الحسابات المحلية</h2></div><small>الأدمن: كامل الصلاحيات · الكاشير: المبيعات والفواتير فقط · لكل حساب راتب شهري اختياري</small></div>${accounts.map((account) => { const salary = salaryByStaff.get(account.id); const isPayrollAccount = ["admin", "cashier", "employee"].includes(account.role); const salaryAction = isPayrollAccount && account.isActive && toNumber(salary?.monthlySalary) > 0 ? (salary?.salaryDelivered ? `<small class="status status--available">تم تسليم الراتب</small>` : `<button class="button button--secondary button--compact" data-action="settle-staff-salary" data-id="${account.id}">تسليم الراتب</button>`) : ""; return `<article class="account-row"><div class="account-row__icon">${icon("users", 20)}</div><div class="account-row__main"><strong>${escapeHtml(account.name)}</strong><small dir="ltr">${escapeHtml(account.username)}</small>${account.jobTitle ? `<small class="account-job-title">${escapeHtml(account.jobTitle)}</small>` : ""}${isPayrollAccount ? `<small class="account-salary-note">راتب الشهر ${money(salary?.monthlySalary ?? account.monthlySalary ?? 0)} · السلف ${money(salary?.advances || 0)} · خصم العجز ${money(salary?.shortageDeductions || 0)} · المتبقي ${money(salary?.remainingSalary || 0)}</small>` : ""}</div><span class="account-badge account-badge--${account.role}">${roleLabel(account.role)}</span><span class="status status--${account.isActive ? "available" : "empty"}">${account.isActive ? "نشط" : "موقوف"}</span><div class="entity-row__actions">${salaryAction}<button class="icon-button" data-action="reset-account-pin" data-id="${account.id}" aria-label="إعادة تعيين رمز دخول ${escapeHtml(account.name)}">${icon("key", 18)}</button><button class="icon-button" data-action="open-account" data-id="${account.id}" aria-label="تعديل ${escapeHtml(account.name)}">${icon("dots", 18)}</button>${account.role === "cashier" && account.isActive ? `<button class="icon-button icon-button--danger" data-action="delete-cashier-account" data-id="${account.id}" aria-label="حذف الكاشير ${escapeHtml(account.name)}">${icon("trash", 18)}</button>` : ""}</div></article>`; }).join("")}</section>`;
+  <section class="panel account-list"><div class="panel__head"><div><span class="eyebrow">فريق المتجر</span><h2>الحسابات المحلية</h2></div><small>الأدمن: كامل الصلاحيات · الكاشير: صلاحيات مخصصة (الافتراضي مبيعات وفواتيرها فقط) · لكل حساب راتب شهري اختياري</small></div>${accounts.map((account) => { const salary = salaryByStaff.get(account.id); const isPayrollAccount = ["admin", "cashier", "employee"].includes(account.role); const salaryAction = isPayrollAccount && account.isActive && toNumber(salary?.monthlySalary) > 0 ? (salary?.salaryDelivered ? `<small class="status status--available">تم تسليم الراتب</small>` : `<button class="button button--secondary button--compact" data-action="settle-staff-salary" data-id="${account.id}">تسليم الراتب</button>`) : ""; return `<article class="account-row"><div class="account-row__icon">${icon("users", 20)}</div><div class="account-row__main"><strong>${escapeHtml(account.name)}</strong><small dir="ltr">${escapeHtml(account.username)}</small>${account.jobTitle ? `<small class="account-job-title">${escapeHtml(account.jobTitle)}</small>` : ""}${isPayrollAccount ? `<small class="account-salary-note">راتب الشهر ${money(salary?.monthlySalary ?? account.monthlySalary ?? 0)} · السلف ${money(salary?.advances || 0)} · خصم العجز ${money(salary?.shortageDeductions || 0)} · المتبقي ${money(salary?.remainingSalary || 0)}</small>` : ""}${cashierPermissionsSummaryMarkup(account)}</div><span class="account-badge account-badge--${account.role}">${roleLabel(account.role)}</span><span class="status status--${account.isActive ? "available" : "empty"}">${account.isActive ? "نشط" : "موقوف"}</span><div class="entity-row__actions">${salaryAction}<button class="icon-button" data-action="reset-account-pin" data-id="${account.id}" aria-label="إعادة تعيين رمز دخول ${escapeHtml(account.name)}">${icon("key", 18)}</button><button class="icon-button" data-action="open-account" data-id="${account.id}" aria-label="تعديل ${escapeHtml(account.name)}">${icon("dots", 18)}</button>${account.role === "cashier" && account.isActive ? `<button class="icon-button icon-button--danger" data-action="delete-cashier-account" data-id="${account.id}" aria-label="حذف الكاشير ${escapeHtml(account.name)}">${icon("trash", 18)}</button>` : ""}</div></article>`; }).join("")}</section>`;
 }
 
 function recoveryNoticeMarkup(failedView) {
@@ -1237,10 +1251,21 @@ function openDialog(content) {
 
 function closeDialog() { closeScannerDialog(); document.querySelector("#dialog-backdrop")?.remove(); }
 
+function cashierPermissionsFieldsMarkup(account = null) {
+  const currentAllowed = Array.isArray(account?.allowedViews)
+    ? account.allowedViews
+    : DEFAULT_CASHIER_ALLOWED_VIEWS;
+
+  return `<div id="cashier-permissions-section" class="form-full cashier-permissions-section"><div class="cashier-permissions-header"><div><span class="eyebrow">صلاحيات الوصول</span><strong class="cashier-permissions-title">الشاشات والصفحات المسموحة للكاشير</strong><small class="field-hint">تحكم في الشاشات والصفحات المسموح لهذا الكاشير بفتحها (الافتراضي مبيعات وفواتيرها فقط).</small></div><div class="cashier-permissions-presets"><button type="button" class="button button--secondary button--compact" data-permissions-preset="sales-only">مبيعات وفواتير فقط</button><button type="button" class="button button--secondary button--compact" data-permissions-preset="all">تحديد الكل</button><button type="button" class="button button--secondary button--compact" data-permissions-preset="clear">إلغاء الكل</button></div></div><div class="cashier-permissions-grid">${CASHIER_CONFIGURABLE_PERMISSIONS.map((perm) => {
+    const isChecked = currentAllowed.includes(perm.id);
+    return `<label class="permission-toggle-card ${isChecked ? "is-active" : ""}"><div class="permission-toggle-info"><div class="permission-toggle-icon">${icon(perm.icon, 18)}</div><div class="permission-toggle-text"><strong class="permission-toggle-label">${escapeHtml(perm.label)}</strong><span class="permission-toggle-desc">${escapeHtml(perm.description)}</span></div></div><div class="switch-control"><input type="checkbox" name="allowedViews" value="${perm.id}" class="switch-input" ${isChecked ? "checked" : ""} /><span class="switch-slider" aria-hidden="true"></span></div></label>`;
+  }).join("")}</div></div>`;
+}
+
 function accountFormMarkup(account = null) {
   const isEdit = Boolean(account);
   const isCurrentAdmin = isEdit && account?.id === state.currentUser?.id && account?.role === "admin";
-  return `<div class="dialog__head"><div><span class="eyebrow">${isEdit ? "تعديل الحساب" : "حساب جديد"}</span><h2>${isEdit ? `بيانات ${escapeHtml(account.name)}` : "إضافة حساب"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="account-form" class="form-grid"><label>الاسم الظاهر<input name="name" dir="rtl" required maxlength="60" value="${escapeHtml(account?.name || "")}" autofocus /></label><label>اسم المستخدم<input name="username" dir="ltr" autocomplete="username" required minlength="3" maxlength="30" value="${escapeHtml(account?.username || "")}" /></label>${isEdit ? "" : `<label>كلمة المرور<input name="pin" type="password" autocomplete="new-password" required minlength="4" maxlength="64" /></label>`}${isCurrentAdmin ? `<label>رمز دخول جديد <small>(اختياري)</small><input name="newPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="12" placeholder="اتركه فارغًا إذا لا تريد تغييره" /></label><label>تأكيد رمز الدخول الجديد<input name="newPinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="12" /></label>` : ""}<label>الدور<select name="role">${ACCOUNT_ROLES.map((role) => `<option value="${role.id}" ${account?.role === role.id || (!account && role.id === "cashier") ? "selected" : ""}>${role.label}</option>`).join("")}</select></label><label>اللقب الوظيفي<input name="jobTitle" dir="rtl" maxlength="60" value="${escapeHtml(account?.jobTitle || "")}" placeholder="مثال: موظف نظافة، حسابات، توصيل" /><small class="field-hint">اختياري ويمكن إضافته أو تعديله لاحقًا.</small></label><label class="checkbox-field"><input name="isActive" type="checkbox" ${account?.isActive !== false ? "checked" : ""} /><span>الحساب نشط ويمكنه الدخول</span></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">${isEdit ? "حفظ التعديلات" : "إنشاء الحساب"} ${icon("check", 17)}</button></div></form>`;
+  return `<div class="dialog__head"><div><span class="eyebrow">${isEdit ? "تعديل الحساب" : "حساب جديد"}</span><h2>${isEdit ? `بيانات ${escapeHtml(account.name)}` : "إضافة حساب"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="account-form" class="form-grid"><label>الاسم الظاهر<input name="name" dir="rtl" required maxlength="60" value="${escapeHtml(account?.name || "")}" autofocus /></label><label>اسم المستخدم<input name="username" dir="ltr" autocomplete="username" required minlength="3" maxlength="30" value="${escapeHtml(account?.username || "")}" /></label>${isEdit ? "" : `<label>كلمة المرور<input name="pin" type="password" autocomplete="new-password" required minlength="4" maxlength="64" /></label>`}${isCurrentAdmin ? `<label>رمز دخول جديد <small>(اختياري)</small><input name="newPin" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="12" placeholder="اتركه فارغًا إذا لا تريد تغييره" /></label><label>تأكيد رمز الدخول الجديد<input name="newPinConfirm" type="password" inputmode="numeric" pattern="[0-9]*" minlength="4" maxlength="12" /></label>` : ""}<label>الدور<select name="role">${ACCOUNT_ROLES.map((role) => `<option value="${role.id}" ${account?.role === role.id || (!account && role.id === "cashier") ? "selected" : ""}>${role.label}</option>`).join("")}</select></label><label>اللقب الوظيفي<input name="jobTitle" dir="rtl" maxlength="60" value="${escapeHtml(account?.jobTitle || "")}" placeholder="مثال: موظف نظافة، حسابات، توصيل" /><small class="field-hint">اختياري ويمكن إضافته أو تعديله لاحقًا.</small></label><label class="checkbox-field"><input name="isActive" type="checkbox" ${account?.isActive !== false ? "checked" : ""} /><span>الحساب نشط ويمكنه الدخول</span></label>${cashierPermissionsFieldsMarkup(account)}<div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">${isEdit ? "حفظ التعديلات" : "إنشاء الحساب"} ${icon("check", 17)}</button></div></form>`;
 }
 
 function openAccountDialog(account = null) {
@@ -1250,26 +1275,102 @@ function openAccountDialog(account = null) {
   const roleSelect = accountForm.elements.role;
   roleSelect.closest("label").insertAdjacentHTML("afterend", `<label id="account-salary-field">الراتب الشهري<input name="monthlySalary" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(account?.monthlySalary ?? "")}" placeholder="0" /><small class="field-hint">يستخدم لحساب السلف والراتب المتبقي للموظف.</small></label>`);
   const salaryField = accountForm.querySelector("#account-salary-field");
-  const syncSalaryField = () => { const staff = roleSelect.value === "admin" || roleSelect.value === "cashier" || roleSelect.value === "employee"; salaryField.hidden = !staff; salaryField.querySelector("input").disabled = !staff; };
-  roleSelect.addEventListener("change", syncSalaryField); syncSalaryField();
+  const permissionsSection = accountForm.querySelector("#cashier-permissions-section");
+
+  const syncRoleFields = () => {
+    const role = roleSelect.value;
+    const staff = role === "admin" || role === "cashier" || role === "employee";
+    salaryField.hidden = !staff;
+    salaryField.querySelector("input").disabled = !staff;
+    if (permissionsSection) {
+      const isCashierRole = role === "cashier";
+      permissionsSection.hidden = !isCashierRole;
+      permissionsSection.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+        cb.disabled = !isCashierRole;
+      });
+    }
+  };
+  roleSelect.addEventListener("change", syncRoleFields);
+  syncRoleFields();
+
+  overlay.querySelectorAll("[data-permissions-preset]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const preset = btn.dataset.permissionsPreset;
+      const checkboxes = permissionsSection.querySelectorAll("input[name=allowedViews]");
+      checkboxes.forEach((cb) => {
+        if (preset === "sales-only") {
+          cb.checked = DEFAULT_CASHIER_ALLOWED_VIEWS.includes(cb.value);
+        } else if (preset === "all") {
+          cb.checked = true;
+        } else if (preset === "clear") {
+          cb.checked = false;
+        }
+        cb.closest(".permission-toggle-card")?.classList.toggle("is-active", cb.checked);
+      });
+    });
+  });
+
+  permissionsSection?.querySelectorAll("input[name=allowedViews]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      cb.closest(".permission-toggle-card")?.classList.toggle("is-active", cb.checked);
+    });
+  });
+
   accountForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
     const values = Object.fromEntries(new FormData(form));
     values.isActive = form.querySelector("[name=isActive]").checked;
-    const newPin = String(values.newPin || "").trim(); const newPinConfirm = String(values.newPinConfirm || "").trim();
-    delete values.newPin; delete values.newPinConfirm;
-    if (newPin || newPinConfirm) { if (newPin !== newPinConfirm) { showToast("رمزا الدخول الجديدان غير متطابقين.", "error"); return; } values.pin = newPin; }
+    const newPin = String(values.newPin || "").trim();
+    const newPinConfirm = String(values.newPinConfirm || "").trim();
+    delete values.newPin;
+    delete values.newPinConfirm;
+    if (newPin || newPinConfirm) {
+      if (newPin !== newPinConfirm) {
+        showToast("رمزا الدخول الجديدان غير متطابقين.", "error");
+        return;
+      }
+      values.pin = newPin;
+    }
+
+    if (values.role === "cashier") {
+      const checkedBoxes = Array.from(form.querySelectorAll("input[name=allowedViews]:checked"));
+      values.allowedViews = checkedBoxes.map((cb) => cb.value);
+      if (!values.allowedViews.length) {
+        values.allowedViews = [...DEFAULT_CASHIER_ALLOWED_VIEWS];
+      }
+    } else {
+      delete values.allowedViews;
+    }
+
     try {
       const updated = account ? await db.updateAccount(account.id, values) : await db.createAccount(values);
       if (account && newPin) await db.changeAccountPin(account.id, newPin);
       state.accounts = await db.listAccounts();
       if (account?.id === state.currentUser?.id) {
-        state.currentUser = updated.isActive ? { ...state.currentUser, name: updated.name, role: updated.role, jobTitle: updated.jobTitle, monthlySalary: updated.monthlySalary, mustChangePin: false } : null;
-        if (!state.currentUser) { await db.clearPersistentSession(); state.cart = []; }
+        state.currentUser = updated.isActive ? {
+          ...state.currentUser,
+          name: updated.name,
+          role: updated.role,
+          jobTitle: updated.jobTitle,
+          monthlySalary: updated.monthlySalary,
+          allowedViews: updated.allowedViews,
+          mustChangePin: false,
+        } : null;
+        if (!state.currentUser) {
+          await db.clearPersistentSession();
+          state.cart = [];
+        } else if (!canAccessView(state.currentUser, state.view)) {
+          state.view = state.currentUser.allowedViews?.[0] || "sales";
+        }
       }
-      await refresh(); closeDialog(); render(); showToast(account ? "تم حفظ بيانات الحساب." : "تم إنشاء الحساب.");
-    } catch (error) { showToast(error.message || "تعذر حفظ الحساب.", "error"); }
+      await refresh();
+      closeDialog();
+      render();
+      showToast(account ? "تم حفظ بيانات الحساب والصلاحيات." : "تم إنشاء الحساب بنجاح.");
+    } catch (error) {
+      showToast(error.message || "تعذر حفظ الحساب.", "error");
+    }
   });
 }
 
