@@ -1427,3 +1427,16 @@ html[data-theme="dark"] #app { background-color: transparent; }
 #product-package-summary { margin: 10px 0 0; font-weight: 700; }
 #product-package-summary[hidden] { display: none; }
 [data-theme="dark"] .product-package-fieldset { background: #1a2b25; border-color: var(--line); }
+
+/* ===== زر الرجوع في الشريط العلوي ===== */
+.topbar-back-btn { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; font-size: 12px; font-weight: 800; padding: 7px 11px; border-radius: 999px; }
+.topbar-back-btn svg { transform: scaleX(-1); flex: 0 0 auto; }
+.topbar--with-back .topbar__actions { flex-wrap: nowrap; }
+@media (max-width: 620px) {
+  .topbar-back-btn { padding: 6px 9px; font-size: 11px; }
+  .topbar-back-btn span { max-width: 88px; overflow: hidden; text-overflow: ellipsis; }
+}
+@media (max-width: 420px) {
+  .topbar-back-btn span { display: none; }
+  .topbar-back-btn { padding: 7px; }
+}

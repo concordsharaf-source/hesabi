@@ -109,7 +109,7 @@ function generateQuickCashOptions(total) {
   return list.slice(0, 6);
 }
 
-const state = { view: "dashboard", lastStableView: "dashboard", showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false, cashIn: false, cashOut: false, cashMoves: false, transfers: false, cashExpenses: false, shifts: false, shiftStats: false, salaries: false, notifications: false, setGeneral: false, setBrand: false, setAccounts: false, setActivity: false, setNav: false, setData: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
+const state = { view: "dashboard", lastStableView: "dashboard", viewHistory: [], showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false, cashIn: false, cashOut: false, cashMoves: false, transfers: false, cashExpenses: false, shifts: false, shiftStats: false, salaries: false, notifications: false, setGeneral: false, setBrand: false, setAccounts: false, setActivity: false, setNav: false, setData: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
 const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "purchases"].includes(id))];
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
@@ -907,6 +907,24 @@ function emptyState(title, text, destination = "new-product") {
   return `<div class="empty-state"><img src="${emptyImage}" alt="" /><div><h3>${title}</h3><p>${text}</p><button class="button button--secondary" ${action}>${icon("plus", 16)} ${label}</button></div></div>`;
 }
 
+// ===== زر الرجوع: يعيدك إلى الصفحة التي جئت منها =====
+const VIEW_BACK_LABELS = { dashboard: "الرئيسية", products: "المنتجات", inventory: "المخزون", sales: "المبيعات", invoices: "الفواتير", customers: "العملاء", "customer-payments": "دفعات العملاء", suppliers: "الموردين", "supplier-payments": "دفعات الموردين", purchases: "المشتريات", cashbox: "الصندوق", vault: "الخزنة", expenses: "المصروفات", reports: "التقارير", settings: "الإعدادات", "data-management": "إدارة البيانات", "periodic-inventory": "الجرد المحاسبي" };
+
+function backTargetView(currentView, fallback = "") {
+  for (let index = state.viewHistory.length - 1; index >= 0; index -= 1) {
+    const candidate = state.viewHistory[index];
+    if (candidate && candidate !== currentView && canAccessView(state.currentUser, candidate)) return candidate;
+  }
+  return fallback && canAccessView(state.currentUser, fallback) ? fallback : "";
+}
+
+function backButtonMarkup(currentView, fallback = "") {
+  const target = backTargetView(currentView, fallback);
+  if (!target) return "";
+  const label = VIEW_BACK_LABELS[target] || "السابق";
+  return `<button class="button button--secondary button--compact topbar-back-btn" data-action="go-back" data-view="${target}" title="رجوع إلى ${label}" aria-label="رجوع إلى ${label}">${icon("arrow", 16)}<span>رجوع إلى ${label}</span></button>`;
+}
+
 function crossLinkMarkup(view, { eyebrow, title, subtitle, label, glyph }) {
   return `<section class="cross-link-bar"><button type="button" class="cross-link-bar__button" data-action="navigate" data-view="${view}">
     <span class="cross-link-bar__icon">${icon(glyph, 20)}</span>
@@ -997,7 +1015,7 @@ function invoiceWithCashier(invoice) { return invoice ? { ...invoice, cashierNam
 function invoicesMarkup() {
   const query = state.invoiceQuery.trim().toLocaleUpperCase("en");
   const invoices = state.sales.filter((sale) => !query || String(sale.invoiceNumber || "").toLocaleUpperCase("en").includes(query));
-  return `${topbarMarkup("الفواتير", "كل فاتورة محفوظة مع منتجاتها وحركات خصم المخزون.")}
+  return `${topbarMarkup("الفواتير", "كل فاتورة محفوظة مع منتجاتها وحركات خصم المخزون.", backButtonMarkup("invoices", "sales"), "topbar--with-back")}
   <section class="toolbar invoice-search-toolbar"><label class="search-field">${icon("search", 19)}<input id="invoice-search" dir="ltr" inputmode="search" autocomplete="off" placeholder="ابحث برقم الفاتورة مثل INV-000005" value="${escapeHtml(state.invoiceQuery)}" /></label></section>
   <section class="panel invoice-list">${state.sales.length ? invoices.length ? invoices.map((sale) => { const displaySale = invoiceWithCashier(sale); return `<button class="invoice-row" data-action="open-invoice" data-id="${sale.id}"><div class="invoice-row__mark">${icon("receipt", 20)}</div><div class="invoice-row__main"><strong>${sale.invoiceNumber}</strong><small>${dateTime(sale.date)} · ${paymentChannelLabel(sale)} · ${escapeHtml(sale.paymentStatus || "مدفوعة")}${sale.customerName ? ` · العميل: ${escapeHtml(sale.customerName)}` : ""} · الكاشير: ${escapeHtml(displaySale.cashierName)}</small></div><strong>${money(sale.total)}</strong>${icon("arrow", 18)}</button>`; }).join("") : `<div class="inline-empty">لا توجد فاتورة مطابقة للرقم «${escapeHtml(state.invoiceQuery)}».</div>` : emptyState("لا توجد فواتير حتى الآن", "أتم أول عملية بيع لتظهر تفاصيلها هنا.", "sales")}</section>`;
 }
@@ -1447,6 +1465,10 @@ function renderApplication() {
   root.innerHTML = `<div class="app-shell">${navMarkup()}<main class="workspace">${body}</main>${salesScannerFabMarkup()}</div>`;
   if (state.view === "cashbox" && isAdmin(state.currentUser)) root.querySelector(".workspace")?.insertAdjacentHTML("beforeend", `${collapsiblePanel("shifts", { eyebrow: "صناديق الكاشير", title: "ورديات الكاشير وترحيل الخزنة", subtitle: "مراجعة الورديات وترحيلها إلى الخزنة", badge: `${amount((state.cashierShifts || []).length)} وردية`, glyph: "users" }, cashierShiftSummaryMarkup())}${collapsiblePanel("shiftStats", { eyebrow: "المساءلة المالية", title: "إحصاءات عجز وفائض الكاشير", subtitle: "متابعة الفروقات وتسويتها من الراتب", badge: `${amount((state.cashierShiftStatistics || []).length)} كاشير`, glyph: "chart" }, cashierDifferenceStatisticsMarkup())}${collapsiblePanel("salaries", { eyebrow: "رواتب الشهر الحالي", title: "رواتب الفريق وتسليم المستحقات", subtitle: "الرواتب والسلف وخصومات العجز", badge: `${amount((state.cashierSalarySummaries || []).length)} حساب`, glyph: "wallet" }, cashierSalarySummaryMarkup())}`);
   bindEvents();
+  if (state.view !== state.lastStableView) {
+    if (state.viewHistory[state.viewHistory.length - 1] !== state.lastStableView) state.viewHistory.push(state.lastStableView);
+    if (state.viewHistory.length > 20) state.viewHistory.shift();
+  }
   state.lastStableView = state.view;
 }
 
@@ -1771,6 +1793,15 @@ async function handleActionUnsafe(event) {
   if (action === "setup-home") { try { await signOutCloudBackupUser(); } catch { /* لا توجد جلسة سحابية أو تعذر فصلها. */ } state.cloud.user = null; state.cloud.identity = null; state.showSetupHome = true; render(); return; }
   if (action === "logout") { openLogoutConfirmDialog(); return; }
   if (action === "account-session") { openAccountSessionDialog(); return; }
+  if (action === "go-back") {
+    const target = event.currentTarget.dataset.view;
+    if (!target || !canAccessView(state.currentUser, target)) { state.view = isAdmin(state.currentUser) ? "dashboard" : "sales"; render(); return; }
+    while (state.viewHistory.length && state.viewHistory[state.viewHistory.length - 1] !== target) state.viewHistory.pop();
+    state.viewHistory.pop();
+    state.view = target;
+    render();
+    return;
+  }
   if (action === "navigate") { const view = event.currentTarget.dataset.view; if (!canAccessView(state.currentUser, view)) { adminOnlyMessage(); return; } state.view = view; render(); if (["settings", "data-management"].includes(view) && isAdmin(state.currentUser)) void refreshCloudBackups({ quiet: true }); return; }
   if (!state.currentUser) { render(); return; }
   if (action === "open-app-search") { openAppSearchDialog(); return; }
