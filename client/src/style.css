@@ -1295,3 +1295,41 @@ label { font-size:15px; }
   border-color: #81d6ac !important;
   box-shadow: 0 0 0 3px rgba(129,214,172,.28) !important;
 }
+
+/* ===== زر الفواتير المعلقة: قرمزي مع وميض خفيف عند وجود زبون معلّق ===== */
+.held-badge-btn, .held-topbar-btn {
+  color: #fff !important;
+  background: linear-gradient(145deg, #c0304a, #8d1330) !important;
+  border: 1px solid #e8879b !important;
+  font-weight: 800 !important;
+  box-shadow: 0 4px 12px rgba(141, 19, 48, .22);
+  animation: heldPulse 2.4s ease-in-out infinite;
+}
+.held-badge-btn:hover, .held-topbar-btn:hover {
+  color: #fff !important;
+  background: linear-gradient(145deg, #d13b56, #9c1636) !important;
+  border-color: #ffc2ce !important;
+}
+.held-badge-btn svg, .held-topbar-btn svg { color: #fff; }
+
+/* وميض هادئ: تغيّر طفيف في التوهج فقط، بلا حركة أو وميض مزعج */
+@keyframes heldPulse {
+  0%, 100% { box-shadow: 0 4px 12px rgba(141,19,48,.22), 0 0 0 0 rgba(212,60,90,.34); }
+  50%      { box-shadow: 0 4px 12px rgba(141,19,48,.22), 0 0 0 5px rgba(212,60,90,0); }
+}
+
+[data-theme="dark"] .held-badge-btn, [data-theme="dark"] .held-topbar-btn {
+  color: #fff !important;
+  background: linear-gradient(145deg, #c42a47, #84132b) !important;
+  border-color: #ff9eb0 !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,.3);
+}
+[data-theme="dark"] .held-badge-btn:hover, [data-theme="dark"] .held-topbar-btn:hover {
+  background: linear-gradient(145deg, #d63756, #981832) !important;
+  border-color: #ffd0d7 !important;
+}
+
+/* احترام تفضيل تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  .held-badge-btn, .held-topbar-btn { animation: none; }
+}
