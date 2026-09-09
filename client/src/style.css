@@ -1089,3 +1089,47 @@ label { font-size:15px; }
   .topbar__description { max-width: 100%; font-size: 13.5px; }
   .topbar--cashbox .topbar__description { max-width: 100%; }
 }
+
+/* ===== أيقونات الشريط العلوي في سطر واحد على الجوال ===== */
+@media (max-width: 899px) {
+  .topbar__actions {
+    flex-wrap: nowrap;            /* يمنع نزولها إلى سطر ثانٍ */
+    justify-content: space-between; /* يوزّعها على العرض بدل ترك فراغ جانبي */
+    align-items: center;
+    width: 100%;
+    gap: 6px;
+    overflow: visible;
+  }
+  /* اسمح للعناصر بالانكماش قليلًا بدل الالتفاف */
+  .topbar__actions > * { flex: 0 1 auto; min-width: 0; }
+  .topbar__actions .icon-button {
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+  }
+  .topbar__actions .button {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+  }
+  .topbar__actions .account-badge {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 599px) {
+  /* الشارة تُخفى أصلًا على الجوال، فتُوزّع الأيقونات بالتساوي دون فراغ */
+  .topbar__actions { justify-content: space-between; gap: 8px; }
+  .topbar__actions .icon-button { width: 42px; height: 42px; }
+  /* أزرار الإجراء المضغوطة (نص مخفي) تبقى بحجم أيقونة ولا تلتف */
+  .topbar__actions .button { flex: 0 0 42px; width: 42px; padding: 0; }
+  .topbar--cashbox > .topbar__actions,
+  .workspace > .topbar.topbar--cashbox > .topbar__actions {
+    flex-wrap: nowrap !important;
+    justify-content: space-between !important;
+  }
+}
