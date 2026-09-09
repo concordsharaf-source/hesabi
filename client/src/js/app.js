@@ -2138,9 +2138,87 @@ function openAccountPinDialog(account) {
 
 function productFormMarkup(product = null, presetBarcode = "") {
   const isEdit = Boolean(product);
+  const profile = businessProfile();
+  const unit = product?.unit || profile.defaultUnit;
+  const packageUnit = product?.purchasePackageUnit || profile.defaultPackageUnit;
+  const unitsPerPackage = Math.max(1, toNumber(product?.unitsPerPackage) || 1);
+  const packageCost = toNumber(product?.lastPackageCost) || roundMoney(toNumber(product?.purchasePrice) * unitsPerPackage);
+  const labels = packageFieldLabels(packageUnit, unit);
   const input = (name, label, type = "text", value = "", attrs = "") => `<label>${label}<input name="${name}" type="${type}" value="${escapeHtml(value)}" ${attrs} /></label>`;
   const barcodeField = `<label class="barcode-field">الباركود<div class="barcode-field__control"><input id="product-barcode" name="barcode" type="text" dir="ltr" inputmode="numeric" autocomplete="off" value="${escapeHtml(product?.barcode || presetBarcode)}" /><button id="scan-product-barcode" class="button button--secondary barcode-field__scan" type="button">${icon("scan", 17)}<span>مسح</span></button></div><small id="barcode-feedback" class="barcode-feedback" aria-live="polite">اكتب الباركود أو امسحه بالكاميرا.</small></label>`;
-  return `<div class="dialog__head"><div><span class="eyebrow">${isEdit ? "تحديث الكتالوج" : "منتج جديد"}</span><h2>${isEdit ? `تعديل ${escapeHtml(product.name)}` : "إضافة منتج"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="product-form" class="form-grid" data-id="${product?.id || ""}">${input("name", "اسم المنتج", "text", product?.name, "required maxlength=100 autofocus dir=rtl")}${barcodeField}${input("internalCode", "الكود الداخلي", "text", product?.internalCode, "dir=ltr autocomplete=off")}${categorySelectMarkup(product?.category || "")}${input("purchasePrice", "سعر الشراء", "number", product?.purchasePrice ?? "", "min=0 step=0.01 required")}${input("salePrice", "سعر البيع", "number", product?.salePrice ?? "", "min=0 step=0.01 required")}${!isEdit ? input("quantity", "الكمية الافتتاحية", "number", "", "min=0 step=0.001") : `<div class="locked-field"><span>الكمية الحالية</span><strong>${amount(product.quantity)} ${escapeHtml(product.unit)}</strong><small>تُعدّل من شاشة المخزون فقط.</small></div>`}${input("minimumStock", "الحد الأدنى للمخزون", "number", product?.minimumStock ?? "", "min=0 step=0.001")}${input("nearestProductionDate", "تاريخ الإنتاج", "date", product?.nearestProductionDate ?? "", "class=native-date-input dir=ltr")}${input("nearestExpiryDate", "تاريخ الانتهاء", "date", product?.nearestExpiryDate ?? "", "class=native-date-input dir=ltr")}<label>الوحدة<select name="unit">${profileOptions("units", product?.unit || businessProfile().defaultUnit).map((unit) => `<option value="${unit}" ${product?.unit === unit ? "selected" : ""}>${unit}</option>`).join("")}</select></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">${isEdit ? "حفظ التعديلات" : "حفظ المنتج"} ${icon("check", 17)}</button></div></form>${isEdit ? `<div class="dialog__danger"><span>لا يُحذف المنتج نهائيًا؛ يحتفظ التطبيق بسجله إذا ارتبط بفواتير.</span><button class="text-button text-button--danger" id="delete-product">${icon("trash", 16)} حذف من القائمة</button></div>` : ""}`;
+
+  /* قسم العبوات: نفس منطق فاتورة الشراء — نوع العبوة، عدد الحبات فيها، وسعرها. */
+  const packageSection = `
+    <fieldset class="form-full product-package-fieldset">
+      <legend><span class="eyebrow">التعبئة والتسعير</span></legend>
+      <label class="checkbox-field product-package-toggle"><input type="checkbox" id="product-package-mode" ${unitsPerPackage > 1 ? "checked" : ""} /><span><strong>الإدخال بالعبوات (كراتين)</strong><small>احسب سعر ${escapeHtml(unit)} تلقائيًا من سعر العبوة</small></span></label>
+      <div class="product-package-grid" id="product-package-grid" ${unitsPerPackage > 1 ? "" : "hidden"}>
+        <label>نوع العبوة<select name="packageUnit">${profileOptions("packageUnits", packageUnit).map((item) => `<option value="${item}" ${item === packageUnit ? "selected" : ""}>${item}</option>`).join("")}</select></label>
+        <label><span data-package-label="units">${labels.units}</span><input name="unitsPerPackage" type="number" min="1" step="1" value="${unitsPerPackage}" /></label>
+        <label><span data-package-label="cost">${labels.cost}</span><input name="packageCost" type="number" min="0" step="0.01" value="${packageCost || ""}" /></label>
+        ${!isEdit ? `<label><span data-package-label="quantity">${labels.quantity}</span><input name="packageQuantity" type="number" min="0" step="1" value="" placeholder="0" /></label>` : ""}
+      </div>
+      <p class="scanner-session-note" id="product-package-summary" ${unitsPerPackage > 1 ? "" : "hidden"}></p>
+    </fieldset>`;
+
+  return `<div class="dialog__head"><div><span class="eyebrow">${isEdit ? "تحديث الكتالوج" : "منتج جديد"}</span><h2>${isEdit ? `تعديل ${escapeHtml(product.name)}` : "إضافة منتج"}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="product-form" class="form-grid" data-id="${product?.id || ""}">${input("name", "اسم المنتج", "text", product?.name, "required maxlength=100 autofocus dir=rtl")}${barcodeField}${input("internalCode", "الكود الداخلي", "text", product?.internalCode, "dir=ltr autocomplete=off")}${categorySelectMarkup(product?.category || "")}<label>وحدة المخزون والبيع<select name="unit">${profileOptions("units", unit).map((item) => `<option value="${item}" ${item === unit ? "selected" : ""}>${item}</option>`).join("")}</select></label>${packageSection}${input("purchasePrice", `<span data-package-label="purchase">سعر شراء ${escapeHtml(unit)}</span>`, "number", product?.purchasePrice ?? "", "min=0 step=0.01 required")}${input("salePrice", `<span data-package-label="sale">سعر بيع ${escapeHtml(unit)}</span>`, "number", product?.salePrice ?? "", "min=0 step=0.01 required")}${!isEdit ? input("quantity", `<span data-package-label="qty">الكمية الافتتاحية</span>`, "number", "", "min=0 step=0.001") : `<div class="locked-field"><span>الكمية الحالية</span><strong>${amount(product.quantity)} ${escapeHtml(product.unit)}</strong><small>تُعدّل من شاشة المخزون فقط.</small></div>`}${input("minimumStock", `<span data-package-label="min">الحد الأدنى للمخزون</span>`, "number", product?.minimumStock ?? "", "min=0 step=0.001")}${input("nearestProductionDate", "تاريخ الإنتاج", "date", product?.nearestProductionDate ?? "", "class=native-date-input dir=ltr")}${input("nearestExpiryDate", "تاريخ الانتهاء", "date", product?.nearestExpiryDate ?? "", "class=native-date-input dir=ltr")}<div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">${isEdit ? "حفظ التعديلات" : "حفظ المنتج"} ${icon("check", 17)}</button></div></form>${isEdit ? `<div class="dialog__danger"><span>لا يُحذف المنتج نهائيًا؛ يحتفظ التطبيق بسجله إذا ارتبط بفواتير.</span><button class="text-button text-button--danger" id="delete-product">${icon("trash", 16)} حذف من القائمة</button></div>` : ""}`;
+}
+
+/* يربط حقول العبوة في نموذج المنتج: يحدّث المسميات ويحسب سعر الوحدة والكمية تلقائيًا. */
+function bindProductPackageFields(overlay, form, { isEdit = false } = {}) {
+  const toggle = overlay.querySelector("#product-package-mode");
+  const grid = overlay.querySelector("#product-package-grid");
+  const summary = overlay.querySelector("#product-package-summary");
+  if (!toggle || !grid || !summary) return;
+
+  const el = (name) => form.elements[name];
+  const setLabel = (key, text) => overlay.querySelectorAll(`[data-package-label="${key}"]`).forEach((node) => { node.textContent = text; });
+
+  const syncLabels = () => {
+    const unit = el("unit")?.value || "حبة";
+    const packageUnit = el("packageUnit")?.value || "كرتون";
+    const labels = packageFieldLabels(packageUnit, unit);
+    setLabel("units", labels.units);
+    setLabel("cost", labels.cost);
+    setLabel("quantity", labels.quantity);
+    setLabel("purchase", `سعر شراء ${unit}`);
+    setLabel("sale", `سعر بيع ${unit}`);
+    setLabel("min", `الحد الأدنى بال${unit}`);
+    setLabel("qty", `الكمية الافتتاحية بال${unit}`);
+  };
+
+  const recalc = () => {
+    if (!toggle.checked) { summary.hidden = true; return; }
+    const unit = el("unit")?.value || "حبة";
+    const units = Math.max(1, Math.floor(toNumber(el("unitsPerPackage")?.value) || 1));
+    const cost = Math.max(0, toNumber(el("packageCost")?.value));
+    const packages = Math.max(0, toNumber(el("packageQuantity")?.value));
+    const math = calculatePackagePurchase({ packageQuantity: packages || 0, unitsPerPackage: units, packageCost: cost });
+
+    // سعر شراء الوحدة يُشتق من سعر العبوة، والكمية تُشتق من عدد العبوات.
+    if (cost > 0 && units > 0) el("purchasePrice").value = roundMoney(math.unitCost);
+    if (!isEdit && packages > 0) el("quantity").value = math.quantity;
+
+    const parts = [`سعر ${unit}: ${money(math.unitCost)}`];
+    if (!isEdit && packages > 0) parts.push(`سيدخل المخزون ${amount(math.quantity)} ${unit}`);
+    if (packages > 0 && cost > 0) parts.push(`إجمالي التكلفة ${money(math.total)}`);
+    summary.textContent = parts.join(" · ");
+    summary.hidden = false;
+  };
+
+  toggle.addEventListener("change", () => {
+    grid.hidden = !toggle.checked;
+    summary.hidden = !toggle.checked;
+    if (!toggle.checked) { if (el("unitsPerPackage")) el("unitsPerPackage").value = 1; }
+    else recalc();
+  });
+
+  el("unit")?.addEventListener("change", () => { syncLabels(); recalc(); });
+  el("packageUnit")?.addEventListener("change", () => { syncLabels(); recalc(); });
+  ["unitsPerPackage", "packageCost", "packageQuantity"].forEach((name) => el(name)?.addEventListener("input", recalc));
+
+  syncLabels();
+  recalc();
 }
 
 function openProductDialog(product = null, presetBarcode = "") {
@@ -2151,6 +2229,7 @@ function openProductDialog(product = null, presetBarcode = "") {
   const unitSelect = form.elements.unit;
   const selectedUnit = product?.unit || businessProfile().defaultUnit;
   unitSelect.innerHTML = profileOptions("units", selectedUnit).map((unit) => `<option value="${unit}" ${unit === selectedUnit ? "selected" : ""}>${unit}</option>`).join("");
+  bindProductPackageFields(overlay, form, { isEdit: Boolean(product) });
   const barcodeInput = overlay.querySelector("#product-barcode");
   const barcodeFeedback = overlay.querySelector("#barcode-feedback");
   if (product && isPharmacy()) {

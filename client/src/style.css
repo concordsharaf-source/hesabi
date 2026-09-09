@@ -1414,3 +1414,16 @@ html[data-theme="dark"] #app { background-color: transparent; }
 .settings-hub .report-panel-body > .activity-log-page { padding: 0; }
 .settings-hub .report-panel-body .toolbar { margin-top: 0; }
 .settings-hub .report-panel-body > * > .panel:first-child { margin-top: 0; }
+
+/* ===== قسم التعبئة في نموذج المنتج (كراتين/عبوات) ===== */
+.product-package-fieldset { margin: 0; padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: var(--green-pale); }
+.product-package-fieldset legend { padding: 0 6px; }
+.product-package-toggle { margin-bottom: 10px; }
+.product-package-toggle span { display: flex; flex-direction: column; gap: 1px; }
+.product-package-toggle small { color: var(--muted); font-size: 11.5px; }
+.product-package-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.product-package-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 700; }
+.product-package-grid[hidden] { display: none; }
+#product-package-summary { margin: 10px 0 0; font-weight: 700; }
+#product-package-summary[hidden] { display: none; }
+[data-theme="dark"] .product-package-fieldset { background: #1a2b25; border-color: var(--line); }
