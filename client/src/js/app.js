@@ -1621,7 +1621,7 @@ function flashProductRow(productId) {
   lastAddedFlashTimeoutId = window.setTimeout(() => {
     state.lastAddedProductId = null;
     document.querySelectorAll(".is-flash-added").forEach((el) => el.classList.remove("is-flash-added"));
-  }, 650);
+  }, 165);
 }
 
 function addToCart(productId) {
