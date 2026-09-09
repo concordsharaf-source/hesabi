@@ -20,6 +20,7 @@ import { APK_REPORT_TYPES, getApkReportRows } from "./apk-report-catalog.js";
 import { renderOfficialReportHtml } from "./report-template.js";
 import { CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isDesktopBarcodeWedge, isNewContinuousBarcode, shouldAcceptDesktopBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 import { installDesktopIntegration } from "./desktop.js";
+import { NOTIFICATION_TOPICS, clearNotificationHistory, enableBackgroundChecks, notificationPermission, notificationSettings, notificationsSupported, publishBackgroundSnapshot, requestNotificationPermission, runAlertChecks, saveNotificationSettings, showAppNotification, subscribeToPush } from "./notifications.js";
 
 const icon = (name, size = 20) => {
   const paths = {
@@ -454,6 +455,7 @@ function expiryMeterMarkup(product) { const progress = expiryProgress({ producti
 async function refresh() {
   [state.products, state.productSuppliers, state.sales, state.saleItems, state.suppliers, state.supplierPayments, state.customers, state.customerPayments, state.purchases, state.purchaseItems, state.expenses, state.stockMovements, state.cashMovements, state.transferVaultDeposits, state.cashbox, state.dashboard, state.cashierShifts, state.cashierSalarySummaries, state.cashierMonthlySalaryExpenses, state.cashierShiftStatistics, state.vault, state.periodicInventories] = await Promise.all([db.listProducts(), db.listProductSupplierLinks(), db.listSales(), db.listSaleItems(), db.listSuppliers(), db.listSupplierPayments(), db.listCustomers(), db.listCustomerPayments(), db.listPurchases(), db.listPurchaseItems(), db.listExpenses(), db.listStockMovements(), db.listCashMovements({ from: state.cashFrom, to: state.cashTo }), db.listTransferVaultDeposits(), db.getCashbox({ from: state.cashFrom, to: state.cashTo }), db.getDashboard(), db.listCashierShifts({ date: "" }), db.listCashierSalarySummaries(), db.listCashierMonthlySalaryExpenses({ from: state.expenseFrom, to: state.expenseTo }), db.listCashierShiftStatistics({ from: state.cashFrom, to: state.cashTo }), db.getVault({ from: state.cashFrom, to: state.cashTo }), db.listPeriodicInventories()]);
   state.activeCashierShift = state.currentUser?.role === "cashier" ? await db.getActiveCashierShift(state.currentUser.id) : null;
+  void syncNotificationAlerts();
   const auditRange = currentPeriodicInventoryRange();
   [state.analytics, state.periodicInventorySummary] = await Promise.all([db.getAnalytics({ from: state.reportFrom, to: state.reportTo }), db.getPeriodicInventorySummary(auditRange)]);
   state.todayTransfers = calculateTransferCollections({ sales: state.sales.filter((sale) => dateKey(sale.date) === dateKey()), customerPayments: state.customerPayments.filter((payment) => dateKey(payment.date) === dateKey()) });
@@ -497,6 +499,125 @@ async function resetMobileNavigationOrder() {
   state.settings = await db.getSettings();
   render();
   showToast("تمت استعادة ترتيب شريط الهاتف الافتراضي.");
+}
+
+function applyDeepLinkView() {
+  try {
+    const requested = new URLSearchParams(window.location.search).get("view");
+    if (requested && canAccessView(state.currentUser, requested)) state.view = requested;
+    if (requested) window.history.replaceState({}, "", window.location.pathname);
+  } catch { /* تجاهل */ }
+}
+
+let notificationBridgeBound = false;
+function installNotificationBridge() {
+  if (notificationBridgeBound || !("serviceWorker" in navigator)) return;
+  notificationBridgeBound = true;
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event.data?.type !== "HESABI_NOTIFICATION_CLICK") return;
+    try {
+      const view = new URL(event.data.url, window.location.origin).searchParams.get("view");
+      if (view && canAccessView(state.currentUser, view)) { state.view = view; render(); }
+    } catch { /* تجاهل */ }
+  });
+}
+
+function alertContext() {
+  const products = state.products || [];
+  return {
+    products,
+    dashboard: state.dashboard,
+    shifts: state.cashierShifts || [],
+    pairRequests: state.cloud?.pairRequests || [],
+    isAdmin: isAdmin(state.currentUser),
+    debtThreshold: toNumber(state.settings?.debtAlertThreshold) || 0,
+  };
+}
+
+function alertSnapshotCounts() {
+  const context = alertContext();
+  const products = context.products;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const batches = state.dashboard?.expiringBatches || [];
+  const dayMs = 86400000;
+  const expired = batches.filter((batch) => batch.expiryDate && new Date(`${batch.expiryDate}T00:00:00`).getTime() < today.getTime()).length;
+  const nearExpiry = batches.filter((batch) => {
+    if (!batch.expiryDate) return false;
+    const days = Math.ceil((new Date(`${batch.expiryDate}T00:00:00`).getTime() - today.getTime()) / dayMs);
+    return days >= 0 && days <= 30;
+  }).length;
+  return {
+    outOfStock: products.filter((product) => toNumber(product.quantity) <= 0).length,
+    lowStock: products.filter((product) => toNumber(product.quantity) > 0 && toNumber(product.minimumStock) > 0 && toNumber(product.quantity) <= toNumber(product.minimumStock)).length,
+    expired,
+    nearExpiry,
+    pendingRequests: context.isAdmin ? (state.cloud?.pairRequests || []).filter((request) => request.status === "pending").length : 0,
+    pendingSurpluses: context.isAdmin ? (state.cashierShifts || []).filter((shift) => shift.surplusApprovalStatus === "PENDING").length : 0,
+  };
+}
+
+async function syncNotificationAlerts() {
+  try {
+    publishBackgroundSnapshot(alertSnapshotCounts());
+    if (notificationPermission() !== "granted") return;
+    await runAlertChecks(alertContext());
+  } catch (error) {
+    console.warn("[Hesabi notifications]", error);
+  }
+}
+
+async function enableNotifications() {
+  if (!notificationsSupported()) { showToast("متصفحك لا يدعم إشعارات النظام.", "error"); return; }
+  const permission = await requestNotificationPermission();
+  if (permission !== "granted") {
+    showToast(permission === "denied" ? "الإشعارات محظورة. فعّلها من إعدادات المتصفح للموقع." : "لم تُمنح صلاحية الإشعارات.", "error");
+    render();
+    return;
+  }
+  saveNotificationSettings({ enabled: true });
+  const capability = await enableBackgroundChecks();
+  const vapidKey = import.meta.env?.VITE_PUSH_VAPID_PUBLIC_KEY || state.settings?.pushVapidPublicKey || "";
+  if (vapidKey) {
+    const subscription = await subscribeToPush(vapidKey);
+    if (subscription) { try { await db.saveSettings({ ...state.settings, pushSubscription: subscription }); state.settings = await db.getSettings(); } catch { /* تجاهل */ } }
+  }
+  await showAppNotification({ topic: "general", key: `welcome:${Date.now()}`, title: "تم تفعيل إشعارات حسابي", body: capability.periodicSync ? "ستصلك التنبيهات حتى والتطبيق في الخلفية." : "ستصلك التنبيهات عند فتح التطبيق أو تحديثه.", cooldownMs: 0 });
+  await syncNotificationAlerts();
+  render();
+}
+
+function toggleNotificationTopic(topicId) {
+  const settings = notificationSettings();
+  saveNotificationSettings({ topics: { ...settings.topics, [topicId]: settings.topics[topicId] === false } });
+  render();
+}
+
+function notificationsPanelMarkup() {
+  const supported = notificationsSupported();
+  const permission = notificationPermission();
+  const settings = notificationSettings();
+  const topics = NOTIFICATION_TOPICS.filter((topic) => !topic.adminOnly || isAdmin(state.currentUser));
+  const statusLabel = !supported ? "غير مدعوم في هذا المتصفح"
+    : permission === "granted" ? (settings.enabled ? "مفعّلة" : "موقوفة مؤقتًا")
+    : permission === "denied" ? "محظورة من إعدادات المتصفح" : "غير مفعّلة";
+  const statusTone = permission === "granted" && settings.enabled ? "status--available" : permission === "denied" ? "status--danger" : "status--pending";
+
+  return `<section class="panel notifications-panel">
+    <div class="panel__head"><div><span class="eyebrow">التنبيهات</span><h2>إشعارات المتجر</h2></div><small class="status ${statusTone}">${statusLabel}</small></div>
+    <p class="panel__subtext">تصلك التنبيهات المهمة حتى والتطبيق في الخلفية: طلبات الكاشير، نفاد المنتجات، انتهاء الصلاحية، وفائض الورديات.</p>
+    ${!supported ? `<div class="inline-empty">افتح التطبيق من متصفح حديث أو ثبّته على الشاشة الرئيسية لتفعيل الإشعارات.</div>` : ""}
+    ${supported && permission !== "granted" ? `<button class="button button--primary" data-action="enable-notifications">${icon("alert", 17)}<span>تفعيل الإشعارات</span></button>` : ""}
+    ${supported && permission === "granted" ? `<div class="notification-topics">${topics.map((topic) => `
+      <label class="checkbox-field notification-topic">
+        <input type="checkbox" data-notification-topic="${topic.id}" ${settings.topics[topic.id] === false ? "" : "checked"} />
+        <span><strong>${topic.label}</strong><small>${topic.description}</small></span>
+      </label>`).join("")}</div>
+      <div class="notification-actions">
+        <button class="button button--secondary button--compact" data-action="toggle-notifications-enabled">${settings.enabled ? "إيقاف مؤقت" : "استئناف"}</button>
+        <button class="button button--secondary button--compact" data-action="test-notification">إشعار تجريبي</button>
+        <button class="button button--secondary button--compact" data-action="reset-notification-history">إعادة ضبط التكرار</button>
+      </div>` : ""}
+  </section>`;
 }
 
 const THEME_MODES = ["system", "light", "dark"];
@@ -1184,7 +1305,7 @@ function settingsMarkup() {
     { view: "data-management", iconName: "restore", eyebrow: "الحفظ", title: "إدارة البيانات", description: "نسخ محلية وسحابية واستعادة آمنة" },
   ];
   return `${topbarMarkup("مركز الإعدادات", "اختر منطقة الضبط المطلوبة. تبقى بيانات متجرك محلية، ولا تظهر هذه الأدوات للكاشير.")}
-  <div class="settings-page settings-hub"><section class="settings-hub__intro panel"><span class="eyebrow">لوحة إدارة</span><h2>ضبط المتجر من مكان واحد</h2><p>فُصلت الإعدادات إلى صفحات واضحة لتبقى الشاشة مرتبة على الهاتف وسطح المكتب.</p></section><section class="settings-hub__grid">${cards.map(settingsHubCard).join("")}</section>${settingsContactMarkup()}</div>`;
+  <div class="settings-page settings-hub"><section class="settings-hub__intro panel"><span class="eyebrow">لوحة إدارة</span><h2>ضبط المتجر من مكان واحد</h2><p>فُصلت الإعدادات إلى صفحات واضحة لتبقى الشاشة مرتبة على الهاتف وسطح المكتب.</p></section><section class="settings-hub__grid">${cards.map(settingsHubCard).join("")}</section>${notificationsPanelMarkup()}${settingsContactMarkup()}</div>`;
 }
 function generalSettingsMarkup() {
   return `${topbarMarkup("إعدادات عامة", "حدّث بيانات المتجر التي تظهر في رأس التطبيق والفواتير، ثم احفظ التغيير.", settingsBackAction())}
@@ -1520,6 +1641,7 @@ function bindDateInputDisplays() {
 function bindEvents() {
   root.querySelectorAll("[data-action]").forEach((element) => element.addEventListener("click", handleAction));
   bindDateInputDisplays();
+  root.querySelectorAll("[data-notification-topic]").forEach((input) => input.addEventListener("change", () => toggleNotificationTopic(input.dataset.notificationTopic)));
   root.querySelector("#setup-form")?.addEventListener("submit", handleSetup);
   root.querySelector("#login-form")?.addEventListener("submit", handleLogin);
   root.querySelector("#required-pin-form")?.addEventListener("submit", changeRequiredPin);
@@ -1633,6 +1755,10 @@ async function handleActionUnsafe(event) {
   if (!canUseAction(state.currentUser, action, { mode: event.currentTarget.dataset.mode })) { adminOnlyMessage(); return; }
   if (action === "move-mobile-nav") { await updateMobileNavigationOrder(id, event.currentTarget.dataset.direction); return; }
   if (action === "reset-mobile-nav") { await resetMobileNavigationOrder(); return; }
+  if (action === "enable-notifications") { await enableNotifications(); return; }
+  if (action === "toggle-notifications-enabled") { const current = notificationSettings(); saveNotificationSettings({ enabled: !current.enabled }); showToast(current.enabled ? "أُوقفت الإشعارات مؤقتًا." : "استُؤنفت الإشعارات."); render(); return; }
+  if (action === "test-notification") { const ok = await showAppNotification({ topic: "general", key: `test:${Date.now()}`, title: "إشعار تجريبي من حسابي", body: "إذا وصلك هذا الإشعار فالتنبيهات تعمل بشكل صحيح.", cooldownMs: 0 }); showToast(ok ? "أُرسل الإشعار التجريبي." : "تعذر الإرسال. تأكد من تفعيل الإشعارات.", ok ? "success" : "error"); return; }
+  if (action === "reset-notification-history") { clearNotificationHistory(); showToast("أُعيد ضبط سجل التكرار. ستصلك التنبيهات من جديد."); void syncNotificationAlerts(); return; }
   if (action === "toggle-theme") { toggleTheme(); return; }
   if (action === "quick-lock") { openScreenLockDialog(); return; }
   if (action === "toggle-report-panel") { const key = event.currentTarget.dataset.panel; if (!state.reportPanels) state.reportPanels = {}; state.reportPanels[key] = !state.reportPanels[key]; render(); return; }
@@ -3508,5 +3634,5 @@ export async function bootApp(target) {
   installRuntimeGuards();
   installDesktopBarcodeReader();
   installAudioUnlockListener();
-  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } applyTheme(); watchSystemTheme(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
+  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } applyTheme(); watchSystemTheme(); installNotificationBridge(); applyDeepLinkView(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }
