@@ -109,7 +109,7 @@ function generateQuickCashOptions(total) {
   return list.slice(0, 6);
 }
 
-const state = { view: "dashboard", lastStableView: "dashboard", showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false, cashIn: false, cashOut: false, cashMoves: false, transfers: false, cashExpenses: false, shifts: false, shiftStats: false, salaries: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
+const state = { view: "dashboard", lastStableView: "dashboard", showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false, cashIn: false, cashOut: false, cashMoves: false, transfers: false, cashExpenses: false, shifts: false, shiftStats: false, salaries: false, notifications: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
 const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "purchases"].includes(id))];
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
@@ -592,18 +592,23 @@ function toggleNotificationTopic(topicId) {
   render();
 }
 
-function notificationsPanelMarkup() {
+function notificationsStatus() {
+  const supported = notificationsSupported();
+  const permission = notificationPermission();
+  const settings = notificationSettings();
+  if (!supported) return { label: "غير مدعوم", tone: "status--pending" };
+  if (permission === "granted") return settings.enabled ? { label: "مفعّلة", tone: "status--available" } : { label: "موقوفة مؤقتًا", tone: "status--pending" };
+  if (permission === "denied") return { label: "محظورة", tone: "status--danger" };
+  return { label: "غير مفعّلة", tone: "status--pending" };
+}
+
+function notificationsBodyMarkup() {
   const supported = notificationsSupported();
   const permission = notificationPermission();
   const settings = notificationSettings();
   const topics = NOTIFICATION_TOPICS.filter((topic) => !topic.adminOnly || isAdmin(state.currentUser));
-  const statusLabel = !supported ? "غير مدعوم في هذا المتصفح"
-    : permission === "granted" ? (settings.enabled ? "مفعّلة" : "موقوفة مؤقتًا")
-    : permission === "denied" ? "محظورة من إعدادات المتصفح" : "غير مفعّلة";
-  const statusTone = permission === "granted" && settings.enabled ? "status--available" : permission === "denied" ? "status--danger" : "status--pending";
 
   return `<section class="panel notifications-panel">
-    <div class="panel__head"><div><span class="eyebrow">التنبيهات</span><h2>إشعارات المتجر</h2></div><small class="status ${statusTone}">${statusLabel}</small></div>
     <p class="panel__subtext">تصلك التنبيهات المهمة حتى والتطبيق في الخلفية: طلبات الكاشير، نفاد المنتجات، انتهاء الصلاحية، وفائض الورديات.</p>
     ${!supported ? `<div class="inline-empty">افتح التطبيق من متصفح حديث أو ثبّته على الشاشة الرئيسية لتفعيل الإشعارات.</div>` : ""}
     ${supported && permission !== "granted" ? `<button class="button button--primary" data-action="enable-notifications">${icon("alert", 17)}<span>تفعيل الإشعارات</span></button>` : ""}
@@ -618,6 +623,17 @@ function notificationsPanelMarkup() {
         <button class="button button--secondary button--compact" data-action="reset-notification-history">إعادة ضبط التكرار</button>
       </div>` : ""}
   </section>`;
+}
+
+function notificationsPanelMarkup() {
+  const status = notificationsStatus();
+  return collapsiblePanel("notifications", {
+    eyebrow: "التنبيهات",
+    title: "إشعارات المتجر",
+    subtitle: "طلبات الكاشير، نفاد المنتجات، انتهاء الصلاحية، وفائض الورديات",
+    badge: status.label,
+    glyph: "alert",
+  }, notificationsBodyMarkup());
 }
 
 const THEME_MODES = ["system", "light", "dark"];
