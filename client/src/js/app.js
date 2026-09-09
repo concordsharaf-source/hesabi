@@ -1428,8 +1428,41 @@ function installDesktopBarcodeReader() {
   }, true);
 }
 
+
+// ===== عرض حقول التاريخ بصيغة يوم/شهر/سنة بدل صيغة المتصفح (شهر/يوم/سنة) =====
+function formatDateInputDisplay(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || "").trim());
+  if (!match) return "";
+  const [, year, month, day] = match;
+  return `${day}/${month}/${year}`;
+}
+
+function decorateDateInput(input) {
+  const display = formatDateInputDisplay(input.value);
+  if (display) {
+    input.dataset.display = display;
+    input.classList.add("has-value");
+  } else {
+    delete input.dataset.display;
+    input.classList.remove("has-value");
+  }
+}
+
+function bindDateInputDisplays() {
+  root.querySelectorAll('input[type="date"]').forEach((input) => {
+    input.setAttribute("data-date-display", "");
+    if (!input.title) input.title = "الصيغة: يوم/شهر/سنة";
+    decorateDateInput(input);
+    if (input.dataset.displayBound) return;
+    input.dataset.displayBound = "1";
+    input.addEventListener("input", () => decorateDateInput(input));
+    input.addEventListener("change", () => decorateDateInput(input));
+  });
+}
+
 function bindEvents() {
   root.querySelectorAll("[data-action]").forEach((element) => element.addEventListener("click", handleAction));
+  bindDateInputDisplays();
   root.querySelector("#setup-form")?.addEventListener("submit", handleSetup);
   root.querySelector("#login-form")?.addEventListener("submit", handleLogin);
   root.querySelector("#required-pin-form")?.addEventListener("submit", changeRequiredPin);

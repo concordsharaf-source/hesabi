@@ -1333,3 +1333,32 @@ label { font-size:15px; }
 @media (prefers-reduced-motion: reduce) {
   .held-badge-btn, .held-topbar-btn { animation: none; }
 }
+
+/* ===== حقول التاريخ: عرض يوم/شهر/سنة بدل صيغة المتصفح (شهر/يوم/سنة) ===== */
+input[type="date"][data-date-display] {
+  position: relative;
+  direction: ltr;
+  text-align: right;
+}
+/* في المتصفحات المبنية على WebKit/Blink نخفي الحقول الأصلية ونرسم النص الصحيح */
+@supports selector(::-webkit-datetime-edit) {
+  input[type="date"][data-date-display].has-value::-webkit-datetime-edit { opacity: 0; }
+  input[type="date"][data-date-display].has-value::before {
+    content: attr(data-display);
+    position: absolute;
+    inset-inline-start: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    direction: ltr;
+    color: var(--ink);
+    font-size: inherit;
+    font-weight: inherit;
+    font-family: inherit;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+  input[type="date"][data-date-display]:focus::-webkit-datetime-edit { opacity: 1; }
+  input[type="date"][data-date-display]:focus::before { content: none; }
+}
+input[type="date"][data-date-display]::-webkit-calendar-picker-indicator { cursor: pointer; }
+[data-theme="dark"] input[type="date"][data-date-display].has-value::before { color: var(--ink); }
