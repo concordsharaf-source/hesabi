@@ -1377,3 +1377,9 @@ label { font-size:15px; }
   .surplus-approval__buttons { justify-content:stretch; }
   .surplus-approval__buttons .button { flex:1; }
 }
+
+/* ===== منع ومضة الخلفية الفاتحة عند تحديث الصفحة في الوضع الداكن ===== */
+/* تُطبَّق على html نفسه قبل تحميل التطبيق، فلا تظهر أي خلفية فاتحة أثناء الإقلاع. */
+html[data-theme="dark"] { background-color: #101d18; color-scheme: dark; }
+html[data-theme="dark"] body { background-color: #101d18; color: #f2faf5; }
+html[data-theme="dark"] #app { background-color: transparent; }

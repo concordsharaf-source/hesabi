@@ -498,7 +498,14 @@ async function resetMobileNavigationOrder() {
   showToast("تمت استعادة ترتيب شريط الهاتف الافتراضي.");
 }
 
-function applyTheme() { document.documentElement.dataset.theme = state.settings?.theme === "dark" ? "dark" : "light"; }
+function applyTheme() {
+  const theme = state.settings?.theme === "dark" ? "dark" : "light";
+  document.documentElement.dataset.theme = theme;
+  // نحفظ السمة في التخزين المحلي ليطبّقها سكربت الرأس قبل أول رسم عند تحديث الصفحة.
+  try { localStorage.setItem("hesabi-theme", theme); } catch { /* التخزين المحلي غير متاح */ }
+  document.documentElement.style.background = theme === "dark" ? "#101d18" : "";
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#101d18" : "#1F6B59");
+}
 function themeToggleMarkup() { const dark = state.settings?.theme === "dark"; return `<button class="icon-button theme-toggle" data-action="toggle-theme" aria-label="${dark ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن"}" title="${dark ? "الوضع الفاتح" : "الوضع الداكن"}">${icon(dark ? "sun" : "moon", 19)}</button>`; }
 function salesScannerFabMarkup() { return `<button class="sales-scanner-fab" data-action="open-sales-scanner" data-mode="sale" aria-label="فتح المبيعات ومسح الباركود" title="بيع ومسح باركود">${icon("cart", 22)}<span>بيع</span></button>`; }
 

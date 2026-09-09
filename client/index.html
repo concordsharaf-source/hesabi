@@ -15,6 +15,25 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <title>حسابي | إدارة متجرك</title>
+    <script>
+      /* يطبّق السمة قبل أول رسم لمنع ومضة الخلفية الفاتحة عند تحديث الصفحة في الوضع الداكن. */
+      (function () {
+        try {
+          var stored = localStorage.getItem("hesabi-theme");
+          var theme = stored === "dark" || stored === "light"
+            ? stored
+            : (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+          document.documentElement.dataset.theme = theme;
+          if (theme === "dark") {
+            document.documentElement.style.background = "#101d18";
+            var meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute("content", "#101d18");
+          }
+        } catch (error) {
+          document.documentElement.dataset.theme = "light";
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="app" aria-live="polite"></div>
