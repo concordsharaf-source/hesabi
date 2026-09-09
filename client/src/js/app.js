@@ -1438,25 +1438,39 @@ function formatDateInputDisplay(value) {
 }
 
 function decorateDateInput(input) {
+  const wrap = input.closest(".date-field-wrap");
+  if (!wrap) return;
   const display = formatDateInputDisplay(input.value);
-  if (display) {
-    input.dataset.display = display;
-    input.classList.add("has-value");
-  } else {
-    delete input.dataset.display;
-    input.classList.remove("has-value");
+  let node = wrap.querySelector(".date-field-display");
+  if (!display) {
+    wrap.classList.remove("is-overlaid");
+    node?.remove();
+    return;
   }
+  if (!node) {
+    node = document.createElement("span");
+    node.className = "date-field-display";
+    input.insertAdjacentElement("afterend", node);
+  }
+  node.textContent = display;
+  wrap.classList.add("is-overlaid");
 }
 
 function bindDateInputDisplays() {
   root.querySelectorAll('input[type="date"]').forEach((input) => {
-    input.setAttribute("data-date-display", "");
+    if (!input.closest(".date-field-wrap")) {
+      const wrap = document.createElement("span");
+      wrap.className = "date-field-wrap";
+      input.replaceWith(wrap);
+      wrap.appendChild(input);
+    }
     if (!input.title) input.title = "الصيغة: يوم/شهر/سنة";
     decorateDateInput(input);
     if (input.dataset.displayBound) return;
     input.dataset.displayBound = "1";
     input.addEventListener("input", () => decorateDateInput(input));
     input.addEventListener("change", () => decorateDateInput(input));
+    input.addEventListener("blur", () => decorateDateInput(input));
   });
 }
 

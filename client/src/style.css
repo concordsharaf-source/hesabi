@@ -1334,31 +1334,29 @@ label { font-size:15px; }
   .held-badge-btn, .held-topbar-btn { animation: none; }
 }
 
-/* ===== حقول التاريخ: عرض يوم/شهر/سنة بدل صيغة المتصفح (شهر/يوم/سنة) ===== */
-input[type="date"][data-date-display] {
-  position: relative;
+/* ===== حقول التاريخ: عرض يوم/شهر/سنة بدل صيغة المتصفح ===== */
+.date-field-wrap { position: relative; display: block; min-width: 0; }
+.date-filter .date-field-wrap { flex: 1; }
+
+/* نُخفي نص الحقل الأصلي بالكامل (كل أجزائه) ونُبقي أيقونة التقويم تعمل */
+.date-field-wrap > input[type="date"] { width: 100%; }
+.date-field-wrap.is-overlaid > input[type="date"]::-webkit-datetime-edit { opacity: 0; }
+.date-field-wrap.is-overlaid > input[type="date"] { color: transparent; }
+.date-field-wrap.is-overlaid > input[type="date"]:focus { color: inherit; }
+.date-field-wrap.is-overlaid > input[type="date"]:focus::-webkit-datetime-edit { opacity: 1; }
+.date-field-wrap.is-overlaid > input[type="date"]:focus + .date-field-display { display: none; }
+
+.date-field-display {
+  position: absolute;
+  inset-inline-start: 12px;
+  top: 50%;
+  transform: translateY(-50%);
   direction: ltr;
-  text-align: right;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+  white-space: nowrap;
 }
-/* في المتصفحات المبنية على WebKit/Blink نخفي الحقول الأصلية ونرسم النص الصحيح */
-@supports selector(::-webkit-datetime-edit) {
-  input[type="date"][data-date-display].has-value::-webkit-datetime-edit { opacity: 0; }
-  input[type="date"][data-date-display].has-value::before {
-    content: attr(data-display);
-    position: absolute;
-    inset-inline-start: 12px;
-    top: 50%;
-    transform: translateY(-50%);
-    direction: ltr;
-    color: var(--ink);
-    font-size: inherit;
-    font-weight: inherit;
-    font-family: inherit;
-    pointer-events: none;
-    white-space: nowrap;
-  }
-  input[type="date"][data-date-display]:focus::-webkit-datetime-edit { opacity: 1; }
-  input[type="date"][data-date-display]:focus::before { content: none; }
-}
-input[type="date"][data-date-display]::-webkit-calendar-picker-indicator { cursor: pointer; }
-[data-theme="dark"] input[type="date"][data-date-display].has-value::before { color: var(--ink); }
+[data-theme="dark"] .date-field-display { color: var(--ink); }
