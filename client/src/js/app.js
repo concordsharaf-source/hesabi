@@ -107,7 +107,7 @@ function generateQuickCashOptions(total) {
   return list.slice(0, 6);
 }
 
-const state = { view: "dashboard", lastStableView: "dashboard", showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
+const state = { view: "dashboard", lastStableView: "dashboard", showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
 const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "purchases"].includes(id))];
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
@@ -747,58 +747,52 @@ function expensesMarkup({ embedded = false } = {}) {
   <section class="expense-period-grid"><section class="panel entity-list"><div class="panel__head"><div><span class="eyebrow">تشغيل يومي</span><h2>مصروفات يومية</h2></div><small>المصروفات التشغيلية اليومية فقط</small></div>${expenseRows(dailyExpenses, "daily")}</section><section class="panel entity-list"><div class="panel__head"><div><span class="eyebrow">التزام شهري</span><h2>مصروفات شهرية</h2></div><small>الإيجار والكهرباء والماء والالتزامات التشغيلية</small></div>${expenseRows(monthlyExpenses, "monthly")}</section></section><section class="panel entity-list salary-expense-section"><div class="panel__head"><div><span class="eyebrow">رواتب الموظفين</span><h2>السلف والرواتب المسلمة</h2></div><small>لا يدخل الراتب كاملًا في المصروفات إلا بعد تسليمه</small></div>${expenseRows(salaryEntries, "salary")}</section><section class="panel expense-page__bottom-action"><div><span class="eyebrow">سلفة موظف</span><strong>تسجيل سلفة جديدة</strong><small>تخرج نقدًا وتخصم من الراتب المتبقي دون احتساب الراتب كاملًا</small></div><button class="button button--secondary" data-action="new-cashier-salary-advance">${icon("wallet", 17)}<span>سلفة موظف</span></button></section>`;
 }
 
+function reportPanelToggle(key, { eyebrow, title, subtitle = "", badge = "" }) {
+  const open = Boolean(state.reportPanels?.[key]);
+  return `<button type="button" class="report-toggle ${open ? "is-open" : ""}" data-action="toggle-report-panel" data-panel="${key}" aria-expanded="${open}">
+    <span class="report-toggle__icon">${icon("chart", 18)}</span>
+    <span class="report-toggle__text"><span class="eyebrow">${eyebrow}</span><strong>${title}</strong>${subtitle ? `<small>${subtitle}</small>` : ""}</span>
+    ${badge ? `<span class="report-toggle__badge">${badge}</span>` : ""}
+    <span class="report-toggle__chevron">${icon("arrow", 18)}</span>
+  </button>`;
+}
+
 function smartTopMoversMarkup(topByVolume = [], topByProfit = []) {
+  const volumeOpen = Boolean(state.reportPanels?.topVolume);
+  const profitOpen = Boolean(state.reportPanels?.topProfit);
   return `
-    <section class="smart-analytics-section">
-      <div class="smart-section-head">
-        <div>
-          <span class="eyebrow">${icon("chart", 15)} تحليلات ذكية</span>
-          <h2>حركة المنتجات والأرباح</h2>
+    <section class="smart-analytics-section collapsible-reports">
+      ${reportPanelToggle("topVolume", { eyebrow: "الأكثر طلباً", title: "الأعلى مبيعاً بالكمية", subtitle: "الترتيب بحسب الكمية المباعة ضمن الفترة", badge: topByVolume.length ? `${amount(topByVolume.length)} صنف` : "" })}
+      ${volumeOpen ? `<article class="panel smart-card report-panel-body">
+        <div class="smart-card__list">
+          ${topByVolume.length ? topByVolume.map((item, idx) => `
+            <div class="smart-rank-row">
+              <span class="rank-badge">#${idx + 1}</span>
+              <div class="rank-info">
+                <strong>${escapeHtml(item.name)}</strong>
+                <small>إجمالي المبيعات: ${money(item.revenue)}</small>
+              </div>
+              <strong class="rank-value">${amount(item.quantity)} قطعة</strong>
+            </div>
+          `).join("") : `<p class="panel__empty">لا توجد مبيعات منتجات ضمن الفترة.</p>`}
         </div>
-        <small>الترتيب بحسب المبيعات المحققة ضمن الفترة المحددة</small>
-      </div>
-      <div class="smart-analytics-grid">
-        <article class="panel smart-card">
-          <div class="panel__head">
-            <div>
-              <span class="eyebrow">الأكثر طلباً</span>
-              <h3>الأعلى مبيعاً بالكمية</h3>
-            </div>
-          </div>
-          <div class="smart-card__list">
-            ${topByVolume.length ? topByVolume.map((item, idx) => `
-              <div class="smart-rank-row">
-                <span class="rank-badge">#${idx + 1}</span>
-                <div class="rank-info">
-                  <strong>${escapeHtml(item.name)}</strong>
-                  <small>إجمالي المبيعات: ${money(item.revenue)}</small>
-                </div>
-                <strong class="rank-value">${amount(item.quantity)} قطعة</strong>
+      </article>` : ""}
+
+      ${reportPanelToggle("topProfit", { eyebrow: "أبطال الربحية", title: "الأعلى مساهمة في الأرباح", subtitle: "الترتيب بحسب الربح المحقق ضمن الفترة", badge: topByProfit.length ? `${amount(topByProfit.length)} صنف` : "" })}
+      ${profitOpen ? `<article class="panel smart-card report-panel-body">
+        <div class="smart-card__list">
+          ${topByProfit.length ? topByProfit.map((item, idx) => `
+            <div class="smart-rank-row">
+              <span class="rank-badge rank-badge--profit">#${idx + 1}</span>
+              <div class="rank-info">
+                <strong>${escapeHtml(item.name)}</strong>
+                <small>الكمية: ${amount(item.quantity)}</small>
               </div>
-            `).join("") : `<p class="panel__empty">لا توجد مبيعات منتجات ضمن الفترة.</p>`}
-          </div>
-        </article>
-        <article class="panel smart-card">
-          <div class="panel__head">
-            <div>
-              <span class="eyebrow">أبطال الربحية</span>
-              <h3>الأعلى مساهمة في الأرباح</h3>
+              <strong class="rank-value text-success">${money(item.profit)}</strong>
             </div>
-          </div>
-          <div class="smart-card__list">
-            ${topByProfit.length ? topByProfit.map((item, idx) => `
-              <div class="smart-rank-row">
-                <span class="rank-badge rank-badge--profit">#${idx + 1}</span>
-                <div class="rank-info">
-                  <strong>${escapeHtml(item.name)}</strong>
-                  <small>الكمية: ${amount(item.quantity)}</small>
-                </div>
-                <strong class="rank-value text-success">${money(item.profit)}</strong>
-              </div>
-            `).join("") : `<p class="panel__empty">لا توجد أرباح محسوبة ضمن الفترة.</p>`}
-          </div>
-        </article>
-      </div>
+          `).join("") : `<p class="panel__empty">لا توجد أرباح محسوبة ضمن الفترة.</p>`}
+        </div>
+      </article>` : ""}
     </section>
   `;
 }
@@ -811,47 +805,42 @@ function smartHourlyPeakMarkup(hourlyDistribution = []) {
     const hr = h % 12 === 0 ? 12 : h % 12;
     return `${hr} ${period}`;
   };
+  const open = Boolean(state.reportPanels?.hourly);
 
   return `
-    <article class="panel peak-hours-card">
-      <div class="panel__head">
-        <div>
-          <span class="eyebrow">تحليل ساعات الذروة</span>
-          <h2>توزيع المبيعات على ساعات اليوم</h2>
+    <section class="collapsible-reports">
+      ${reportPanelToggle("hourly", { eyebrow: "تحليل ساعات الذروة", title: "توزيع المبيعات على ساعات اليوم", subtitle: "اضغط لعرض المخطط الساعي", badge: peakHour.total > 0 ? `ذروة: ${formatHour(peakHour.hour)}` : "" })}
+      ${open ? `<article class="panel peak-hours-card report-panel-body">
+        ${peakHour.total > 0 ? `<div class="panel__head"><div><span class="eyebrow">أعلى ساعة</span></div><span class="peak-hour-badge">ذروة المبيعات: ${formatHour(peakHour.hour)} (${money(peakHour.total)})</span></div>` : ""}
+        <div class="hourly-bars-chart">
+          ${hourlyDistribution.map((h) => {
+            const heightPct = Math.max(6, Math.round((h.total / maxTotal) * 100));
+            const isPeak = peakHour.total > 0 && h.hour === peakHour.hour;
+            return `
+              <div class="hourly-bar-col ${isPeak ? "is-peak" : ""}" title="الساعة ${formatHour(h.hour)}: ${amount(h.count)} فاتورة · ${money(h.total)}">
+                <div class="hourly-bar-fill" style="height: ${heightPct}%"></div>
+                <span class="hourly-bar-label">${h.hour % 4 === 0 ? formatHour(h.hour) : "·"}</span>
+              </div>
+            `;
+          }).join("")}
         </div>
-        ${peakHour.total > 0 ? `<span class="peak-hour-badge">ذروة المبيعات: ${formatHour(peakHour.hour)} (${money(peakHour.total)})</span>` : ""}
-      </div>
-      <div class="hourly-bars-chart">
-        ${hourlyDistribution.map((h) => {
-          const heightPct = Math.max(6, Math.round((h.total / maxTotal) * 100));
-          const isPeak = peakHour.total > 0 && h.hour === peakHour.hour;
-          return `
-            <div class="hourly-bar-col ${isPeak ? "is-peak" : ""}" title="الساعة ${formatHour(h.hour)}: ${amount(h.count)} فاتورة · ${money(h.total)}">
-              <div class="hourly-bar-fill" style="height: ${heightPct}%"></div>
-              <span class="hourly-bar-label">${h.hour % 4 === 0 ? formatHour(h.hour) : "·"}</span>
-            </div>
-          `;
-        }).join("")}
-      </div>
-    </article>
+      </article>` : ""}
+    </section>
   `;
 }
 
 function smartDeadStockMarkup(deadStock) {
   if (!deadStock || !deadStock.count) return "";
+  const open = Boolean(state.reportPanels?.deadStock);
   return `
-    <article class="panel dead-stock-card">
-      <div class="panel__head">
-        <div>
-          <span class="eyebrow">البضاعة الراكدة</span>
-          <h2>بضائع بدون حركة بيع في هذه الفترة (${amount(deadStock.count)} صنف)</h2>
-          <small>رأس المال في المخزون الراكد: <strong>${money(deadStock.value)}</strong></small>
+    <section class="collapsible-reports">
+      ${reportPanelToggle("deadStock", { eyebrow: "البضاعة الراكدة", title: `بضائع بدون حركة بيع (${amount(deadStock.count)} صنف)`, subtitle: `رأس المال في المخزون الراكد: ${money(deadStock.value)}`, badge: `${amount(deadStock.count)} صنف` })}
+      ${open ? `<article class="panel dead-stock-card report-panel-body">
+        <div class="dead-stock-items-chips">
+          ${(deadStock.products || []).map((p) => `<button type="button" class="dead-stock-chip" data-action="open-product" data-id="${p.id}">${escapeHtml(p.name)} (${amount(p.quantity)} ${escapeHtml(p.unit)})</button>`).join("")}
         </div>
-      </div>
-      <div class="dead-stock-items-chips">
-        ${(deadStock.products || []).map((p) => `<button type="button" class="dead-stock-chip" data-action="open-product" data-id="${p.id}">${escapeHtml(p.name)} (${amount(p.quantity)} ${escapeHtml(p.unit)})</button>`).join("")}
-      </div>
-    </article>
+      </article>` : ""}
+    </section>
   `;
 }
 
@@ -1367,6 +1356,7 @@ async function handleActionUnsafe(event) {
   if (action === "reset-mobile-nav") { await resetMobileNavigationOrder(); return; }
   if (action === "toggle-theme") { toggleTheme(); return; }
   if (action === "quick-lock") { openScreenLockDialog(); return; }
+  if (action === "toggle-report-panel") { const key = event.currentTarget.dataset.panel; if (!state.reportPanels) state.reportPanels = {}; state.reportPanels[key] = !state.reportPanels[key]; render(); return; }
   if (action === "filter-activity-type") { state.activityType = event.currentTarget.dataset.type; render(); return; }
   if (action === "open-reorder-list") { openReorderDialog(); return; }
   if (action === "new-product") { openProductDialog(); return; }

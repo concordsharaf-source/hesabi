@@ -1030,3 +1030,20 @@ label { font-size:15px; }
 .button--whatsapp { background: #25d366; color: #fff; border-color: #128c7e; }
 .button--whatsapp:hover { background: #128c7e; color: #fff; }
 
+
+/* أزرار التقارير القابلة للطي */
+.collapsible-reports { display: flex; flex-direction: column; gap: 10px; margin: 12px 0; }
+.report-toggle { display: flex; align-items: center; gap: 12px; width: 100%; text-align: right; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; box-shadow: var(--shadow-subtle); transition: background .18s ease, border-color .18s ease, transform .12s ease; }
+.report-toggle:hover { border-color: var(--brand, #2f9e6d); transform: translateY(-1px); }
+.report-toggle__icon { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 10px; background: rgba(47, 158, 109, .12); color: var(--brand, #2f9e6d); flex-shrink: 0; }
+.report-toggle__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.report-toggle__text strong { font-size: 15px; }
+.report-toggle__text small { color: var(--muted, #7b8a84); font-size: 12px; }
+.report-toggle__badge { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: rgba(47, 158, 109, .12); color: var(--brand, #2f9e6d); white-space: nowrap; }
+.report-toggle__chevron { display: inline-flex; transform: rotate(-90deg); transition: transform .2s ease; opacity: .6; }
+.report-toggle.is-open .report-toggle__chevron { transform: rotate(90deg); opacity: 1; }
+.report-toggle.is-open { border-color: var(--brand, #2f9e6d); }
+.report-panel-body { animation: reportPanelReveal .18s ease; }
+@keyframes reportPanelReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+[data-theme="dark"] .report-toggle { background: #172d25; border-color: #3b5a4d; color: #e4ffef; }
+[data-theme="dark"] .report-toggle__icon, [data-theme="dark"] .report-toggle__badge { background: rgba(120, 235, 180, .14); color: #78ebb4; }
