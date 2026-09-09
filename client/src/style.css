@@ -1141,3 +1141,36 @@ label { font-size:15px; }
 .report-panel-body .merged-section-head { margin-bottom: 10px; }
 .report-panel-body .report-card { width: 100%; }
 .report-panel-body > .toolbar { margin-top: 0; }
+
+/* ===== شريط التنقل السريع بين المنتجات والمخزون ===== */
+.cross-link-bar { margin: 12px 0 14px; }
+.cross-link-bar__button {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 14px 16px; text-align: right; cursor: pointer;
+  color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: var(--shadow-subtle);
+  transition: background .16s ease, border-color .16s ease, transform .12s ease;
+}
+.cross-link-bar__button:hover { border-color: var(--green); transform: translateY(-1px); }
+.cross-link-bar__icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 11px;
+  color: var(--green-deep); background: var(--green-pale);
+}
+.cross-link-bar__text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.cross-link-bar__text strong { font-size: 15px; }
+.cross-link-bar__text small { color: var(--muted); font-size: 12px; overflow-wrap: break-word; }
+.cross-link-bar__cta {
+  display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
+  padding: 8px 13px; border-radius: 999px; white-space: nowrap;
+  color: #fff; background: var(--green); font-size: 12.5px; font-weight: 800;
+}
+.cross-link-bar__cta svg { transform: rotate(180deg); }
+[data-theme="dark"] .cross-link-bar__button { background: #172d25; border-color: #3b5a4d; color: #e4ffef; }
+[data-theme="dark"] .cross-link-bar__icon { color: #78ebb4; background: rgba(120,235,180,.14); }
+@media (max-width: 599px) {
+  .cross-link-bar__text small { display: none; }
+  .cross-link-bar__cta { padding: 8px 11px; font-size: 12px; }
+  .cross-link-bar__cta span { display: none; }
+}
