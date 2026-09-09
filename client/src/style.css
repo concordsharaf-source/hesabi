@@ -1414,20 +1414,3 @@ html[data-theme="dark"] #app { background-color: transparent; }
 .settings-hub .report-panel-body > .activity-log-page { padding: 0; }
 .settings-hub .report-panel-body .toolbar { margin-top: 0; }
 .settings-hub .report-panel-body > * > .panel:first-child { margin-top: 0; }
-
-/* ===== انتقال ناعم عند التنقل بالسحب بين الصفحات ===== */
-@media (max-width: 899px) {
-  .workspace.is-swipe-next { animation: swipeInFromLeft .2s ease-out both; }
-  .workspace.is-swipe-prev { animation: swipeInFromRight .2s ease-out both; }
-}
-@keyframes swipeInFromLeft {
-  from { opacity: .35; transform: translateX(-14px); }
-  to { opacity: 1; transform: none; }
-}
-@keyframes swipeInFromRight {
-  from { opacity: .35; transform: translateX(14px); }
-  to { opacity: 1; transform: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .workspace.is-swipe-next, .workspace.is-swipe-prev { animation: none; }
-}
