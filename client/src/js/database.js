@@ -640,8 +640,30 @@ export const db = {
     if (!shift || shift.status !== "CLOSED" || shift.countedCash === null || shift.countedCash === undefined) throw new Error("أغلق وردية الكاشير وجردها قبل ترحيلها إلى الخزنة.");
     if (shift.vaultTransferredAt) throw new Error("تم ترحيل صندوق هذه الوردية إلى الخزنة مسبقًا.");
     const difference = roundMoney(toNumber(shift.difference)); const now = nowIso();
-    if (difference !== 0) transaction.objectStore("cashMovements").add({ id: uid("cash-movement"), type: difference > 0 ? "DEPOSIT" : "WITHDRAWAL", sourceType: difference > 0 ? "CASHIER_SURPLUS" : "CASHIER_SHORTAGE", amount: Math.abs(difference), date: dateKey(now), notes: `تسوية ${difference > 0 ? "فائض" : "عجز"} وردية ${shift.accountName || "كاشير"}`, cashierShiftId: shift.id, cashierId: shift.accountId, cashierName: shift.accountName || "", createdAt: now });
-    const updated = { ...shift, vaultTransferredAt: now, vaultTransferredAmount: roundMoney(toNumber(shift.countedCash)), vaultTransferredByAccountId: normalize(transferredByAccountId), cashDifferencePosted: true, updatedAt: now };
+    // العجز يُسوّى في الخزنة مباشرة. أما الفائض فلا يُضاف إلى حساب الكاشير إلا بموافقة المدير.
+    if (difference < 0) transaction.objectStore("cashMovements").add({ id: uid("cash-movement"), type: "WITHDRAWAL", sourceType: "CASHIER_SHORTAGE", amount: Math.abs(difference), date: dateKey(now), notes: `تسوية عجز وردية ${shift.accountName || "كاشير"}`, cashierShiftId: shift.id, cashierId: shift.accountId, cashierName: shift.accountName || "", createdAt: now });
+    const hasSurplus = difference > 0;
+    const updated = { ...shift, vaultTransferredAt: now, vaultTransferredAmount: roundMoney(toNumber(shift.countedCash)), vaultTransferredByAccountId: normalize(transferredByAccountId), cashDifferencePosted: !hasSurplus, surplusApprovalStatus: hasSurplus ? "PENDING" : "", surplusAmount: hasSurplus ? difference : 0, updatedAt: now };
+    shifts.put(updated); await transactionDone(transaction); return updated;
+  },
+  async listPendingCashierSurpluses({ from = "", to = "" } = {}) {
+    const database = await this.open(); const shifts = await requestAsPromise(database.transaction("cashierShifts", "readonly").objectStore("cashierShifts").getAll());
+    return shifts
+      .filter((shift) => shift.surplusApprovalStatus === "PENDING" && toNumber(shift.difference) > 0 && (!from || shift.date >= from) && (!to || shift.date <= to))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  },
+  async resolveCashierSurplus({ shiftId, decision = "APPROVED", approvedByAccountId = "", notes = "" } = {}) {
+    if (!["APPROVED", "REJECTED"].includes(decision)) throw new Error("قرار غير صالح لفائض الوردية.");
+    const database = await this.open(); const transaction = database.transaction(["cashierShifts", "cashMovements"], "readwrite"); const shifts = transaction.objectStore("cashierShifts"); const shift = await requestAsPromise(shifts.get(shiftId));
+    if (!shift) throw new Error("لم يتم العثور على وردية الكاشير.");
+    if (shift.surplusApprovalStatus !== "PENDING") throw new Error("لا يوجد فائض بانتظار موافقة المدير في هذه الوردية.");
+    const surplus = roundMoney(toNumber(shift.difference));
+    if (surplus <= 0) throw new Error("لا يوجد فائض في هذه الوردية.");
+    const now = nowIso();
+    if (decision === "APPROVED") {
+      transaction.objectStore("cashMovements").add({ id: uid("cash-movement"), type: "DEPOSIT", sourceType: "CASHIER_SURPLUS", amount: surplus, date: dateKey(now), notes: normalize(notes) || `فائض معتمد من المدير · وردية ${shift.accountName || "كاشير"}`, cashierShiftId: shift.id, cashierId: shift.accountId, cashierName: shift.accountName || "", createdAt: now });
+    }
+    const updated = { ...shift, surplusApprovalStatus: decision, surplusResolvedAt: now, surplusApprovedByAccountId: normalize(approvedByAccountId), surplusApprovalNotes: normalize(notes), cashDifferencePosted: decision === "APPROVED", updatedAt: now };
     shifts.put(updated); await transactionDone(transaction); return updated;
   },
   async getVault({ from = "", to = "" } = {}) {
@@ -652,7 +674,8 @@ export const db = {
   },
   async listCashierShiftStatistics({ from = "", to = "" } = {}) {
     const database = await this.open(); const transaction = database.transaction(["cashierShifts", "cashierSalaryDeductions"], "readonly"); const [shifts, deductions] = await Promise.all([requestAsPromise(transaction.objectStore("cashierShifts").getAll()), requestAsPromise(transaction.objectStore("cashierSalaryDeductions").getAll())]); await transactionDone(transaction);
-    const matches = (shift) => (!from || shift.date >= from) && (!to || shift.date <= to); const grouped = new Map(); shifts.filter((shift) => matches(shift)).forEach((shift) => { const current = grouped.get(shift.accountId) || { accountId: shift.accountId, accountName: shift.accountName || "كاشير", shifts: 0, shortages: 0, surpluses: 0, netDifference: 0, untransferred: 0, pendingShortages: 0, pendingShiftIds: [] }; const difference = toNumber(shift.difference); current.shifts += 1; if (difference < 0) current.shortages = roundMoney(current.shortages + Math.abs(difference)); if (difference > 0) current.surpluses = roundMoney(current.surpluses + difference); current.netDifference = roundMoney(current.netDifference + difference); if (shift.status === "CLOSED" && !shift.vaultTransferredAt) current.untransferred += 1; if (shift.status === "CLOSED" && shift.vaultTransferredAt && difference < 0 && !shift.salaryDeductionId) { current.pendingShortages = roundMoney(current.pendingShortages + Math.abs(difference)); current.pendingShiftIds.push(shift.id); } grouped.set(shift.accountId, current); });
+    const matches = (shift) => (!from || shift.date >= from) && (!to || shift.date <= to); const grouped = new Map(); shifts.filter((shift) => matches(shift)).forEach((shift) => { const current = grouped.get(shift.accountId) || { accountId: shift.accountId, accountName: shift.accountName || "كاشير", shifts: 0, shortages: 0, surpluses: 0, pendingSurpluses: 0, approvedSurpluses: 0, rejectedSurpluses: 0, netDifference: 0, untransferred: 0, pendingShortages: 0, pendingShiftIds: [] }; const difference = toNumber(shift.difference); current.shifts += 1; if (difference < 0) current.shortages = roundMoney(current.shortages + Math.abs(difference)); if (difference > 0) { current.surpluses = roundMoney(current.surpluses + difference); if (shift.surplusApprovalStatus === "PENDING") current.pendingSurpluses = roundMoney(current.pendingSurpluses + difference); else if (shift.surplusApprovalStatus === "APPROVED") current.approvedSurpluses = roundMoney(current.approvedSurpluses + difference); else if (shift.surplusApprovalStatus === "REJECTED") current.rejectedSurpluses = roundMoney(current.rejectedSurpluses + difference); } // الفائض لا يُحتسب في الصافي إلا بعد اعتماد المدير
+      const countsToward = difference < 0 || shift.surplusApprovalStatus === "APPROVED"; if (countsToward) current.netDifference = roundMoney(current.netDifference + difference); if (shift.status === "CLOSED" && !shift.vaultTransferredAt) current.untransferred += 1; if (shift.status === "CLOSED" && shift.vaultTransferredAt && difference < 0 && !shift.salaryDeductionId) { current.pendingShortages = roundMoney(current.pendingShortages + Math.abs(difference)); current.pendingShiftIds.push(shift.id); } grouped.set(shift.accountId, current); });
     return [...grouped.values()].sort((a, b) => a.accountName.localeCompare(b.accountName, "ar"));
   },
   async listCashierShortageCandidates({ accountId, month = dateKey().slice(0, 7) } = {}) { const database = await this.open(); const shifts = await requestAsPromise(database.transaction("cashierShifts", "readonly").objectStore("cashierShifts").index("accountId").getAll(accountId)); return shifts.filter((shift) => shift.status === "CLOSED" && shift.vaultTransferredAt && toNumber(shift.difference) < 0 && !shift.salaryDeductionId && String(shift.date || "").slice(0, 7) === month).sort((a, b) => String(a.date).localeCompare(String(b.date))); },

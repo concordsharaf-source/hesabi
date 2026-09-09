@@ -1360,3 +1360,20 @@ label { font-size:15px; }
   white-space: nowrap;
 }
 [data-theme="dark"] .date-field-display { color: var(--ink); }
+
+/* ===== موافقة المدير على فائض وردية الكاشير ===== */
+.status--pending { color:#8a5a00; background:#fdf0d5; border:1px solid #e3b769; }
+.status--danger { color:#8d1330; background:#fbe4e8; border:1px solid #e8879b; }
+[data-theme="dark"] .status--pending { color:#ffd89a; background:#4a3a1c; border-color:#a8823c; }
+[data-theme="dark"] .status--danger { color:#ffc2ce; background:#4d1626; border-color:#b04a63; }
+
+.surplus-approval { display:flex; flex-direction:column; align-items:flex-end; gap:7px; }
+.surplus-approval__buttons { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.surplus-approval .status { text-align:center; line-height:1.6; }
+.cashier-difference-row .is-pending { display:block; margin-top:2px; color:#8a5a00; font-size:10.5px; font-weight:700; }
+[data-theme="dark"] .cashier-difference-row .is-pending { color:#ffd89a; }
+@media (max-width:599px) {
+  .surplus-approval { align-items:stretch; width:100%; }
+  .surplus-approval__buttons { justify-content:stretch; }
+  .surplus-approval__buttons .button { flex:1; }
+}
