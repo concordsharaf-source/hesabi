@@ -109,7 +109,7 @@ function generateQuickCashOptions(total) {
   return list.slice(0, 6);
 }
 
-const state = { view: "dashboard", lastStableView: "dashboard", viewHistory: [], showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false, cashIn: false, cashOut: false, cashMoves: false, transfers: false, cashExpenses: false, shifts: false, shiftStats: false, salaries: false, notifications: false, setGeneral: false, setBrand: false, setAccounts: false, setActivity: false, setNav: false, setData: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
+const state = { view: "dashboard", lastStableView: "dashboard", viewHistory: [], isNavigatingBack: false, showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false, cashIn: false, cashOut: false, cashMoves: false, transfers: false, cashExpenses: false, shifts: false, shiftStats: false, salaries: false, notifications: false, setGeneral: false, setBrand: false, setAccounts: false, setActivity: false, setNav: false, setData: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
 const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "purchases"].includes(id))];
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
@@ -1461,14 +1461,15 @@ function renderApplication() {
   if (!state.currentUser) { root.innerHTML = loginMarkup(); bindEvents(); return; }
   if (state.currentUser.mustChangePin) { root.innerHTML = requiredPinMarkup(); bindEvents(); return; }
   if (!canAccessView(state.currentUser, state.view)) state.view = isAdmin(state.currentUser) ? "dashboard" : "sales";
+  if (state.isNavigatingBack) { state.isNavigatingBack = false; }
+  else if (state.view !== state.lastStableView && canAccessView(state.currentUser, state.lastStableView)) {
+    if (state.viewHistory[state.viewHistory.length - 1] !== state.lastStableView) state.viewHistory.push(state.lastStableView);
+    if (state.viewHistory.length > 20) state.viewHistory.shift();
+  }
   const body = { dashboard: dashboardMarkup, products: productsMarkup, inventory: inventoryMarkup, sales: salesMarkup, invoices: invoicesMarkup, customers: customersMarkup, "customer-payments": customerPaymentsMarkup, suppliers: suppliersMarkup, "supplier-payments": supplierPaymentsMarkup, purchases: purchasesMarkup, expenses: expensesMarkup, cashbox: cashboxMarkup, transfers: transfersMarkup, reports: reportsMarkup, "periodic-inventory": periodicInventoryMarkup, accounts: accountsMarkup, "activity-log": activityLogMarkup, settings: settingsMarkup, "general-settings": generalSettingsMarkup, "brand-settings": brandSettingsMarkup, "navigation-settings": navigationSettingsMarkup, "data-management": dataManagementMarkup }[state.view]?.() || dashboardMarkup();
   root.innerHTML = `<div class="app-shell">${navMarkup()}<main class="workspace">${body}</main>${salesScannerFabMarkup()}</div>`;
   if (state.view === "cashbox" && isAdmin(state.currentUser)) root.querySelector(".workspace")?.insertAdjacentHTML("beforeend", `${collapsiblePanel("shifts", { eyebrow: "صناديق الكاشير", title: "ورديات الكاشير وترحيل الخزنة", subtitle: "مراجعة الورديات وترحيلها إلى الخزنة", badge: `${amount((state.cashierShifts || []).length)} وردية`, glyph: "users" }, cashierShiftSummaryMarkup())}${collapsiblePanel("shiftStats", { eyebrow: "المساءلة المالية", title: "إحصاءات عجز وفائض الكاشير", subtitle: "متابعة الفروقات وتسويتها من الراتب", badge: `${amount((state.cashierShiftStatistics || []).length)} كاشير`, glyph: "chart" }, cashierDifferenceStatisticsMarkup())}${collapsiblePanel("salaries", { eyebrow: "رواتب الشهر الحالي", title: "رواتب الفريق وتسليم المستحقات", subtitle: "الرواتب والسلف وخصومات العجز", badge: `${amount((state.cashierSalarySummaries || []).length)} حساب`, glyph: "wallet" }, cashierSalarySummaryMarkup())}`);
   bindEvents();
-  if (state.view !== state.lastStableView) {
-    if (state.viewHistory[state.viewHistory.length - 1] !== state.lastStableView) state.viewHistory.push(state.lastStableView);
-    if (state.viewHistory.length > 20) state.viewHistory.shift();
-  }
   state.lastStableView = state.view;
 }
 
@@ -1798,6 +1799,7 @@ async function handleActionUnsafe(event) {
     if (!target || !canAccessView(state.currentUser, target)) { state.view = isAdmin(state.currentUser) ? "dashboard" : "sales"; render(); return; }
     while (state.viewHistory.length && state.viewHistory[state.viewHistory.length - 1] !== target) state.viewHistory.pop();
     state.viewHistory.pop();
+    state.isNavigatingBack = true;
     state.view = target;
     render();
     return;
