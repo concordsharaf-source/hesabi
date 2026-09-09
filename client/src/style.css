@@ -1402,3 +1402,15 @@ html[data-theme="dark"] #app { background-color: transparent; }
 /* لوحة الإشعارات داخل زر قابل للطي */
 .report-panel-body > .notifications-panel { margin-top: 0; border-radius: 12px; }
 .report-panel-body > .notifications-panel .panel__subtext { margin-top: 0; }
+
+/* ===== أقسام مركز الإعدادات داخل أزرار قابلة للطي ===== */
+.settings-hub .collapsible-reports { margin: 0 0 10px; }
+/* لا داعي لزر العودة إلى مركز الإعدادات وأنت بداخله */
+.settings-hub .report-panel-body [data-action="navigate"][data-view="settings"] { display: none; }
+.settings-hub .report-panel-body > .settings-page,
+.settings-hub .report-panel-body > .settings-subpage,
+.settings-hub .report-panel-body > .data-management-page,
+.settings-hub .report-panel-body > .accounts-page,
+.settings-hub .report-panel-body > .activity-log-page { padding: 0; }
+.settings-hub .report-panel-body .toolbar { margin-top: 0; }
+.settings-hub .report-panel-body > * > .panel:first-child { margin-top: 0; }
