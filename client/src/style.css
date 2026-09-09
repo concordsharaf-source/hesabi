@@ -1174,3 +1174,68 @@ label { font-size:15px; }
   .cross-link-bar__cta { padding: 8px 11px; font-size: 12px; }
   .cross-link-bar__cta span { display: none; }
 }
+
+/* ===== زر البحث الشامل في الصفحة الرئيسية ===== */
+.app-search-launch { margin: 4px 0 14px; }
+.app-search-launch__button {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 14px 16px; text-align: right; cursor: pointer;
+  color: var(--ink); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: var(--shadow-subtle);
+  transition: border-color .16s ease, transform .12s ease;
+}
+.app-search-launch__button:hover { border-color: var(--green); transform: translateY(-1px); }
+.app-search-launch__icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 11px;
+  color: var(--green-deep); background: var(--green-pale);
+}
+.app-search-launch__text { display: flex; flex-direction: column; gap: 1px; flex: 1; min-width: 0; }
+.app-search-launch__text strong { font-size: 15px; }
+.app-search-launch__text small { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-search-launch__hint {
+  flex: 0 0 auto; padding: 7px 14px; border-radius: 999px; white-space: nowrap;
+  color: #fff; background: var(--green); font-size: 12.5px; font-weight: 800;
+}
+[data-theme="dark"] .app-search-launch__button { background: #172d25; border-color: #3b5a4d; color: #e4ffef; }
+[data-theme="dark"] .app-search-launch__icon { color: #78ebb4; background: rgba(120,235,180,.14); }
+
+/* نافذة البحث */
+.app-search__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.app-search__field { width: 100%; margin: 4px 0 12px; }
+.app-search__field input { width: 100%; min-width: 0; }
+.app-search__results { display: flex; flex-direction: column; gap: 14px; max-height: 52vh; overflow-y: auto; padding-left: 2px; }
+.app-search__group { display: flex; flex-direction: column; gap: 6px; }
+.app-search__group-title { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--green); }
+.app-search__item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 12px; text-align: right; cursor: pointer;
+  color: var(--ink); background: transparent;
+  border: 1px solid var(--line); border-radius: 11px;
+  transition: background .14s ease, border-color .14s ease;
+}
+.app-search__item:hover, .app-search__item:focus-visible { background: var(--green-pale); border-color: var(--green); }
+.app-search__icon { display: inline-flex; flex: 0 0 auto; color: var(--green-deep); }
+.app-search__label { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.app-search__label strong { font-size: 14px; }
+.app-search__label small { color: var(--muted); font-size: 11.5px; }
+.app-search__go { flex: 0 0 auto; opacity: .5; }
+.app-search__go svg { transform: rotate(180deg); }
+.app-search__empty { padding: 18px 14px; color: var(--muted); font-size: 13px; line-height: 1.8; text-align: center; }
+[data-theme="dark"] .app-search__item { color: #e4ffef; border-color: #3b5a4d; }
+[data-theme="dark"] .app-search__item:hover { background: #254a3d; border-color: #6dab8d; }
+[data-theme="dark"] .app-search__icon { color: #78ebb4; }
+
+/* إبراز الخانة المقصودة بعد الانتقال إليها */
+.is-search-highlight {
+  border-color: var(--green) !important;
+  box-shadow: 0 0 0 3px rgba(47,158,109,.25) !important;
+  animation: searchPulse 1.6s ease;
+}
+@keyframes searchPulse { 0%,100% { box-shadow: 0 0 0 3px rgba(47,158,109,.25); } 50% { box-shadow: 0 0 0 7px rgba(47,158,109,.12); } }
+
+@media (max-width: 599px) {
+  .app-search-launch__text small { display: none; }
+  .app-search__results { max-height: 60vh; }
+}

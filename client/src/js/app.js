@@ -506,6 +506,167 @@ function topbarMarkup(title, description, action = "", modifierClass = "") {
   return `<header class="topbar${modifierClass ? ` ${modifierClass}` : ""}"><div><p class="eyebrow topbar__store"><img src="${storeLogoUrl()}" alt="" />${escapeHtml(storeDisplayName())}</p><h1>${title}</h1>${description ? `<p class="topbar__description">${description}</p>` : ""}</div><div class="topbar__actions"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span>${action}${themeToggleMarkup()}<button class="icon-button lock-screen-btn" data-action="quick-lock" aria-label="قفل الشاشة السريع" title="قفل الشاشة السريع">${icon("lock", 18)}</button><button class="icon-button" data-action="account-session" aria-label="تبديل المستخدمين أو تسجيل الخروج" title="تبديل المستخدمين أو تسجيل الخروج">${icon("users", 18)}</button></div></header>`;
 }
 
+
+// ===== البحث الشامل: الوصول إلى أي صفحة أو خانة أو إجراء =====
+const APP_SEARCH_ENTRIES = [
+  { id: "dashboard", label: "الرئيسية", group: "الصفحات", glyph: "grid", view: "dashboard", keywords: "لوحة نظرة يومك رئيسية home dashboard" },
+  { id: "products", label: "المنتجات", group: "الصفحات", glyph: "package", view: "products", keywords: "اصناف سلع باركود اسعار products" },
+  { id: "inventory", label: "المخزون", group: "الصفحات", glyph: "layers", view: "inventory", keywords: "كميات جرد رصيد مستودع stock inventory" },
+  { id: "sales", label: "المبيعات ونقطة البيع", group: "الصفحات", glyph: "cart", view: "sales", keywords: "بيع كاشير فاتورة pos sales سلة" },
+  { id: "invoices", label: "فواتير المبيعات", group: "الصفحات", glyph: "receipt", view: "invoices", keywords: "فواتير طباعة مرتجع invoices" },
+  { id: "customers", label: "العملاء والديون", group: "الصفحات", glyph: "users", view: "customers", keywords: "زبائن ديون اجل ارصدة customers" },
+  { id: "customer-payments", label: "دفعات العملاء", group: "الصفحات", glyph: "wallet", view: "customer-payments", keywords: "تسديد سداد دفعة عميل" },
+  { id: "suppliers", label: "الموردون", group: "الصفحات", glyph: "truck", view: "suppliers", keywords: "موردين مستحقات توريد suppliers" },
+  { id: "supplier-payments", label: "دفعات الموردين", group: "الصفحات", glyph: "wallet", view: "supplier-payments", keywords: "سداد مورد دفعة" },
+  { id: "purchases", label: "المشتريات", group: "الصفحات", glyph: "truck", view: "purchases", keywords: "شراء فاتورة شراء توريد purchases" },
+  { id: "expenses", label: "المصروفات", group: "الصفحات", glyph: "wallet", view: "expenses", keywords: "مصاريف رواتب سلف ايجار expenses" },
+  { id: "cashbox", label: "الخزنة والصناديق", group: "الصفحات", glyph: "wallet", view: "cashbox", keywords: "صندوق خزنة نقد كاش cashbox vault" },
+  { id: "transfers", label: "الحوالات والتحويلات", group: "الصفحات", glyph: "truck", view: "transfers", keywords: "حوالة تحويل وارد صادر transfers" },
+  { id: "reports", label: "التقارير", group: "الصفحات", glyph: "chart", view: "reports", keywords: "تقرير ارباح تحليل reports" },
+  { id: "periodic-inventory", label: "الجرد المحاسبي الدوري", group: "الصفحات", glyph: "layers", view: "periodic-inventory", keywords: "جرد دوري شهري سنوي لقطة" },
+  { id: "accounts", label: "الحسابات والمستخدمون", group: "الصفحات", glyph: "users", view: "accounts", keywords: "مستخدمين كاشير صلاحيات accounts" },
+  { id: "activity-log", label: "سجل العمليات", group: "الصفحات", glyph: "history", view: "activity-log", keywords: "سجل نشاط تدقيق log" },
+  { id: "settings", label: "الإعدادات", group: "الصفحات", glyph: "box", view: "settings", keywords: "اعدادات ضبط settings" },
+  { id: "general-settings", label: "الإعدادات العامة", group: "الصفحات", glyph: "box", view: "general-settings", keywords: "عملة نشاط اسم المتجر" },
+  { id: "brand-settings", label: "الهوية والشعار", group: "الصفحات", glyph: "box", view: "brand-settings", keywords: "شعار لوجو هوية علامة" },
+  { id: "navigation-settings", label: "ترتيب شريط التنقل", group: "الصفحات", glyph: "grid", view: "navigation-settings", keywords: "ترتيب قائمة تنقل" },
+  { id: "data-management", label: "النسخ الاحتياطي والبيانات", group: "الصفحات", glyph: "box", view: "data-management", keywords: "نسخة احتياطية استعادة سحابة backup" },
+
+  { id: "p-reports-topVolume", label: "الأكثر طلباً", group: "خانات التقارير", glyph: "chart", view: "reports", panel: "topVolume", keywords: "الاعلى مبيعا كمية" },
+  { id: "p-reports-topProfit", label: "أبطال الربحية", group: "خانات التقارير", glyph: "chart", view: "reports", panel: "topProfit", keywords: "ارباح ربحية الاعلى" },
+  { id: "p-reports-hourly", label: "تحليل ساعات الذروة", group: "خانات التقارير", glyph: "chart", view: "reports", panel: "hourly", keywords: "ذروة ساعات توزيع" },
+  { id: "p-reports-deadStock", label: "البضاعة الراكدة", group: "خانات التقارير", glyph: "package", view: "reports", panel: "deadStock", keywords: "راكد بدون حركة" },
+
+  { id: "p-cash-in", label: "مصادر الداخل للصندوق", group: "خانات الخزنة", glyph: "wallet", view: "cashbox", panel: "cashIn", keywords: "وارد داخل ايداع" },
+  { id: "p-cash-out", label: "مصادر الخارج من الصندوق", group: "خانات الخزنة", glyph: "wallet", view: "cashbox", panel: "cashOut", keywords: "صادر خارج سحب" },
+  { id: "p-cash-moves", label: "حركات الخزنة والتسويات", group: "خانات الخزنة", glyph: "history", view: "cashbox", panel: "cashMoves", keywords: "حركة ايداع سحب تسوية" },
+  { id: "p-cash-transfers", label: "التحويلات داخل الخزنة", group: "خانات الخزنة", glyph: "truck", view: "cashbox", panel: "transfers", keywords: "حوالات تحويل" },
+  { id: "p-cash-expenses", label: "المصروفات داخل الخزنة", group: "خانات الخزنة", glyph: "wallet", view: "cashbox", panel: "cashExpenses", keywords: "مصاريف" },
+  { id: "p-cash-shifts", label: "ورديات الكاشير", group: "خانات الخزنة", glyph: "users", view: "cashbox", panel: "shifts", keywords: "وردية شفت ترحيل" },
+  { id: "p-cash-stats", label: "إحصاءات عجز وفائض الكاشير", group: "خانات الخزنة", glyph: "chart", view: "cashbox", panel: "shiftStats", keywords: "عجز فائض فروقات" },
+  { id: "p-cash-salaries", label: "رواتب الفريق", group: "خانات الخزنة", glyph: "wallet", view: "cashbox", panel: "salaries", keywords: "راتب رواتب سلف تسليم" },
+
+  { id: "a-new-sale", label: "فتح شاشة بيع جديد", group: "إجراءات سريعة", glyph: "cart", view: "sales", keywords: "بيع جديد فاتورة كاشير" },
+  { id: "a-new-product", label: "إضافة منتج جديد", group: "إجراءات سريعة", glyph: "plus", action: "new-product", keywords: "منتج جديد اضافة صنف" },
+  { id: "a-new-customer", label: "إضافة عميل جديد", group: "إجراءات سريعة", glyph: "users", action: "new-customer", keywords: "عميل جديد زبون" },
+  { id: "a-new-supplier", label: "إضافة مورد جديد", group: "إجراءات سريعة", glyph: "truck", action: "new-supplier", keywords: "مورد جديد" },
+  { id: "a-new-purchase", label: "فاتورة شراء جديدة", group: "إجراءات سريعة", glyph: "truck", action: "new-purchase", keywords: "شراء فاتورة توريد" },
+  { id: "a-new-expense", label: "تسجيل مصروف", group: "إجراءات سريعة", glyph: "wallet", action: "new-expense", keywords: "مصروف صرف" },
+  { id: "a-salary-advance", label: "تسجيل سلفة موظف", group: "إجراءات سريعة", glyph: "wallet", action: "new-cashier-salary-advance", keywords: "سلفة راتب موظف" },
+  { id: "a-deposit", label: "إيداع في الخزنة", group: "إجراءات سريعة", glyph: "plus", action: "new-cash-deposit", keywords: "ايداع نقد خزنة" },
+  { id: "a-withdraw", label: "سحب من الخزنة", group: "إجراءات سريعة", glyph: "wallet", action: "new-cash-withdrawal", keywords: "سحب نقد خزنة" },
+  { id: "a-reorder", label: "قائمة إعادة الطلب", group: "إجراءات سريعة", glyph: "truck", action: "open-reorder-list", keywords: "اعادة طلب نواقص" },
+  { id: "a-stock-history", label: "سجل حركة المخزون", group: "إجراءات سريعة", glyph: "history", action: "open-stock-history", keywords: "سجل حركة مخزون" },
+  { id: "a-scan", label: "مسح باركود", group: "إجراءات سريعة", glyph: "scan", action: "open-sales-scanner", keywords: "باركود سكانر مسح كاميرا" },
+  { id: "a-export-report", label: "تصدير التقارير PDF", group: "إجراءات سريعة", glyph: "receipt", action: "export-report", keywords: "تصدير pdf طباعة تقرير" },
+  { id: "a-theme", label: "تبديل الوضع الليلي/النهاري", group: "إجراءات سريعة", glyph: "box", action: "toggle-theme", keywords: "ثيم داكن ليلي نهاري" },
+  { id: "a-lock", label: "قفل الشاشة", group: "إجراءات سريعة", glyph: "lock", action: "quick-lock", keywords: "قفل حماية" },
+];
+
+const normalizeSearchText = (value) => String(value || "")
+  .toLocaleLowerCase("ar")
+  .replace(/[\u064B-\u0652\u0640]/g, "")
+  .replace(/[أإآ]/g, "ا").replace(/[ىي]/g, "ي").replace(/ة/g, "ه").replace(/ؤ/g, "و").replace(/ئ/g, "ي")
+  .replace(/\s+/g, " ").trim();
+
+function availableSearchEntries() {
+  return APP_SEARCH_ENTRIES.filter((entry) => {
+    if (entry.view && !canAccessView(state.currentUser, entry.view)) return false;
+    if (entry.action && !canUseAction(state.currentUser, entry.action)) return false;
+    return true;
+  });
+}
+
+function searchAppEntries(query) {
+  const q = normalizeSearchText(query);
+  const entries = availableSearchEntries();
+  if (!q) return entries.slice(0, 12);
+  const terms = q.split(" ").filter(Boolean);
+  return entries
+    .map((entry) => {
+      const hay = normalizeSearchText(`${entry.label} ${entry.group} ${entry.keywords || ""}`);
+      const label = normalizeSearchText(entry.label);
+      if (!terms.every((term) => hay.includes(term))) return null;
+      let score = 0;
+      if (label === q) score += 100;
+      else if (label.startsWith(q)) score += 60;
+      else if (label.includes(q)) score += 35;
+      if (entry.group === "الصفحات") score += 8;
+      return { entry, score };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 24)
+    .map((item) => item.entry);
+}
+
+function appSearchResultsMarkup(query) {
+  const results = searchAppEntries(query);
+  if (!results.length) return `<div class="app-search__empty">لا توجد نتائج مطابقة لـ "${escapeHtml(query)}". جرّب كلمة أخرى مثل: مخزون، ديون، حوالة، راتب.</div>`;
+  const groups = new Map();
+  results.forEach((entry) => { if (!groups.has(entry.group)) groups.set(entry.group, []); groups.get(entry.group).push(entry); });
+  return [...groups.entries()].map(([group, items]) => `<div class="app-search__group"><span class="app-search__group-title">${group}</span>${items.map((entry) => `
+    <button type="button" class="app-search__item" data-search-goto="${entry.id}">
+      <span class="app-search__icon">${icon(entry.glyph || "grid", 18)}</span>
+      <span class="app-search__label"><strong>${escapeHtml(entry.label)}</strong>${entry.panel ? `<small>خانة داخل ${escapeHtml(APP_SEARCH_ENTRIES.find((e) => e.id === entry.view)?.label || entry.view)}</small>` : ""}</span>
+      <span class="app-search__go">${icon("arrow", 16)}</span>
+    </button>`).join("")}</div>`).join("");
+}
+
+function openAppSearchDialog() {
+  const overlay = openDialog(`<div class="dialog__head app-search__head">
+      <div><span class="eyebrow">بحث شامل</span><h2>ابحث عن أي صفحة أو خانة</h2></div>
+      <button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button>
+    </div>
+    <label class="search-field app-search__field">${icon("search", 19)}<input id="app-search-input" type="search" dir="rtl" lang="ar" autocomplete="off" placeholder="اكتب: مخزون، تقارير، ديون، حوالة، راتب..." /></label>
+    <div id="app-search-results" class="app-search__results">${appSearchResultsMarkup("")}</div>`);
+
+  const input = overlay.querySelector("#app-search-input");
+  const list = overlay.querySelector("#app-search-results");
+
+  const bindItems = () => list.querySelectorAll("[data-search-goto]").forEach((button) => {
+    button.addEventListener("click", () => runAppSearchEntry(button.dataset.searchGoto));
+  });
+  const update = () => { list.innerHTML = appSearchResultsMarkup(input.value); bindItems(); };
+
+  bindItems();
+  input.addEventListener("input", update);
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") { event.preventDefault(); list.querySelector("[data-search-goto]")?.click(); }
+  });
+  requestAnimationFrame(() => input.focus());
+}
+
+function runAppSearchEntry(entryId) {
+  const entry = APP_SEARCH_ENTRIES.find((item) => item.id === entryId);
+  if (!entry) return;
+  closeDialog();
+  if (entry.panel) {
+    if (!canAccessView(state.currentUser, entry.view)) { adminOnlyMessage(); return; }
+    if (!state.reportPanels) state.reportPanels = {};
+    state.reportPanels[entry.panel] = true;
+    state.view = entry.view;
+    render();
+    requestAnimationFrame(() => {
+      const target = root.querySelector(`[data-panel="${entry.panel}"]`);
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+      target?.classList.add("is-search-highlight");
+      setTimeout(() => target?.classList.remove("is-search-highlight"), 1800);
+    });
+    return;
+  }
+  if (entry.action) {
+    const synthetic = { currentTarget: { dataset: { action: entry.action } } };
+    void handleAction(synthetic);
+    return;
+  }
+  if (entry.view) {
+    if (!canAccessView(state.currentUser, entry.view)) { adminOnlyMessage(); return; }
+    state.view = entry.view;
+    render();
+  }
+}
+
 function dashboardMarkup() {
   const dashboard = state.dashboard;
   const transfers = state.todayTransfers || { total: 0, count: 0 };
@@ -513,6 +674,7 @@ function dashboardMarkup() {
   const todayAtMidnight = new Date(`${dateKey()}T00:00:00`).getTime();
   const expiring = (state.dashboard?.expiringBatches || []).sort((a, b) => String(a.expiryDate).localeCompare(String(b.expiryDate))).slice(0, 5);
   return `${topbarMarkup("نظرة على يومك", "تابع المبيعات والمخزون من سجل واحد واضح.", `<button class="button button--primary topbar-sales-action" data-action="navigate" data-view="sales">${icon("cart", 18)}<span>بيع جديد</span></button>`)}
+  <section class="app-search-launch"><button type="button" class="app-search-launch__button" data-action="open-app-search"><span class="app-search-launch__icon">${icon("search", 20)}</span><span class="app-search-launch__text"><strong>ابحث في التطبيق</strong><small>أي صفحة أو خانة أو إجراء — المخزون، الديون، الحوالات، الرواتب، التقارير...</small></span><span class="app-search-launch__hint">بحث</span></button></section>
   <section class="daily-ribbon"><div><span class="presence-dot"></span><strong>اليوم التشغيلي</strong><small>كل عملية تحفظ على هذا الجهاز تلقائيًا</small></div><div class="daily-ribbon__date">${new Intl.DateTimeFormat("ar-SA-u-nu-latn", { weekday: "long" }).format(new Date())}، ${dateOnly(new Date())}</div></section>
   <section class="metric-grid">
     ${metricCard("مبيعات اليوم", money(dashboard.todaySales), "trend", "قيمة الفواتير المكتملة", dashboard.todaySales)}
@@ -1376,6 +1538,7 @@ async function handleActionUnsafe(event) {
   if (action === "account-session") { openAccountSessionDialog(); return; }
   if (action === "navigate") { const view = event.currentTarget.dataset.view; if (!canAccessView(state.currentUser, view)) { adminOnlyMessage(); return; } state.view = view; render(); if (["settings", "data-management"].includes(view) && isAdmin(state.currentUser)) void refreshCloudBackups({ quiet: true }); return; }
   if (!state.currentUser) { render(); return; }
+  if (action === "open-app-search") { openAppSearchDialog(); return; }
   if (action === "open-sales-scanner") { if (!canAccessView(state.currentUser, "sales")) { adminOnlyMessage(); return; } state.view = "sales"; render(); requestAnimationFrame(() => openScanner("sale")); return; }
   if (!canUseAction(state.currentUser, action, { mode: event.currentTarget.dataset.mode })) { adminOnlyMessage(); return; }
   if (action === "move-mobile-nav") { await updateMobileNavigationOrder(id, event.currentTarget.dataset.direction); return; }
