@@ -58,6 +58,7 @@ const icon = (name, size = 20) => {
     phone: '<path d="M22 16.9v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.8a2 2 0 0 1-.45 2.11L8.11 9.89a16 16 0 0 0 6 6l1.26-1.26a2 2 0 0 1 2.11-.45c.9.35 1.84.59 2.8.72A2 2 0 0 1 22 16.9Z"/>',
     moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
+    monitor: '<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',
     lock: '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>',
     shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
     whatsapp: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
@@ -498,15 +499,50 @@ async function resetMobileNavigationOrder() {
   showToast("تمت استعادة ترتيب شريط الهاتف الافتراضي.");
 }
 
+const THEME_MODES = ["system", "light", "dark"];
+const systemPrefersDark = () => typeof window !== "undefined" && window.matchMedia
+  ? window.matchMedia("(prefers-color-scheme: dark)").matches
+  : false;
+
+// "system" هو الافتراضي: يتبع ضبط الجهاز حتى يختار المستخدم وضعًا صريحًا.
+function themePreference() {
+  const stored = state.settings?.theme;
+  return THEME_MODES.includes(stored) ? stored : "system";
+}
+function resolvedTheme() {
+  const preference = themePreference();
+  return preference === "system" ? (systemPrefersDark() ? "dark" : "light") : preference;
+}
+
 function applyTheme() {
-  const theme = state.settings?.theme === "dark" ? "dark" : "light";
+  const preference = themePreference();
+  const theme = resolvedTheme();
   document.documentElement.dataset.theme = theme;
-  // نحفظ السمة في التخزين المحلي ليطبّقها سكربت الرأس قبل أول رسم عند تحديث الصفحة.
-  try { localStorage.setItem("hesabi-theme", theme); } catch { /* التخزين المحلي غير متاح */ }
+  // نحفظ التفضيل ليطبّقه سكربت الرأس قبل أول رسم عند تحديث الصفحة.
+  try { localStorage.setItem("hesabi-theme", preference); } catch { /* التخزين المحلي غير متاح */ }
   document.documentElement.style.background = theme === "dark" ? "#101d18" : "";
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#101d18" : "#1F6B59");
 }
-function themeToggleMarkup() { const dark = state.settings?.theme === "dark"; return `<button class="icon-button theme-toggle" data-action="toggle-theme" aria-label="${dark ? "تفعيل الوضع الفاتح" : "تفعيل الوضع الداكن"}" title="${dark ? "الوضع الفاتح" : "الوضع الداكن"}">${icon(dark ? "sun" : "moon", 19)}</button>`; }
+
+// عند اتباع ضبط الجهاز، نتفاعل فورًا مع تغيّره دون الحاجة لتحديث الصفحة.
+let systemThemeWatcherBound = false;
+function watchSystemTheme() {
+  if (systemThemeWatcherBound || typeof window === "undefined" || !window.matchMedia) return;
+  systemThemeWatcherBound = true;
+  const query = window.matchMedia("(prefers-color-scheme: dark)");
+  const onChange = () => { if (themePreference() === "system") { applyTheme(); render(); } };
+  if (query.addEventListener) query.addEventListener("change", onChange);
+  else if (query.addListener) query.addListener(onChange);
+}
+
+function themeToggleMarkup() {
+  const preference = themePreference();
+  const label = preference === "system"
+    ? `يتبع ضبط الجهاز (${systemPrefersDark() ? "داكن" : "فاتح"}) — اضغط للوضع الفاتح`
+    : preference === "light" ? "الوضع الفاتح — اضغط للوضع الداكن" : "الوضع الداكن — اضغط لاتباع ضبط الجهاز";
+  const glyph = preference === "system" ? "monitor" : preference === "light" ? "sun" : "moon";
+  return `<button class="icon-button theme-toggle ${preference === "system" ? "theme-toggle--system" : ""}" data-action="toggle-theme" aria-label="${label}" title="${label}">${icon(glyph, 19)}</button>`;
+}
 function salesScannerFabMarkup() { return `<button class="sales-scanner-fab" data-action="open-sales-scanner" data-mode="sale" aria-label="فتح المبيعات ومسح الباركود" title="بيع ومسح باركود">${icon("cart", 22)}<span>بيع</span></button>`; }
 
 function topbarMarkup(title, description, action = "", modifierClass = "") {
@@ -2446,7 +2482,19 @@ async function restoreBackupFromFile(event) {
 }
 async function resetAllData() { if (!window.confirm("سيُمسح كل السجل المحلي على هذا الجهاز. صدّر نسخة احتياطية أولًا. هل تريد المتابعة؟")) return; if (!window.confirm("تأكيد نهائي: لا يمكن التراجع من داخل التطبيق. هل تمضي في المسح؟")) return; try { await db.resetAllData(); state.settings = null; state.cart = []; state.cartDiscount = ""; state.heldInvoices = []; saveHeldInvoicesToStorage(state.heldInvoices); state.view = "dashboard"; await refresh(); render(); showToast("مُسحت البيانات المحلية. يمكنك بدء سجل متجر جديد."); } catch (error) { showToast(error.message, "error"); } }
 
-async function toggleTheme() { try { const theme = state.settings?.theme === "dark" ? "light" : "dark"; await db.saveSettings({ ...state.settings, theme }); state.settings = await db.getSettings(); applyTheme(); render(); showToast(theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح"); } catch (error) { showToast(error.message, "error"); } }
+async function toggleTheme() {
+  try {
+    const order = ["system", "light", "dark"];
+    const theme = order[(order.indexOf(themePreference()) + 1) % order.length];
+    await db.saveSettings({ ...state.settings, theme });
+    state.settings = await db.getSettings();
+    applyTheme();
+    render();
+    showToast(theme === "system"
+      ? `يتبع ضبط الجهاز الآن (${systemPrefersDark() ? "داكن" : "فاتح"})`
+      : theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح");
+  } catch (error) { showToast(error.message, "error"); }
+}
 
 async function deleteAllProducts() { const count = state.products.length; if (!count) { showToast("لا توجد منتجات لحذفها."); return; } if (!window.confirm(`تنبيه: سيتم حذف ${count} منتجًا من قوائم المنتجات والمخزون. ستبقى الفواتير والسجلات المالية محفوظة. هل تريد المتابعة؟`)) return; if (!window.confirm("تأكيد نهائي: سيتم إخفاء جميع المنتجات الحالية من القوائم لتتمكن من استيراد قائمة جديدة. هل تؤكد الحذف؟")) return; try { const deleted = await db.softDeleteAllProducts(); state.cart = []; await refresh(); render(); showToast(`تم حذف ${deleted} منتجًا من القوائم مع الحفاظ على السجلات.`); } catch (error) { showToast(error.message || "تعذر حذف المنتجات.", "error"); } }
 
@@ -3460,5 +3508,5 @@ export async function bootApp(target) {
   installRuntimeGuards();
   installDesktopBarcodeReader();
   installAudioUnlockListener();
-  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } applyTheme(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
+  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } applyTheme(); watchSystemTheme(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }
