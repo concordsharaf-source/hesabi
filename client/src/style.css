@@ -1133,3 +1133,11 @@ label { font-size:15px; }
     justify-content: space-between !important;
   }
 }
+
+/* ===== أقسام صفحة الخزنة داخل أزرار قابلة للطي ===== */
+.report-panel-body > .panel,
+.report-panel-body > section.panel { margin: 0; }
+.report-panel-body > .cashbox-merged-section { margin: 0; }
+.report-panel-body .merged-section-head { margin-bottom: 10px; }
+.report-panel-body .report-card { width: 100%; }
+.report-panel-body > .toolbar { margin-top: 0; }
