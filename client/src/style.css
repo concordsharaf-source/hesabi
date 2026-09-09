@@ -1047,3 +1047,45 @@ label { font-size:15px; }
 @keyframes reportPanelReveal { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 [data-theme="dark"] .report-toggle { background: #172d25; border-color: #3b5a4d; color: #e4ffef; }
 [data-theme="dark"] .report-toggle__icon, [data-theme="dark"] .report-toggle__badge { background: rgba(120, 235, 180, .14); color: #78ebb4; }
+
+/* ===== ضبط عنوان الصفحة والوصف في الشريط العلوي (كل الصفحات) ===== */
+.topbar { flex-wrap: wrap; }
+.topbar > div:first-child { flex: 1 1 320px; min-width: 0; }
+.topbar h1 {
+  min-width: 0;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+  hyphens: none;
+  text-wrap: balance;
+}
+.topbar__description {
+  min-width: 0;
+  max-width: 78ch;
+  line-height: 1.75;
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: none;
+  text-wrap: pretty;
+}
+.topbar__actions { flex-wrap: wrap; justify-content: flex-end; }
+
+@media (max-width: 899px) {
+  /* كوّم الشريط رأسيًا حتى يأخذ العنوان والوصف عرض الصفحة كاملًا */
+  .topbar { flex-direction: column; align-items: stretch; gap: 12px; }
+  .topbar > div:first-child { flex: 0 0 auto; width: 100%; }
+  .topbar__actions { justify-content: flex-start; width: 100%; }
+}
+
+@media (max-width: 599px) {
+  /* يلغي التقطيع العشوائي للكلمات الذي كان يضع كلمة واحدة في كل سطر */
+  .topbar h1,
+  .topbar__description {
+    overflow-wrap: break-word;
+    word-break: normal;
+  }
+  .topbar h1 { font-size: 26px; line-height: 1.3; }
+  .topbar__description { max-width: 100%; font-size: 13.5px; }
+  .topbar--cashbox .topbar__description { max-width: 100%; }
+}
