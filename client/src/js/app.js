@@ -20,6 +20,7 @@ import { APK_REPORT_TYPES, getApkReportRows } from "./apk-report-catalog.js";
 import { renderOfficialReportHtml } from "./report-template.js";
 import { CAMERA_SCAN_INTERVAL_MS, getCameraAssistOptions, getScannerCameraConstraints, isDesktopBarcodeWedge, isNewContinuousBarcode, shouldAcceptDesktopBarcode, shouldReleaseContinuousBarcode } from "./scanner-session.js";
 import { installDesktopIntegration } from "./desktop.js";
+import { installSwipeNavigation } from "./swipe-navigation.js";
 import { NOTIFICATION_TOPICS, clearNotificationHistory, enableBackgroundChecks, notificationPermission, notificationSettings, notificationsSupported, publishBackgroundSnapshot, requestNotificationPermission, runAlertChecks, saveNotificationSettings, showAppNotification, subscribeToPush } from "./notifications.js";
 
 const icon = (name, size = 20) => {
@@ -519,6 +520,34 @@ function installNotificationBridge() {
       const view = new URL(event.data.url, window.location.origin).searchParams.get("view");
       if (view && canAccessView(state.currentUser, view)) { state.view = view; render(); }
     } catch { /* تجاهل */ }
+  });
+}
+
+/* ترتيب صفحات شريط الهاتف السفلي كما يراه المستخدم فعليًا. */
+function mobileNavigationViews() {
+  const accessible = NAV_ITEMS.filter((item) => canAccessView(state.currentUser, item.id)).map((item) => item.id);
+  return normalizedMobileNavigationOrder(state.settings?.mobileNavigationOrder).filter((id) => accessible.includes(id));
+}
+
+let swipeNavigationBound = false;
+function installViewSwipeNavigation() {
+  if (swipeNavigationBound) return;
+  swipeNavigationBound = true;
+  installSwipeNavigation(document.body, {
+    getOrder: mobileNavigationViews,
+    getCurrent: () => state.view,
+    isEnabled: () => Boolean(state.currentUser) && Boolean(state.settings?.setupCompleted) && !state.currentUser?.mustChangePin,
+    onNavigate: (view, direction) => {
+      if (!canAccessView(state.currentUser, view)) return;
+      state.view = view;
+      render();
+      const workspace = root.querySelector(".workspace");
+      if (workspace) {
+        workspace.classList.add(direction > 0 ? "is-swipe-next" : "is-swipe-prev");
+        workspace.addEventListener("animationend", () => workspace.classList.remove("is-swipe-next", "is-swipe-prev"), { once: true });
+      }
+      window.scrollTo({ top: 0, behavior: "auto" });
+    },
   });
 }
 
@@ -3657,5 +3686,5 @@ export async function bootApp(target) {
   installRuntimeGuards();
   installDesktopBarcodeReader();
   installAudioUnlockListener();
-  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } applyTheme(); watchSystemTheme(); installNotificationBridge(); applyDeepLinkView(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
+  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } applyTheme(); watchSystemTheme(); installNotificationBridge(); applyDeepLinkView(); installViewSwipeNavigation(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }
