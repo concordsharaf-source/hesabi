@@ -548,6 +548,27 @@ test("تتيح شاشة البداية استعادة ملف حسابي قبل �
   assert.match(app, /ستعود بعدها إلى الدخول بحساباتك ورموزك السابقة/);
 });
 
+test("الاستعادة من نسخة سابقة تنتقل دائمًا إلى صفحة الدخول بلا تنزيل قسري", async () => {
+  const [app, main] = await Promise.all([
+    readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
+    readFile(new URL("../client/src/main.js", import.meta.url), "utf8"),
+  ]);
+  // نسخة أمان داخلية بدل إجبار المستخدم على تنزيل ملف قبل الاستعادة
+  assert.match(app, /async function applyRestoredBackup\(parsed/);
+  assert.match(app, /await db\.createLocalBackup\(\);/);
+  assert.doesNotMatch(app, /downloadBackupPayload\(safetyBackup/);
+  // تحديث الجلسة معزول، ثم الانتقال إلى صفحة الدخول في كل الحالات
+  assert.match(app, /Hesabi restore state refresh/);
+  assert.match(app, /تمت استعادة البيانات من \$\{sourceLabel\}/);
+  // نسخ الأمان الداخلية قابلة للاستعادة من الواجهة
+  assert.match(app, /data-action="restore-local-backup"/);
+  assert.match(app, /if \(action === "restore-local-backup"\) \{ await restoreLocalBackup\(id\); return; \}/);
+  assert.match(app, /state\.localBackups = await db\.listLocalBackups\(\)/);
+  assert.match(app, /نسخة أمان داخلية/);
+  // لا شاشة بيضاء صامتة إن لم يبدأ التطبيق
+  assert.match(main, /لم يبدأ حسابي على هذه الصفحة/);
+});
+
 test("يفصل عنوان ووصف الصندوق عن أزراره على شاشات الهاتف الصغيرة", async () => {
   const [app, styles] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),

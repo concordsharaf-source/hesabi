@@ -74,7 +74,7 @@ function generateQuickCashOptions(total) {
   return list.slice(0, 6);
 }
 
-const state = { view: "dashboard", lastStableView: "dashboard", viewHistory: [], isNavigatingBack: false, showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false, cashIn: false, cashOut: false, cashMoves: false, transfers: false, cashExpenses: false, shifts: false, shiftStats: false, salaries: false, notifications: false, setGeneral: false, setBrand: false, setAccounts: false, setActivity: false, setNav: false, setData: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
+const state = { view: "dashboard", lastStableView: "dashboard", viewHistory: [], isNavigatingBack: false, showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, localBackups: [], auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false, cashIn: false, cashOut: false, cashMoves: false, transfers: false, cashExpenses: false, shifts: false, shiftStats: false, salaries: false, notifications: false, setGeneral: false, setBrand: false, setAccounts: false, setActivity: false, setNav: false, setData: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
 const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "purchases"].includes(id))];
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
@@ -424,6 +424,7 @@ async function refresh() {
   const auditRange = currentPeriodicInventoryRange();
   [state.analytics, state.periodicInventorySummary] = await Promise.all([db.getAnalytics({ from: state.reportFrom, to: state.reportTo }), db.getPeriodicInventorySummary(auditRange)]);
   state.todayTransfers = calculateTransferCollections({ sales: state.sales.filter((sale) => dateKey(sale.date) === dateKey()), customerPayments: state.customerPayments.filter((payment) => dateKey(payment.date) === dateKey()) });
+  try { state.localBackups = await db.listLocalBackups(); } catch (error) { state.localBackups = []; console.warn("[Hesabi local backups unavailable]", error); }
 }
 
 function navMarkup() {
@@ -1281,7 +1282,7 @@ function mobileNavigationSettingsMarkup() {
 
 function dataManagementMarkup() {
   return `${topbarMarkup("إدارة البيانات", "احفظ نسخة محلية أو سحابية واستعدها عند الحاجة، دون مزامنة تلقائية بين الأجهزة.", `<button class="button button--secondary" data-action="navigate" data-view="settings">${icon("arrow", 17)}<span>الإعدادات</span></button>`)}
-  <div class="data-management-page"><section class="panel barcode-tools"><div class="panel__head"><div><span class="eyebrow">كتالوج الباركود</span><h2>استيراد أو تصدير الباركودات</h2></div></div><p>صدّر منتجاتك إلى Excel، أو استورد ملف Excel/CSV/TSV. تُطابق الأعمدة العربية أو الإنجليزية تلقائيًا وتظهر المنتجات والباركودات فورًا في القوائم.</p><div class="dialog__actions"><button class="button button--secondary" type="button" data-action="export-barcodes">تصدير Excel</button><label class="button button--primary" for="barcode-import-file">استيراد ملف الباركود<input id="barcode-import-file" type="file" accept=".xlsx,.xls,.csv,.tsv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden /></label></div><small class="field-hint">يفضل أن يحتوي الملف على عمود «الباركود» و«اسم المنتج». إذا كان المنتج موجودًا سيتم تحديث باركوده، وإذا لم يكن موجودًا سيُضاف إلى المنتجات.</small></section><section class="report-grid"><section class="panel report-card data-management-card"><span class="eyebrow">نسخة محلية</span><h2>تصدير واستيراد البيانات</h2><p>صدّر ملف JSON يحتفظ بكل بيانات هذا الجهاز، واستعده فقط من ملف حسابي موثوق.</p>${state.settings?.localBackupDirectoryName ? `<small class="field-hint">الحفظ التلقائي في: ${escapeHtml(state.settings.localBackupDirectoryName)}</small>` : `<small class="field-hint">اختر مجلدًا ليُحفظ فيه النسخ اليومية تلقائيًا على سطح المكتب.</small>`}<div class="dialog__actions"><button class="button button--primary" data-action="export-backup">${icon("download", 17)} تصدير نسخة</button><button class="button button--secondary" data-action="choose-backup-directory">${icon("box", 17)} اختيار مجلد الحفظ</button><label class="button button--primary" for="restore-file">${icon("restore", 17)} استيراد واستعادة</label><input id="restore-file" type="file" accept="application/json,.json" hidden /></div></section>${cloudBackupMarkup()}<section class="panel report-card data-management-card data-management-card--danger"><span class="eyebrow">منطقة حساسة</span><h2>مسح البيانات</h2><p>يمسح كل بيانات هذا الجهاز ويعيد التطبيق إلى شاشة الإعداد. صدّر نسخة احتياطية أولًا.</p><button class="button button--danger" data-action="reset-data">مسح جميع البيانات</button></section></section></div>`;
+  <div class="data-management-page"><section class="panel barcode-tools"><div class="panel__head"><div><span class="eyebrow">كتالوج الباركود</span><h2>استيراد أو تصدير الباركودات</h2></div></div><p>صدّر منتجاتك إلى Excel، أو استورد ملف Excel/CSV/TSV. تُطابق الأعمدة العربية أو الإنجليزية تلقائيًا وتظهر المنتجات والباركودات فورًا في القوائم.</p><div class="dialog__actions"><button class="button button--secondary" type="button" data-action="export-barcodes">تصدير Excel</button><label class="button button--primary" for="barcode-import-file">استيراد ملف الباركود<input id="barcode-import-file" type="file" accept=".xlsx,.xls,.csv,.tsv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" hidden /></label></div><small class="field-hint">يفضل أن يحتوي الملف على عمود «الباركود» و«اسم المنتج». إذا كان المنتج موجودًا سيتم تحديث باركوده، وإذا لم يكن موجودًا سيُضاف إلى المنتجات.</small></section><section class="report-grid"><section class="panel report-card data-management-card"><span class="eyebrow">نسخة محلية</span><h2>تصدير واستيراد البيانات</h2><p>صدّر ملف JSON يحتفظ بكل بيانات هذا الجهاز، واستعده فقط من ملف حسابي موثوق.</p>${state.settings?.localBackupDirectoryName ? `<small class="field-hint">الحفظ التلقائي في: ${escapeHtml(state.settings.localBackupDirectoryName)}</small>` : `<small class="field-hint">اختر مجلدًا ليُحفظ فيه النسخ اليومية تلقائيًا على سطح المكتب.</small>`}<div class="dialog__actions"><button class="button button--primary" data-action="export-backup">${icon("download", 17)} تصدير نسخة</button><button class="button button--secondary" data-action="choose-backup-directory">${icon("box", 17)} اختيار مجلد الحفظ</button><label class="button button--primary" for="restore-file">${icon("restore", 17)} استيراد واستعادة</label><input id="restore-file" type="file" accept="application/json,.json" hidden /></div></section>${localBackupsMarkup()}${cloudBackupMarkup()}<section class="panel report-card data-management-card data-management-card--danger"><span class="eyebrow">منطقة حساسة</span><h2>مسح البيانات</h2><p>يمسح كل بيانات هذا الجهاز ويعيد التطبيق إلى شاشة الإعداد. صدّر نسخة احتياطية أولًا.</p><button class="button button--danger" data-action="reset-data">مسح جميع البيانات</button></section></section></div>`;
 }
 
 function storeLogoSettingsMarkup() {
@@ -1832,6 +1833,7 @@ async function handleActionUnsafe(event) {
   if (action === "clear-store-logo") { await clearStoreLogo(); return; }
   if (action === "export-backup") { downloadBackup(); return; }
   if (action === "choose-backup-directory") { chooseBackupDirectory(); return; }
+  if (action === "restore-local-backup") { await restoreLocalBackup(id); return; }
   if (action === "export-barcodes") { exportBarcodesFile(); return; }
   if (action === "open-cloud-auth") { openCloudAuthDialog(); return; }
   if (action === "pairing-invite") { openPairingInviteDialog(); return; }
@@ -2502,11 +2504,12 @@ async function uploadCurrentCloudBackup() {
 }
 
 async function restoreCloudBackup(backupId) {
-  if (!window.confirm("ستتحقق حسابي من النسخة ثم تستبدل بيانات هذا الجهاز. سيُنزل أولًا ملف JSON وقائيًا محليًا، وستعود إلى شاشة الدخول. هل تريد المتابعة؟")) return;
+  if (!window.confirm("ستتحقق حسابي من النسخة ثم تستبدل بيانات هذا الجهاز. تُحفظ نسخة أمان داخلية أولًا، وستعود إلى شاشة الدخول. هل تريد المتابعة؟")) return;
   state.cloud.busy = "restore"; state.cloud.error = ""; render();
   try {
-    const safetyBackup = await db.exportBackup();
-    downloadBackupPayload(safetyBackup, `before-cloud-restore-${dateKey()}`);
+    let safetySaved = true;
+    try { await db.createLocalBackup(); }
+    catch (error) { safetySaved = false; console.warn("[Hesabi safety backup before cloud restore]", error); }
     const { payload } = await readCloudBackup(backupId);
     db.validateBackup(payload);
     const sessionBeforeRestore = state.currentUser;
@@ -2516,7 +2519,7 @@ async function restoreCloudBackup(backupId) {
     state.currentUser = restoredAccount ? await db.getPersistentSession() : null;
     if (restoredAccount && !state.currentUser) { await db.savePersistentSession(restoredAccount.id); state.currentUser = await db.getPersistentSession(); }
     state.cart = []; state.view = "sales"; await refresh(); render();
-    showToast("اكتملت الاستعادة بعد تنزيل نسخة وقائية محلية.");
+    showToast(safetySaved ? "اكتملت الاستعادة، ونسخة الأمان محفوظة داخل الجهاز." : "اكتملت الاستعادة (تعذر إنشاء نسخة أمان داخلية).");
   } catch (error) { state.cloud.error = error.message || "تعذرت استعادة النسخة السحابية."; if (state.view === "settings") render(); showToast(state.cloud.error, "error"); }
   finally { state.cloud.busy = ""; }
 }
@@ -2677,35 +2680,60 @@ function openReportPreview(type = "summary") {
 function downloadReportDoc() { try { downloadGeneratedFile(new File([`\uFEFF${reportExportHtml()}`], `hesabi-report-${dateKey()}.doc`, { type: "application/msword" })); showToast("تم تصدير تقرير DOC"); } catch (error) { showToast(error.message || "تعذر إنشاء تقرير DOC.", "error"); } }
 function openReportExportDialog() { const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">التقارير المالية</span><h2>اختر التقرير المطلوب</h2><p class="dialog__subtext">تُنشأ التقارير من بيانات المتجر ونطاق التاريخ الحالي.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="report-export-options"><button class="button button--primary" data-financial-report="cash">تقرير تحليلي شامل لحركة الصندوق</button><button class="button button--secondary" data-financial-report="income">قائمة الدخل</button><button class="button button--secondary" data-financial-report="balance">المركز المالي</button><button class="button button--secondary" data-financial-report="trial">ميزان المراجعة</button><button class="button button--secondary" data-financial-report="customers">ديون العملاء</button><button class="button button--secondary" data-financial-report="suppliers">تقرير الموردين</button><button class="button button--secondary" data-financial-report="expenses">تقرير المصروفات</button><button class="button button--secondary" data-financial-report="inventory">تقرير المخزون</button>${APK_REPORT_TYPES.map(([type, label]) => `<button class="button button--secondary" data-financial-report="${type}">${label}</button>`).join("")}<button class="button button--secondary" data-report-export="pdf">التقرير التشغيلي العام PDF</button><button class="button button--secondary" data-report-export="xlsx">Excel منظم للجداول</button><button class="button button--secondary" data-report-export="csv">CSV للجداول</button></div>`); overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); overlay.querySelectorAll("[data-financial-report]").forEach((button) => button.addEventListener("click", async () => { openReportPreview(button.dataset.financialReport); })); overlay.querySelectorAll("[data-report-export]").forEach((button) => button.addEventListener("click", async () => { if (button.dataset.reportExport === "csv") { downloadReportCsv(); closeDialog(); } else if (button.dataset.reportExport === "xlsx") { downloadReportXlsx(); closeDialog(); } else openReportPreview(); })); }
 
+/* يُطبّق نسخة مستعادة: نسخة أمان داخلية، ثم الانتقال دائمًا إلى صفحة الدخول. */
+async function applyRestoredBackup(parsed, { sourceLabel = "ملف النسخة" } = {}) {
+  let safetySaved = true;
+  try { await db.createLocalBackup(); }
+  catch (error) { safetySaved = false; console.warn("[Hesabi safety backup before restore]", error); }
+  await db.restoreBackup(parsed);
+  try { await db.clearPersistentSession(); }
+  catch (error) { console.warn("[Hesabi restore session cleanup]", error); }
+  state.currentUser = null;
+  state.activeCashierShift = null;
+  state.cart = [];
+  state.cartDiscount = "";
+  state.showSetupHome = false;
+  state.view = "sales";
+  // تحديث الجلسة لا يمنع الوصول إلى صفحة الدخول: أي خطأ هنا كان يُبقي المستخدم على الصفحة نفسها
+  try { state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.localBackups = await db.listLocalBackups(); }
+  catch (error) { console.warn("[Hesabi restore state refresh]", error); }
+  render();
+  showToast(safetySaved
+    ? `تمت استعادة البيانات من ${sourceLabel}. أدخل اسم المستخدم ورمز الدخول للمتجر.`
+    : `تمت استعادة البيانات من ${sourceLabel}. أدخل اسم المستخدم ورمز الدخول للمتجر (تعذر إنشاء نسخة أمان داخلية).`);
+}
+
 async function restoreBackupFromFile(event) {
   const input = event.currentTarget;
-  const file = input.files?.[0];
-  if (!file) return;
   try {
+    const file = input.files?.[0];
+    if (!file) return;
     let parsed;
     try { parsed = JSON.parse(await file.text()); }
     catch { throw new Error("ملف النسخة ليس ملف JSON صالحًا. اختر نسخة حسابي بصيغة JSON."); }
     db.validateBackup(parsed);
     if (!window.confirm("ستستبدل الاستعادة كل بيانات هذا الجهاز بالنسخة المختارة، ثم تفتح صفحة تسجيل الدخول. هل تريد المتابعة؟")) return;
-    const safetyBackup = await db.exportBackup();
-    downloadBackupPayload(safetyBackup, `before-local-restore-${dateKey()}`);
-    await db.restoreBackup(parsed);
-    try { await db.clearPersistentSession(); } catch (error) { console.warn("[Hesabi restore session cleanup]", error); }
-    state.settings = await db.getSettings();
-    state.accounts = await db.listAccounts();
-    state.currentUser = null;
-    state.activeCashierShift = null;
-    state.cart = [];
-    state.cartDiscount = "";
-    state.showSetupHome = false;
-    state.view = "sales";
-    render();
-    showToast("تمت استعادة البيانات. أدخل اسم المستخدم ورمز الدخول للمتجر.");
+    await applyRestoredBackup(parsed);
   } catch (error) {
     console.error("[Hesabi local restore error]", error);
     showToast(error.message || "تعذرت استعادة ملف النسخة الاحتياطية.", "error");
   } finally { input.value = ""; }
 }
+
+/* استعادة نسخة أمان محفوظة داخل الجهاز (لا تحتاج ملفًا خارجيًا). */
+async function restoreLocalBackup(backupId) {
+  const backup = (state.localBackups || []).find((item) => item.id === backupId);
+  if (!backup?.payload) { showToast("لم تُعثر على النسخة الداخلية المطلوبة.", "error"); return; }
+  if (!window.confirm(`ستستبدل الاستعادة كل بيانات هذا الجهاز بنسخة ${dateTime(backup.createdAt)}، ثم تفتح صفحة تسجيل الدخول. هل تريد المتابعة؟`)) return;
+  try { await applyRestoredBackup(backup.payload, { sourceLabel: `نسخة ${dateTime(backup.createdAt)}` }); }
+  catch (error) { console.error("[Hesabi internal restore error]", error); showToast(error.message || "تعذرت استعادة النسخة الداخلية.", "error"); }
+}
+
+function localBackupsMarkup() {
+  const backups = state.localBackups || [];
+  return `<section class="panel report-card data-management-card"><span class="eyebrow">نسخة أمان داخلية</span><h2>النسخ المحفوظة على هذا الجهاز</h2><p>يحفظ حسابي نسخة أمان داخلية قبل كل استعادة وعند الحفظ اليومي التلقائي، وتبقى آخر ثلاث نسخ جاهزة للرجوع إليها دون أي ملف خارجي.</p>${backups.length ? `<div class="dialog__actions">${backups.map((backup) => `<button class="button button--secondary" data-action="restore-local-backup" data-id="${escapeHtml(backup.id)}">${icon("restore", 17)} ${escapeHtml(dateTime(backup.createdAt))}</button>`).join("")}</div>` : `<div class="inline-empty">لا توجد نسخة داخلية بعد — تُنشأ تلقائيًا قبل أول استعادة أو مع الحفظ اليومي.</div>`}</section>`;
+}
+
 async function resetAllData() { if (!window.confirm("سيُمسح كل السجل المحلي على هذا الجهاز. صدّر نسخة احتياطية أولًا. هل تريد المتابعة؟")) return; if (!window.confirm("تأكيد نهائي: لا يمكن التراجع من داخل التطبيق. هل تمضي في المسح؟")) return; try { await db.resetAllData(); state.settings = null; state.cart = []; state.cartDiscount = ""; state.heldInvoices = []; saveHeldInvoicesToStorage(state.heldInvoices); state.view = "dashboard"; await refresh(); render(); showToast("مُسحت البيانات المحلية. يمكنك بدء سجل متجر جديد."); } catch (error) { showToast(error.message, "error"); } }
 
 async function toggleTheme() {

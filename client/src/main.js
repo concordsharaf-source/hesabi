@@ -19,4 +19,12 @@ if ("serviceWorker" in navigator) {
   }
 }
 
-bootApp(document.querySelector("#app"));
+const appRoot = document.querySelector("#app");
+bootApp(appRoot);
+
+/* حماية من الصفحة الفارغة: إن لم يظهر أي محتوى خلال 12 ثانية (تخزين محجوب أو إطار معاينة مقيّد)
+   نعرض رسالة عربية واضحة بدل شاشة بيضاء صامتة. */
+window.setTimeout(() => {
+  if (!appRoot || appRoot.childElementCount) return;
+  appRoot.innerHTML = `<main class="fatal-state"><h1>لم يبدأ حسابي على هذه الصفحة</h1><p>يحدث هذا غالبًا داخل معاينة مقيّدة لا تسمح بحفظ البيانات المحلية. افتح التطبيق في تبويب مستقل من المتصفح ثم أعد المحاولة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`;
+}, 12000);
