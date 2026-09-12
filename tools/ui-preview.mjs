@@ -1,7 +1,8 @@
 import { chromium } from 'playwright';
 import { mkdirSync } from 'node:fs';
-const BASE = 'http://127.0.0.1:4199';
-mkdirSync('/home/user/preview', { recursive: true });
+const BASE = process.env.APP_URL || 'http://127.0.0.1:4199';
+const OUT = process.env.OUT || '/home/user/preview';
+mkdirSync(OUT, { recursive: true });
 const browser = await chromium.launch();
 
 async function openApp({ width = 390, height = 844, theme = 'light' } = {}) {
@@ -39,7 +40,7 @@ async function setupStore(page) {
 
 async function shot(page, name, { full = false, settle = 900 } = {}) {
   await page.waitForTimeout(settle);
-  await page.screenshot({ path: `/home/user/preview/${name}.png`, fullPage: full });
+  await page.screenshot({ path: `${OUT}/${name}.png`, fullPage: full });
   const text = (await page.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ').slice(0, 260);
   console.log(`── ${name} ──\n${text}\n`);
 }
