@@ -1,5 +1,7 @@
 /* اتجاه التصميم: دفتر التاجر الهادئ — تشغيل يومي عربي واضح، دافئ، وموجّه للأرقام. */
 import "./style.css";
+/* طبقة تصميم «حاسب» البصرية (ألوان، خط، بطاقات، أزرار، تنقل) — بعد style.css لتكون لها الأولوية */
+import "./theme-haseb.css";
 import { bootApp } from "./js/app.js";
 
 if ("serviceWorker" in navigator) {

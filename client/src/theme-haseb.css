@@ -1,0 +1,614 @@
+/* ═══════════════════════════════════════════════════════════════════
+   theme-haseb.css — طبقة التصميم البصري من «حاسب» فوق واجهة «حسابي»
+   ───────────────────────────────────────────────────────────────────
+   الهدف: توحيد الشكل واللون والخط والأيقونات مع تطبيق «حاسب»
+   دون أي تغيير في البنية أو المنطق: كل الأصناف والأسماء كما هي في
+   `style.css`، وهذا الملف يعيد ضبط الطبقة البصرية فقط (لون، حدود،
+   حواف، ظلال، خط، مسافات). لا يوجد هنا أي سلوك أو حساب.
+
+   يُستورد بعد style.css في main.js ليكون له الأولوية في التتالي.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── الخط: Tajawal محليًا (بلا إنترنت، بلا طلب لخطوط جوجل) ── */
+@font-face {
+  font-family: 'Tajawal';
+  src: url('/fonts/tajawal_regular.ttf') format('truetype');
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Tajawal';
+  src: url('/fonts/tajawal_medium.ttf') format('truetype');
+  font-weight: 500; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: 'Tajawal';
+  src: url('/fonts/tajawal_bold.ttf') format('truetype');
+  font-weight: 700; font-style: normal; font-display: swap;
+}
+
+/* ═══════════════ 1) رموز التصميم (نفس رموز «حاسب») ═══════════════ */
+:root {
+  --green: #0f7a57;
+  --green-deep: #0b6044;
+  --green-pale: #d8f0e7;
+
+  --gold: #b5760a;
+  --gold-pale: #fdf0d5;
+
+  --danger: #c0392b;
+  --danger-pale: #fbe0dd;
+
+  --canvas: #f4f6f5;
+  --paper: #ffffff;
+  --line: #dfe5e2;
+
+  --ink: #14201b;
+  --muted: #5b6b64;
+
+  --shadow: 0 1px 2px rgba(16, 28, 22, .06), 0 4px 14px rgba(16, 28, 22, .05);
+  --shadow-soft: 0 1px 3px rgba(16, 28, 22, .05);
+  --shadow-lg: 0 10px 30px rgba(16, 28, 22, .16);
+
+  --radius: 16px;
+  --radius-sm: 11px;
+  --radius-lg: 22px;
+  --ease-out: cubic-bezier(.2, .7, .3, 1);
+
+  /* رموز مساعدة من «حاسب» */
+  --surface-2: #eef2f0;
+  --surface-3: #e4eae7;
+  --overlay: rgba(12, 20, 16, .45);
+  --success-soft: #d9f2e4;
+  --info-soft: #dbeaf8;
+
+  font-family: 'Tajawal', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+:root[data-theme="dark"] {
+  --ink: #eaf2ee;
+  --muted: #a3b0aa;
+  --canvas: #0d1211;
+  --paper: #161c1a;
+  --line: #2a3330;
+  --green: #34b98a;
+  --green-deep: #6fd7b1;
+  --green-pale: #10382b;
+  --gold: #e0a83f;
+  --gold-pale: #3a2c0d;
+  --danger: #f0837a;
+  --danger-pale: #3d1a17;
+  --shadow: none;
+  --shadow-soft: none;
+  --shadow-lg: 0 10px 40px rgba(0, 0, 0, .5);
+  --surface-2: #1e2624;
+  --surface-3: #27302d;
+  --overlay: rgba(0, 0, 0, .6);
+  --success-soft: #0f3527;
+  --info-soft: #122a3d;
+  color-scheme: dark;
+}
+
+/* خلفية نظيفة بلا نقش دفتر أو تدرّج ذهبي */
+html, body { background: var(--canvas); }
+body {
+  font-family: 'Tajawal', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--canvas);
+}
+html[data-theme="dark"], html[data-theme="dark"] body { background: var(--canvas); }
+
+h1, h2, h3 { letter-spacing: 0; font-weight: 700; }
+h1 { font-size: 20px; }
+h2 { font-size: 17px; }
+h3 { font-size: 15px; }
+
+/* ═══════════════ 2) الأسطح: بطاقات ولوحات ═══════════════ */
+.panel,
+.daily-ribbon,
+.sale-product,
+.account-summary,
+.report-card,
+.report-panel-body,
+.inventory-summary,
+.credit-summary {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.panel__head { padding: 15px 16px 10px; border-bottom: 1px solid var(--line); }
+.panel__subtext, .panel__empty { color: var(--muted); font-size: 12.5px; }
+
+/* بطاقات المؤشرات: بيضاء بشارة أيقونة ملوّنة بدل الأخضر الثقيل */
+.metric-card {
+  min-height: 104px;
+  padding: 14px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.metric-card__icon {
+  flex: 0 0 40px;
+  height: 40px;
+  color: var(--green);
+  background: var(--green-pale);
+  border: 0;
+  border-radius: 12px;
+}
+.metric-card small { color: var(--muted); font-size: 12px; font-weight: 500; }
+.metric-card strong { color: var(--ink); font-size: 20px; font-weight: 700; }
+.metric-card span { color: var(--muted); font-size: 11.5px; }
+.metric-card:active { transform: scale(.99); box-shadow: var(--shadow); }
+.metric-card.is-negative { background: var(--danger-pale); border-color: transparent; box-shadow: var(--shadow); }
+.metric-card.is-negative .metric-card__icon { background: rgba(192, 57, 43, .14); color: var(--danger); }
+.metric-card.is-negative strong, .metric-card.is-negative small, .metric-card.is-negative span { color: var(--danger); }
+
+/* شرائط وصناديق داخلية */
+.stock-before, .locked-field, .account-hint, .mobile-nav-settings__item,
+.purchase-picker, .inline-empty, .account-summary > div, .purchase-line,
+.purchase-product-results button, .checkbox-field, .quantity-control, .search-field {
+  background: var(--surface-2);
+  border-color: var(--line);
+  border-radius: 12px;
+}
+.stock-before { color: var(--green-deep); background: var(--green-pale); }
+
+/* ═══════════════ 3) القوائم والصفوف ═══════════════ */
+.entity-list, .invoice-list, .inventory-list, .account-list, .movement-list,
+.account-transactions, .cart-lines, .purchase-lines, .activity-log-table {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.entity-row, .invoice-row, .inventory-row, .account-row, .activity-row,
+.account-transaction, .movement-list article, .purchase-line, .cart-line {
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  transition: background var(--ease-out) .16s;
+}
+.entity-row:last-child, .invoice-row:last-child, .inventory-row:last-child,
+.account-row:last-child, .activity-row:last-child, .account-transaction:last-child,
+.movement-list article:last-child, .purchase-line:last-child, .cart-line:last-child { border-bottom: 0; }
+.entity-row:active, .invoice-row:active, .inventory-row:active, .account-row:active { background: var(--surface-2); }
+
+.entity-row__icon, .account-row__icon, .inventory-icon, .invoice-row__mark,
+.mobile-nav-settings__icon, .account-row__icon, .entity-row__icon--expense {
+  width: 40px; height: 40px;
+  color: var(--green);
+  background: var(--green-pale);
+  border: 0;
+  border-radius: 12px;
+}
+.entity-row__icon--expense { color: var(--gold); background: var(--gold-pale); }
+.invoice-row__mark--purchase { color: var(--info-soft); }
+.entity-row__main small, .invoice-row__main small, .inventory-row__main small,
+.account-row__main small, .movement-amount small { color: var(--muted); font-size: 12px; }
+.entity-row__main strong, .invoice-row__main strong, .inventory-row__main strong { color: var(--ink); font-size: 14px; font-weight: 600; }
+
+/* الخطوط الرفيعة بدل تظليل الصفوف البديل */
+tbody tr:nth-child(even), .inventory-list .inventory-row:nth-child(even),
+.invoice-list .invoice-row:nth-child(even), .entity-list .entity-row:nth-child(even),
+.movement-list article:nth-child(even), .account-transactions article:nth-child(even),
+.purchase-lines .purchase-line:nth-child(even) { background: transparent; }
+tbody tr { border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-size: 12px; font-weight: 600; }
+td, th { padding: 11px 12px; }
+.table-wrap { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+
+/* ═══════════════ 4) الأزرار ═══════════════ */
+.button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: none;
+  transition: transform 160ms var(--ease-out), background 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+}
+.button svg { width: 18px; height: 18px; }
+.button--primary { color: #fff; background: var(--green); box-shadow: 0 6px 16px rgba(15, 122, 87, .18); }
+.button--primary:hover { background: var(--green-deep); box-shadow: 0 8px 20px rgba(15, 122, 87, .22); }
+.button--secondary { color: var(--ink); background: var(--paper); border-color: var(--line); }
+.button--secondary:hover { background: var(--surface-2); }
+.button--danger { color: var(--danger); background: var(--danger-pale); border-color: transparent; }
+.button--danger:hover { background: var(--danger-pale); }
+.button--whatsapp { color: #0f7a4f; background: var(--success-soft); border-color: transparent; }
+.button--hold, .button--hold:hover { color: var(--gold); background: var(--gold-pale); border-color: transparent; }
+.button--scan { color: var(--green-deep); background: var(--green-pale); border-color: transparent; }
+.button--compact { min-height: 38px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+.button--wide { width: 100%; }
+.button--icon-text, .button--whatsapp { white-space: nowrap; }
+
+.icon-button {
+  width: 40px; height: 40px;
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  transition: background 160ms var(--ease-out), transform 160ms var(--ease-out);
+}
+.icon-button svg { width: 21px; height: 21px; }
+.icon-button:hover { background: var(--surface-2); }
+.icon-button--danger { color: var(--danger); }
+.icon-button--call, .icon-button--whatsapp { color: var(--green); background: var(--green-pale); }
+.text-button { color: var(--green); font-weight: 700; }
+.theme-toggle { background: var(--surface-2); border: 1px solid var(--line); border-radius: 12px; }
+
+/* زر الإجراء العائم (المبيعات/المسح) */
+.sales-scanner-fab, .login-home-button {
+  color: #fff;
+  background: var(--green);
+  border: 0;
+  border-radius: 18px;
+  box-shadow: var(--shadow-lg);
+}
+
+/* أزرار بتدرّجات قديمة → لون حاسب الصريح */
+.button--primary, .button--primary:hover,
+.checkout-submit, .checkout-submit:hover, .checkout-launch, .checkout-launch:hover,
+.login-home-button, .sales-scanner-fab {
+  background-image: none;
+  background-color: var(--green);
+  border-color: transparent;
+}
+.button--primary:hover, .checkout-submit:hover, .checkout-launch:hover { background-color: var(--green-deep); }
+.button--danger, .data-management-page .button--danger { background-image: none; background-color: var(--danger); border-color: transparent; color: #fff; }
+.button--danger:hover, .data-management-page .button--danger:hover { background-image: none; background-color: var(--danger); filter: brightness(.94); }
+.cash-change-card, .cash-change-card--change, .cash-change-card--exact, .cash-change-card--short,
+.cash-calculator-section, .action-panel, .account-summary__balance {
+  background-image: none;
+  background-color: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: none;
+  color: var(--ink);
+}
+.account-summary__balance { color: var(--green-deep); background-color: var(--green-pale); border-color: transparent; }
+.cash-change-card--change { color: var(--green-deep); background-color: var(--green-pale); border-color: transparent; }
+.cash-change-card--short, .cash-change-card--exact { color: var(--danger); background-color: var(--danger-pale); border-color: transparent; }
+
+/* سلة البيع: بطاقة بيضاء بترويسة واضحة وإجمالي زمردي — بدل الصندوق الداكن */
+.cart-panel {
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.cart-panel__head { border-bottom: 1px solid var(--line); }
+.cart-panel__head h2, .cart-panel h2 { color: var(--ink); font-size: 17px; font-weight: 700; }
+.cart-panel .eyebrow { color: var(--muted); }
+.cart-panel .text-button { color: var(--danger); }
+.cart-total { border-top: 1px solid var(--line); }
+.cart-total span { color: var(--muted); font-size: 12px; }
+.cart-total strong { color: var(--ink); font-size: 17px; }
+.cart-total .button, .cart-total .button--primary { color: #fff; background: var(--green); box-shadow: 0 6px 16px rgba(15, 122, 87, .18); }
+.cart-total .button:hover { background: var(--green-deep); }
+.cart-line__price--locked, .cart-line__discount-note { color: var(--muted); }
+.cart-empty { border: 1px dashed var(--line); background: transparent; color: var(--muted); }
+[data-theme="dark"] .cart-panel { background: var(--paper); color: var(--ink); border-color: var(--line); }
+[data-theme="dark"] .cart-total .button { color: #06231a; background: var(--green); }
+
+/* ═══════════════ 5) التنقل: شريط سفلي + قائمة جانبية ═══════════════ */
+.bottom-nav {
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  box-shadow: none;
+}
+.nav-item {
+  position: relative;
+  color: var(--muted);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 500;
+}
+.nav-item svg { width: 22px; height: 22px; }
+.nav-item.is-active { color: var(--green); background: transparent; }
+.nav-item.is-active::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 34px; height: 3px;
+  border-radius: 2px;
+  background: var(--green);
+}
+
+.sidebar {
+  background: var(--paper);
+  border-left: 1px solid var(--line);
+  box-shadow: none;
+}
+.sidebar__label { color: var(--muted); font-size: 11px; font-weight: 600; }
+.brand { border-bottom: 1px solid var(--line); }
+.brand strong { color: var(--ink); font-weight: 700; }
+.brand small { color: var(--muted); }
+.sidebar .nav-item { min-height: 46px; padding: 0 12px; color: var(--muted); border-radius: 12px; font-size: 14px; }
+.sidebar .nav-item:hover { color: var(--ink); background: var(--surface-2); }
+.sidebar .nav-item.is-active {
+  color: var(--green-deep);
+  background: var(--green-pale);
+  border-color: transparent;
+  box-shadow: none;
+}
+.sidebar .nav-item.is-active::before { display: none; }
+.sidebar__account { background: var(--surface-2); border: 1px solid var(--line); border-radius: 14px; }
+.sidebar__footer { color: var(--muted); }
+
+/* ═══════════════ 6) الشريط العلوي والعناوين ═══════════════ */
+.topbar { margin: 2px 0 16px; }
+.topbar h1 { font-size: 20px; font-weight: 700; }
+.topbar__description { color: var(--muted); font-size: 12.5px; }
+.eyebrow {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.topbar__store img { width: 26px; height: 26px; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; }
+
+/* ═══════════════ 7) الشرائح والشارات ═══════════════ */
+.account-badge, .category-chip, .peak-hour-badge, .dead-stock-chip, .activity-badge,
+.status, .payment-type, .filter-note, .report-toggle__badge, .payment-receipt__badge {
+  padding: 4px 10px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.account-badge--admin { color: var(--green-deep); background: var(--green-pale); border-color: transparent; }
+.account-badge--cashier { color: var(--muted); background: var(--surface-2); border-color: transparent; }
+.account-badge--employee { color: var(--gold); background: var(--gold-pale); border-color: transparent; }
+.status--available { color: var(--green-deep); background: var(--green-pale); }
+.status--low { color: var(--gold); background: var(--gold-pale); }
+.status--danger, .status--empty { color: var(--danger); background: var(--danger-pale); }
+.status--pending { color: var(--gold); background: var(--gold-pale); }
+.category-chip { color: var(--muted); background: var(--surface-2); }
+.category-chip.is-active, .category-chip[aria-pressed="true"] { color: #fff; background: var(--green); }
+
+/* ═══════════════ 8) الحقول والمدخلات ═══════════════ */
+input, select, textarea {
+  min-height: 44px;
+  padding: 10px 12px;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  outline: none;
+  transition: border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+}
+input::placeholder, textarea::placeholder { color: var(--muted); opacity: .8; }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 16%, transparent);
+}
+label { color: var(--muted); font-size: 13px; font-weight: 500; }
+.search-field { border-radius: 14px; }
+.checkbox-field { border-color: transparent; }
+.checkbox-field input { accent-color: var(--green); }
+.quantity-control > button, .quantity-control__button { color: var(--green-deep); background: var(--green-pale); border-radius: 10px; }
+.payment-method-toggle__button { border-radius: 12px; }
+.payment-method-toggle__button.is-active, .payment-method-toggle__button[aria-pressed="true"] {
+  color: #fff; background: var(--green); border-color: transparent;
+}
+
+/* ═══════════════ 9) النوافذ والتنبيهات ═══════════════ */
+.dialog-backdrop, .scanner-backdrop { background: var(--overlay); }
+.dialog, .scanner-dialog {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.dialog__head { border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.dialog__head h2 { font-size: 17px; font-weight: 700; }
+.dialog__subtext { color: var(--muted); font-size: 12.5px; }
+.dialog__danger { border-top: 1px solid var(--line); color: var(--muted); }
+.dialog__actions .button { min-width: 96px; }
+
+.toast {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+  font-size: 14px;
+  font-weight: 600;
+}
+.toast--error { color: var(--danger); background: var(--danger-pale); border-color: transparent; }
+.toast__icon { color: var(--green); }
+.toast--error .toast__icon { color: var(--danger); }
+
+.scanner-notice--neutral { color: var(--muted); background: var(--surface-2); }
+.scanner-notice--error, .cloud-backup-error { color: var(--danger); background: var(--danger-pale); }
+.barcode-feedback[data-tone="success"] { color: var(--green); }
+
+/* ═══════════════ 10) الحالات الفارغة والنِسب ═══════════════ */
+.empty-state, .no-match, .cart-empty, .inline-empty {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 26px 16px;
+  color: var(--muted);
+  text-align: center;
+  background: transparent;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+.empty-state strong, .no-match strong { color: var(--ink); font-size: 15px; }
+.empty-state small, .no-match small { color: var(--muted); font-size: 12.5px; }
+
+/* ═══════════════ 11) شاشات الدخول والتهيئة ═══════════════ */
+.setup-page {
+  background: var(--canvas);
+  background-image: none;
+}
+.setup-art {
+  color: var(--ink);
+  background: linear-gradient(160deg, var(--green-pale), var(--canvas));
+  border-left: 1px solid var(--line);
+}
+.setup-art:before, .setup-art:after { display: none; }
+.setup-art__copy h1 { color: var(--ink); font-size: 27px; line-height: 1.5; }
+.setup-art__copy p:last-child { color: var(--muted); }
+.setup-art__status { color: var(--green-deep); background: var(--paper); border: 1px solid var(--line); border-radius: 999px; }
+.setup-art__stamps span { color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; }
+.setup-art__ledger-card { color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); transform: none; }
+.setup-sheet {
+  background: var(--paper);
+  background-image: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 22px;
+}
+.setup-sheet:before { display: none; }
+.setup-sheet__brand {
+  background: transparent;
+  border-bottom: 1px solid var(--line);
+  padding: 4px 0 14px;
+  margin: 0 0 16px;
+}
+.setup-sheet__brand strong, .brand-wordmark, .setup-form h2 { color: var(--ink); font-weight: 700; letter-spacing: 0; transform: none; }
+.setup-sheet__brand div span, .setup-form > p { color: var(--muted); }
+.setup-sheet__brand img, .setup-art__brand img { filter: none; border-radius: 12px; }
+.setup-form label:before { display: none; }
+.setup-stamp { color: var(--green-deep); background: var(--green-pale); border: 1px solid transparent; border-radius: 999px; }
+.setup-restore { border-top: 1px solid var(--line); }
+.login-recovery-link { color: var(--green); }
+.offline-note { color: var(--muted); }
+
+/* ═══════════════ 12) الوضع الداكن (نفس رموز حاسب) ═══════════════ */
+[data-theme="dark"] input, [data-theme="dark"] select, [data-theme="dark"] textarea,
+[data-theme="dark"] .search-field, [data-theme="dark"] .quantity-control,
+[data-theme="dark"] .purchase-line, [data-theme="dark"] .purchase-product-results button,
+[data-theme="dark"] .checkbox-field, [data-theme="dark"] .locked-field,
+[data-theme="dark"] .purchase-picker, [data-theme="dark"] .inline-empty,
+[data-theme="dark"] .account-summary > div, [data-theme="dark"] .stock-before {
+  color: var(--ink);
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+[data-theme="dark"] .stock-before { color: var(--green-deep); background: var(--green-pale); border-color: transparent; }
+[data-theme="dark"] .checkbox-field span, [data-theme="dark"] .locked-field span,
+[data-theme="dark"] .locked-field strong { color: var(--ink); }
+
+[data-theme="dark"] .daily-ribbon, [data-theme="dark"] .metric-card, [data-theme="dark"] .panel,
+[data-theme="dark"] .sale-product, [data-theme="dark"] .no-match, [data-theme="dark"] .sidebar,
+[data-theme="dark"] .bottom-nav, [data-theme="dark"] .dialog, [data-theme="dark"] .scanner-dialog,
+[data-theme="dark"] .setup-sheet, [data-theme="dark"] .setup-sheet__brand, [data-theme="dark"] .table-wrap,
+[data-theme="dark"] .entity-list, [data-theme="dark"] .invoice-list, [data-theme="dark"] .inventory-list,
+[data-theme="dark"] .account-list, [data-theme="dark"] .movement-list, [data-theme="dark"] .report-card {
+  color: var(--ink);
+  background: var(--paper);
+  border-color: var(--line);
+}
+[data-theme="dark"] .metric-card small, [data-theme="dark"] .metric-card span { color: var(--muted); }
+[data-theme="dark"] .metric-card strong { color: var(--ink); }
+[data-theme="dark"] .metric-card__icon { color: var(--green); background: var(--green-pale); border: 0; }
+[data-theme="dark"] .metric-card.is-negative { color: var(--danger); background: var(--danger-pale); border-color: transparent; box-shadow: none; }
+[data-theme="dark"] .metric-card.is-negative .metric-card__icon { color: var(--danger); background: rgba(240, 131, 122, .16); }
+[data-theme="dark"] .metric-card.is-negative strong { color: var(--danger) !important; }
+
+[data-theme="dark"] .entity-row, [data-theme="dark"] .invoice-row, [data-theme="dark"] .inventory-row,
+[data-theme="dark"] .account-row, [data-theme="dark"] .activity-row, [data-theme="dark"] .account-transaction,
+[data-theme="dark"] .movement-list article, [data-theme="dark"] .purchase-line, [data-theme="dark"] .cart-line,
+[data-theme="dark"] tbody tr, [data-theme="dark"] .product-card { background: transparent; border-bottom-color: var(--line); }
+[data-theme="dark"] .entity-row__icon, [data-theme="dark"] .account-row__icon, [data-theme="dark"] .inventory-icon,
+[data-theme="dark"] .invoice-row__mark, [data-theme="dark"] .sale-product i { color: var(--green); background: var(--green-pale); }
+[data-theme="dark"] .warning-row__icon, [data-theme="dark"] .entity-row__icon--expense,
+[data-theme="dark"] .invoice-row__mark--purchase { color: var(--gold); background: var(--gold-pale); }
+
+[data-theme="dark"] .theme-toggle, [data-theme="dark"] .button--secondary { color: var(--ink); background: var(--surface-2); border-color: var(--line); }
+[data-theme="dark"] .button--secondary:hover, [data-theme="dark"] .icon-button:hover { background: var(--surface-3); }
+[data-theme="dark"] .button--primary { color: #06231a; background: var(--green); }
+[data-theme="dark"] .button--danger { color: var(--danger); background: var(--danger-pale); }
+[data-theme="dark"] .sales-scanner-fab, [data-theme="dark"] .login-home-button { color: #06231a; background: var(--green); }
+[data-theme="dark"] .quantity-control > button, [data-theme="dark"] .quantity-control__button { color: var(--green-deep); background: var(--green-pale); }
+[data-theme="dark"] .sidebar .nav-item { color: var(--muted); }
+[data-theme="dark"] .sidebar .nav-item.is-active { color: var(--green-deep); background: var(--green-pale); }
+[data-theme="dark"] .bottom-nav .nav-item { color: var(--muted); }
+[data-theme="dark"] .bottom-nav .nav-item.is-active { color: var(--green); }
+[data-theme="dark"] .toast { color: var(--ink); background: var(--paper); border-color: var(--line); }
+[data-theme="dark"] .toast--error { color: var(--danger); background: var(--danger-pale); border-color: transparent; }
+[data-theme="dark"] .scanner-notice--neutral, [data-theme="dark"] .scanner-notice--error,
+[data-theme="dark"] .cloud-backup-error { border-color: transparent; }
+[data-theme="dark"] .setup-page { background: var(--canvas); }
+[data-theme="dark"] .setup-art { background: linear-gradient(160deg, var(--green-pale), var(--canvas)); }
+[data-theme="dark"] .setup-sheet__brand strong, [data-theme="dark"] .setup-form h2,
+[data-theme="dark"] .brand strong, [data-theme="dark"] .setup-art__copy h1 { color: var(--ink); }
+[data-theme="dark"] .sidebar { background: var(--paper); border-left-color: var(--line); box-shadow: none; }
+[data-theme="dark"] .sidebar__account { background: var(--surface-2); border-color: var(--line); }
+[data-theme="dark"] .cart-panel { background: var(--paper); }
+
+/* ═══════════════ 13) ملخّصات ورؤوس المعلومات ═══════════════ */
+/* بطاقات الملخّص: بيضاء بحدود رقيقة بدل الأشرطة الملوّنة الثقيلة */
+.inventory-summary div, .account-summary > div, .periodic-inventory-save-summary > div {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 14px 15px;
+}
+.inventory-summary div + div, .account-summary > div + div {
+  color: var(--ink);
+  background: var(--paper);
+  border-color: var(--line);
+}
+.inventory-summary span, .account-summary span { color: var(--muted); font-size: 12px; font-weight: 500; opacity: 1; }
+.inventory-summary strong, .account-summary strong { color: var(--ink); font-size: 20px; font-weight: 700; }
+.inventory-summary div:first-child strong, .account-summary > div:first-child strong { color: var(--green-deep); }
+.credit-summary {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.credit-summary strong { color: var(--green-deep); }
+.credit-summary small, .credit-summary span { color: var(--muted); }
+
+/* الحالات الفارغة: أيقونة هادئة بدل الرسم القديم */
+.empty-state { max-width: 430px; padding: 30px 18px; border: 1px dashed var(--line); border-radius: var(--radius); }
+.empty-state img { display: none; }
+.empty-state h3 { color: var(--ink); font-size: 15.5px; font-weight: 700; }
+.empty-state p { color: var(--muted); font-size: 12.5px; }
+.empty-state:before {
+  content: '';
+  display: block;
+  width: 46px; height: 46px;
+  margin-bottom: 2px;
+  background: var(--green-pale);
+  border-radius: 14px;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230f7a57' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 8 12 3 3 8v8l9 5 9-5Z'/%3E%3Cpath d='M3 8l9 5 9-5'/%3E%3Cpath d='M12 13v8'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 22px 22px;
+}
+
+/* ═══════════════ 14) تفاصيل صغيرة للاتساق ═══════════════ */
+.presence-dot { background: var(--green); }
+.daily-ribbon__date { color: var(--muted); }
+.report-toggle { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; }
+.peak-hour-badge { color: var(--green-deep); background: var(--green-pale); }
+.dead-stock-chip { color: var(--danger); background: var(--danger-pale); }
+.activity-badge--sale { color: var(--green-deep); background: var(--green-pale); }
+.activity-badge--payment { color: var(--green-deep); background: var(--success-soft); }
+.activity-badge--return { color: var(--gold); background: var(--gold-pale); }
+.activity-badge--salary { color: var(--gold); background: var(--gold-pale); }
+.activity-badge--stock { color: var(--muted); background: var(--surface-2); }
+.activity-badge--auth { color: var(--muted); background: var(--surface-2); }
+.hourly-bar-fill { background: var(--green); border-radius: 6px; }
+.hourly-bars-chart { color: var(--muted); }
+.payment-receipt__highlight { background: var(--green-pale); color: var(--green-deep); border-radius: 12px; }
+.report-card__final { border-top: 1px solid var(--line); }
