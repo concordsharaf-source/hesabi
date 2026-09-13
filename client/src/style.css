@@ -1709,6 +1709,13 @@ html.is-sales-sheet-open .toolbar--sales { position: static; }
 [data-theme="dark"] .checkout-launch { color: #fffdf7; background: linear-gradient(135deg, #b1852e 0%, #76571b 100%); border-color: #f3cf70; }
 [data-theme="dark"] .cart-sheet-close { color: #d7f5ed; background: #205b59; border-color: #d6ad50; }
 
+@font-face {
+  font-family: "DS-Digital";
+  src: url("/fonts/ds-digital.woff") format("woff");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
 /* النسخة النهائية للسلة: أخضر داكن موحّد مع التطبيق، والأرقام مقروءة كلوحة رقمية. */
 .cart-panel,
 [data-theme="dark"] .cart-panel {
@@ -1759,7 +1766,8 @@ html.is-sales-sheet-open .toolbar--sales { position: static; }
 [data-cart-subtotal] {
   color: #fff4bd;
   font-size: clamp(26px, 4vw, 38px);
-  font-family: "Courier New", "Roboto Mono", monospace;
+  font-family: "DS-Digital", "Courier New", monospace;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
   letter-spacing: 1px;
   line-height: 1;
@@ -1768,7 +1776,7 @@ html.is-sales-sheet-open .toolbar--sales { position: static; }
 .cart-total .button, .cart-actions-grid .button--hold { border-color: #d6ad50; }
 .cart-actions-grid .button--hold { color: #fff4bd; background: #174b40; }
 .cart-actions-grid .button--hold:hover { background: #236957; }
-.checkout-launch { color: #14372f; background: linear-gradient(135deg, #f3cf70 0%, #c49a3d 100%); border-color: #fff0ae; }
+.checkout-launch, .cart-total .button { color: #14372f; background: linear-gradient(135deg, #f3cf70 0%, #c49a3d 100%); border-color: #fff0ae; font-family: "DS-Digital", "Cairo", sans-serif; font-weight: 400; letter-spacing: .4px; }
 .checkout-launch:hover { color: #102d27; background: linear-gradient(135deg, #ffe49a 0%, #d6ad50 100%); }
 .cart-sheet-close { color: #fff4bd; background: #174b40; border-color: #d6ad50; }
 .cart-sheet-close:hover { color: #14372f; background: #f3cf70; }
