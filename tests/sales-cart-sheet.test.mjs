@@ -170,7 +170,7 @@ test("لا قفزة إلى أعلى الصفحة: تصيير يحفظ الموض
 });
 
 test("زر إغلاق السلة يلغي البيع ويبرز أرقام الأسعار والإجمالي", () => {
-  assert.match(appJs, /if \(action === "close-sales-sheet"\) \{ state\.cart = \[\]; state\.cartDiscount = ""; commitSalesSheet\("peek"\); return; \}/);
+  assert.match(appJs, /if \(action === "close-sales-sheet"\) \{ state\.cart = \[\]; state\.cartDiscount = ""; state\.salesSheet = "peek"; renderKeepingScroll\(\); return; \}/);
   assert.match(salesMarkup, /class="cart-sheet-close" type="button" data-action="close-sales-sheet"/);
   assert.match(css, /@font-face[\s\S]{0,180}font-family: "DS-Digital"[\s\S]{0,180}ds-digital\.woff/);
   assert.match(css, /\[data-cart-subtotal\][\s\S]{0,240}font-size: clamp\(26px, 4vw, 38px\)[\s\S]{0,160}font-family: "DS-Digital"/);

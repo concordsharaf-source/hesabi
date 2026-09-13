@@ -2145,7 +2145,7 @@ async function handleActionUnsafe(event) {
   const id = event.currentTarget.dataset.id;
   if (action === "fill-login") { const input = root.querySelector("#login-form [name=username]"); if (input) { input.value = event.currentTarget.dataset.username; root.querySelector("#login-form [name=pin]")?.focus(); } return; }
   if (action === "toggle-sales-sheet") { commitSalesSheet(state.salesSheet === "full" ? "peek" : "full"); return; }
-  if (action === "close-sales-sheet") { state.cart = []; state.cartDiscount = ""; commitSalesSheet("peek"); return; }
+  if (action === "close-sales-sheet") { state.cart = []; state.cartDiscount = ""; state.salesSheet = "peek"; renderKeepingScroll(); return; }
   if (action === "open-phone-recovery") { openPhoneRecoveryDialog(); return; }
   if (action === "cloud-password-reset") { openCloudAuthDialog(); return; }
   if (action === "cloud-restore-start") { openCloudRestoreOnSetupDialog(); return; }
