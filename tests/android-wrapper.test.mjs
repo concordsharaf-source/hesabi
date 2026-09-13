@@ -20,7 +20,10 @@ test("يحافظ غلاف Android على هوية حسابي وأصول الوي
 test("يضم غلاف Android نسخة الويب المبنية مع عامل الخدمة", async () => {
   const shell = await read("android/app/src/main/assets/public/index.html");
   const worker = await read("android/app/src/main/assets/public/service-worker.js");
+  const source = await read("client/public/service-worker.js");
   assert.match(shell, /<script[^>]+src=/);
   assert.match(shell, /\/assets\/[^"']+\.js/);
-  assert.match(worker, /hesabi-pwa-v21/);
+  // إصدار الكاش يُشتق من المصدر بدل تثبيت رقم حرفي، فلا ينكسر عند كل رفع إصدار
+  assert.match(worker, /const CACHE_NAME = "hesabi-pwa-v\d+";/, "يجب أن يضم الغلاف تعريف إصدار كاش صريحًا");
+  assert.equal(worker, source, "عامل الخدمة في غلاف Android يجب أن يبقى مطابقًا لمصدر client/public بدل نسخة مجمّدة");
 });

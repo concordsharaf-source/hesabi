@@ -49,7 +49,10 @@ test("يوصّل عامل الخدمة النسخة الجديدة بدل حبس
   assert.match(worker, /const CACHE_NAME = "hesabi-pwa-v(\d+)";/, "يجب تعريف إصدار كاش صريح");
   const version = Number(worker.match(/const CACHE_NAME = "hesabi-pwa-v(\d+)";/)[1]);
   assert.ok(version >= 31, `إصدار الكاش يجب أن يكون 31 أو أحدث، الحالي ${version}`);
-  assert.match(worker, /hesabi-pwa-v25/, "يبقى سجل الإصدارات السابقة في التعليق");
+  // السجل التاريخي يُتحقق بنيويًا بدل سلسلة حرفية، فرفع الإصدار لا يكسر الاختبار
+  const history = [...worker.matchAll(/hesabi-pwa-v(\d+)/g)].map((m) => Number(m[1]));
+  assert.ok(history.length >= 2, "يجب أن يبقى سجل الإصدارات السابقة في التعليق");
+  assert.ok(Math.max(...history) === version, "أحدث رقم في السجل يجب أن يكون الإصدار الفعلي الحالي");
 
   // استراتيجية «مخزَن ثم حدّث في الخلفية» للأصول بدل cache-first التي تحبس الكود القديم
   assert.match(worker, /const revalidate = fetch\(event\.request\)\.then/, "يجب تجديد الأصل من الشبكة في الخلفية");
