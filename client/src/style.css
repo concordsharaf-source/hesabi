@@ -1440,3 +1440,56 @@ html[data-theme="dark"] #app { background-color: transparent; }
   .topbar-back-btn span { display: none; }
   .topbar-back-btn { padding: 7px; }
 }
+
+/* ===== خط المسح الليزري في نافذة قارئ الباركود (زخرفي بالكامل) ===== */
+/* يوضع بعد قاعدة .scanner-box__guide حتى يرث سمات الإطار وحجمه النسبي.
+   لا يمس أي منطق: الكاميرا وقراءة الباركود والحسابات تبقى كما هي حرفيًا. */
+.scanner-box__guide { z-index: 1; }
+.scanner-box__guide::after {
+  content: "";
+  position: absolute;
+  left: 1%;
+  right: 1%;
+  top: 50%;
+  height: 3px;
+  border-radius: 999px;
+  pointer-events: none;
+  /* حافة مضيئة فوق حزمة شفافة: الأطراف نحيفة جدًا والقوة في المنتصف */
+  background:
+    linear-gradient(90deg,
+      rgba(43, 233, 158, 0) 0%,
+      rgba(43, 233, 158, .55) 8%,
+      rgba(158, 255, 206, 1) 50%,
+      rgba(43, 233, 158, .55) 92%,
+      rgba(43, 233, 158, 0) 100%) 0 0 / 100% 1px no-repeat,
+    linear-gradient(90deg,
+      rgba(23, 168, 116, 0) 0%,
+      rgba(23, 168, 116, .22) 18%,
+      rgba(31, 200, 140, .72) 50%,
+      rgba(23, 168, 116, .22) 82%,
+      rgba(23, 168, 116, 0) 100%) 0 100% / 100% 2px no-repeat;
+  /* الهالة: أضيق وأسطع في المنتصف، وأعرض وأخفت كلما اتجهنا للأطراف */
+  filter: drop-shadow(0 0 2px rgba(43, 233, 158, .85))
+          drop-shadow(0 0 7px rgba(31, 200, 140, .55))
+          drop-shadow(0 0 16px rgba(23, 168, 116, .30));
+  animation: hesabi-scanner-laser 2.6s cubic-bezier(.45, .05, .55, .95) infinite alternate;
+  will-change: transform;
+}
+
+@keyframes hesabi-scanner-laser {
+  from { transform: translateY(calc(-50% + 15%)); }
+  to   { transform: translateY(calc(50% - 15%)); }
+}
+
+/* لمسة وظيفية صغيرة: يتجمّد الخط عندما تتوقف الكاميرا (خطأ قراءة) فلا يوحي بمسح جارٍ */
+#scanner-backdrop:has(.scanner-status[data-tone="error"]) .scanner-box__guide::after {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scanner-box__guide::after { animation: none; transform: translateY(-50%); }
+}
+
+@media (max-width: 599px) {
+  .scanner-box__guide::after { height: 2px; }
+}
