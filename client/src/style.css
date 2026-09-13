@@ -1708,4 +1708,68 @@ html.is-sales-sheet-open .toolbar--sales { position: static; }
 [data-theme="dark"] .cart-actions-grid .button--hold:hover { background: rgba(243, 207, 112, .23); }
 [data-theme="dark"] .checkout-launch { color: #fffdf7; background: linear-gradient(135deg, #b1852e 0%, #76571b 100%); border-color: #f3cf70; }
 [data-theme="dark"] .cart-sheet-close { color: #d7f5ed; background: #205b59; border-color: #d6ad50; }
+
+/* النسخة النهائية للسلة: أخضر داكن موحّد مع التطبيق، والأرقام مقروءة كلوحة رقمية. */
+.cart-panel,
+[data-theme="dark"] .cart-panel {
+  color: #effff8;
+  background:
+    radial-gradient(circle at 13% 18%, rgba(243, 207, 112, .12) 0 2px, transparent 3px),
+    radial-gradient(circle at 86% 76%, rgba(111, 218, 180, .08) 0 1px, transparent 2px),
+    linear-gradient(145deg, #164f43 0%, #0d302a 100%);
+  background-size: 34px 34px, 46px 46px, auto;
+  border-color: #d6ad50;
+  box-shadow: 0 12px 30px rgba(4, 30, 24, .38), inset 0 1px 0 rgba(255, 255, 255, .08);
+}
+.cart-line,
+[data-theme="dark"] .cart-line,
+.cart-line:nth-child(even),
+[data-theme="dark"] .cart-line:nth-child(even) {
+  color: #effff8;
+  background: linear-gradient(145deg, #1d604f 0%, #124238 100%);
+  border-color: #d6ad50;
+  box-shadow: 0 5px 12px rgba(2, 25, 20, .26);
+}
+.cart-line:nth-child(odd) { background: linear-gradient(145deg, #236957 0%, #174b40 100%); }
+.cart-line__detail strong, .cart-line > strong { color: #f4fff9; }
+.cart-line__detail small, .cart-line__discount, .cart-line__discount-note, .cart-line__package small { color: #c8eee1; }
+.cart-line__price input,
+.cart-line__discount input,
+.cart-line__package input {
+  min-height: 42px;
+  color: #f8fffb;
+  background: #0d302a;
+  border: 2px solid #d6ad50;
+  border-radius: 9px;
+  font-size: 17px;
+  font-weight: 900;
+  font-family: "Courier New", "Roboto Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 7px rgba(243, 207, 112, .25);
+}
+.cart-line__price input:focus, .cart-line__discount input:focus, .cart-line__package input:focus { outline: 3px solid rgba(243, 207, 112, .55); outline-offset: 1px; }
+.cart-line .quantity-control,
+.cart-line:nth-child(even) .quantity-control { background: #0d302a; border-color: #d6ad50; }
+.cart-line .quantity-control > button, .cart-line .quantity-control__button { color: #f3cf70; background: #174b40; border-color: #d6ad50; }
+.cart-line__discount-wrap .cart-line__discount-note,
+.cart-line:nth-child(even) .cart-line__discount-wrap .cart-line__discount-note { color: #d7f5ed; font-weight: 800; }
+.cart-total { border-top-color: rgba(243, 207, 112, .62); }
+.cart-empty, .cart-empty p, .cart-total span { color: #d7f5ed; }
+.cart-total strong,
+[data-cart-subtotal] {
+  color: #fff4bd;
+  font-size: clamp(26px, 4vw, 38px);
+  font-family: "Courier New", "Roboto Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 1px;
+  line-height: 1;
+  text-shadow: 0 0 9px rgba(243, 207, 112, .3);
+}
+.cart-total .button, .cart-actions-grid .button--hold { border-color: #d6ad50; }
+.cart-actions-grid .button--hold { color: #fff4bd; background: #174b40; }
+.cart-actions-grid .button--hold:hover { background: #236957; }
+.checkout-launch { color: #14372f; background: linear-gradient(135deg, #f3cf70 0%, #c49a3d 100%); border-color: #fff0ae; }
+.checkout-launch:hover { color: #102d27; background: linear-gradient(135deg, #ffe49a 0%, #d6ad50 100%); }
+.cart-sheet-close { color: #fff4bd; background: #174b40; border-color: #d6ad50; }
+.cart-sheet-close:hover { color: #14372f; background: #f3cf70; }
 [data-theme="dark"] .cart-sheet-close:hover { color: #123d38; background: #f3cf70; }

@@ -168,3 +168,10 @@ test("لا قفزة إلى أعلى الصفحة: تصيير يحفظ الموض
   assert.match(sync, /if \(!bottomNav \|\| !bottomNav\.offsetWidth \|\| bottomNav\.scrollWidth <= bottomNav\.clientWidth \+ 1\) return;/, "توسيط عنصر التنقّل يعمل على الحاسوب حيث الشريط مخفيّ — فيزيح الصفحة كلها");
   assert.match(sync, /const keepY = Math\.round\(window\.scrollY \|\| 0\);[\s\S]{0,220}window\.scrollTo\(Math\.round\(window\.scrollX \|\| 0\), keepY\);/, "توسيط الشريط السفلي لا يعيد الموضع الرأسي للصفحة");
 });
+
+test("زر إغلاق السلة يلغي البيع ويبرز أرقام الأسعار والإجمالي", () => {
+  assert.match(appJs, /if \(action === "close-sales-sheet"\) \{ state\.cart = \[\]; state\.cartDiscount = ""; commitSalesSheet\("peek"\); return; \}/);
+  assert.match(salesMarkup, /class="cart-sheet-close" type="button" data-action="close-sales-sheet"/);
+  assert.match(css, /\.cart-line__price input,[\s\S]{0,260}font-size: 17px;[\s\S]{0,160}font-family: "Courier New"/);
+  assert.match(css, /\[data-cart-subtotal\][\s\S]{0,240}font-size: clamp\(26px, 4vw, 38px\)[\s\S]{0,160}font-family: "Courier New"/);
+});
