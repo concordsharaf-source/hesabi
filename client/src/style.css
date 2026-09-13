@@ -1559,5 +1559,8 @@ html[data-theme="dark"] #app { background-color: transparent; }
 .cart-sheet.is-sheet-mobile .checkout-launch,
 .cart-sheet.is-sheet-mobile .button--hold { min-height: 46px; }
 html.is-sales-sheet-mobile .sales-layout { padding-bottom: var(--sales-sheet-reserve, 0px); }
+/* الزر العائم «بيع ومسح باركود» (z:31) كان يهبط فوق الورقة ويغطي زر الدفع — يُخفى ما دامت الورقة قائمة،
+   وزر الماسح في شريط البحث يبقى موجودًا في نفس الصفحة. */
+html.is-sales-sheet-mobile .sales-scanner-fab { display: none; }
 html.is-sales-sheet-open body { overflow: hidden; }
 html.is-sales-sheet-open .toolbar--sales { position: static; }

@@ -1056,10 +1056,12 @@ function salesSheetGeometry(panel) {
 function applySalesSheetGeometry() {
   const panel = root.querySelector(".cart-panel.cart-sheet");
   const layout = root.querySelector(".sales-layout");
-  if (!panel || !layout) return false;
-  const mobile = salesSheetIsMobile();
-  panel.classList.toggle("is-sheet-mobile", mobile);
+  const mobile = Boolean(panel && layout) && salesSheetIsMobile();
+  // طبقتا <html> تصحبان الورقة دائمًا: مغادرة صفحة المبيعات تُحرّر قفل التمرير وتُظهر زر الماسح
   document.documentElement.classList.toggle("is-sales-sheet-mobile", mobile);
+  document.documentElement.classList.toggle("is-sales-sheet-open", mobile && state.salesSheet === "full");
+  if (!panel || !layout) return false;
+  panel.classList.toggle("is-sheet-mobile", mobile);
   if (!mobile) {
     panel.style.removeProperty("--sales-sheet-h");
     panel.style.removeProperty("--sales-sheet-nav");
@@ -1090,7 +1092,6 @@ function commitSalesSheet(mode) {
     const label = handle.querySelector(".cart-sheet__label");
     if (label) label.textContent = next === "full" ? "تصغير السلة" : "توسيع السلة";
   }
-  document.documentElement.classList.toggle("is-sales-sheet-open", next === "full");
   return next;
 }
 

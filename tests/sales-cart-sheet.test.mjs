@@ -98,6 +98,28 @@ test("أرضية peek مقيسة من DOM: الإجمالي وزر الدفع ل
   assert.match(gestures, /salesSheetGeometry\(panel\)/, "حدود السحب تُحسب بلا اللوحة نفسها");
 });
 
+test("دورة حياة الطبقات: مغادرة صفحة المبيعات تُحرّر قفل التمرير وتُعيد الزر العائم", () => {
+  const apply = sheet.slice(sheet.indexOf("function applySalesSheetGeometry() {"));
+  const applyBody = apply.slice(0, apply.indexOf("\n}\n") + 3);
+  const guard = applyBody.indexOf("if (!panel || !layout) return false;");
+  assert.ok(guard > 0, "حد اللوحة غير موجود");
+  const toggleMobile = applyBody.indexOf('classList.toggle("is-sales-sheet-mobile", mobile)');
+  const toggleOpen = applyBody.indexOf('classList.toggle("is-sales-sheet-open"');
+  assert.ok(toggleMobile > 0 && toggleMobile < guard, "طبقة <html> تُدار بعد الخروج المبكر — فتبقى عالقة على بقية الصفحات");
+  assert.ok(toggleOpen > 0 && toggleOpen < guard, "قفل التمرير يُدار بعد الخروج المبكر — تتجمد الصفحات الأخرى");
+  assert.match(applyBody, /is-sales-sheet-open",\s*mobile && state\.salesSheet === "full"/, "قفل التمرير لا يشترط أن تكون الورقة قائمة");
+  assert.doesNotMatch(sheet, /classList\.toggle\("is-sales-sheet-open", next === "full"\)/, "التبديل يعيد إدارة الطبقة خارج الهندسة فينقطع التزامن");
+});
+
+test("الزر العائم لا يغطي زر الدفع: z:31 فوق الورقة، فيُخفى ما دامت قائمة", () => {
+  assert.match(css, /\.sales-scanner-fab \{[^}]*z-index:\s*31/, "تغيّر ترتيب الزر العائم — راجع قاعدة الإخفاء");
+  const sheetZ = Number(/\.cart-sheet\.is-sheet-mobile \{[^}]*z-index:\s*(\d+)/.exec(css)[1]);
+  assert.ok(sheetZ < 31, `الورقة (${sheetZ}) صارت فوق الزر العائم — يمكن إلغاء الإخفاء`);
+  assert.match(css, /html\.is-sales-sheet-mobile \.sales-scanner-fab \{ display: none; \}/, "الزر العائم لم يُخفَ أثناء الورقة فيهبط على زر الدفع");
+  // مدخل الماسح في شريط بحث المبيعات يبقى (الإخفاء يخصّ الزر العائم وحده)
+  assert.match(salesMarkup, /data-action="open-scanner" data-mode="sale"/, "لا مدخل مسح في صفحة المبيعات بعد إخفاء الزر العائم");
+});
+
 test("لا انزلاق في التخطيط الأكبر: لا قاعدة وسائط تُفعّل الورقة على الحاسوب", () => {
   const block = /\/\* ===== سلة البيع كورقة سفلية[\s\S]*$/.exec(css)[0];
   assert.doesNotMatch(block, /@media \((?:max|min)-width/, "ورقة الهاتف مفُعّلة بوسائط عرض — تتعارض مع عمود السلة الجانبي من 600px");
