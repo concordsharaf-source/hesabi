@@ -1564,3 +1564,68 @@ html.is-sales-sheet-mobile .sales-layout { padding-bottom: var(--sales-sheet-res
 html.is-sales-sheet-mobile .sales-scanner-fab { display: none; }
 html.is-sales-sheet-open body { overflow: hidden; }
 html.is-sales-sheet-open .toolbar--sales { position: static; }
+
+/* ===== بطاقات لوحة التحكم: مستطيلة، متناوبة الغُمنة، أيقونة كبيرة، وتقود إلى صفحتها =====
+   لا رقم يُكدَّس ولا ينزل سطرًا ثانيرًا: البطاقة أعرض مما هي طويلة، والرقم سطر واحد
+   بمقياس clamp، ثم يتكفّل fitMetricValues بالتصغير الاضطراري إن ضاق المقام.
+   لا شيء هنا يغيّر قيمة ولا حسابًا: تنسيق وعرض فقط. */
+.metric-grid { gap: 12px; grid-template-columns: minmax(0, 1fr); }
+.metric-card {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 84px;
+  padding: 12px 14px;
+  margin: 0;
+  border-radius: 16px;
+  font: inherit;
+  text-align: start;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.metric-card__icon { flex: 0 0 46px; width: 46px; height: 46px; border-radius: 14px; border-width: 0; }
+.metric-card__body { display: flex; min-width: 0; flex: 1 1 auto; flex-direction: column; gap: 3px; }
+/* قاعدة قديمة (.metric-card span) تلون كل span داخل البطاقة بلون فاتح — تُبطلها الوراثة الصريحة */
+.metric-card .metric-card__body, .metric-card .metric-card__head, .metric-card .metric-card__go { color: inherit; }
+.metric-card__head { display: flex; min-width: 0; align-items: baseline; justify-content: space-between; gap: 8px; overflow: hidden; }
+.metric-card .metric-card__head small { color: inherit; flex: 0 0 auto; min-width: 0; font-size: 11px; font-weight: 800; line-height: 1.2; letter-spacing: .1px; opacity: .86; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.metric-card__body > strong { color: inherit; margin: 0; min-width: 0; font-size: clamp(19px, 2.5vw, 26px); line-height: 1.18; letter-spacing: -.4px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* الدلالة تسكن سطر العنوان: لا تنازع الرقم على عرضه، والرقم يبقى سطرًا واحدًا كامل العرض */
+.metric-card__body em.metric-card__hint { color: inherit; flex: 0 1 auto; min-width: 0; margin: 0; font-size: 10.5px; font-style: normal; line-height: 1.2; opacity: .62; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: end; }
+.metric-card__go { display: none; flex: 0 0 auto; align-self: center; opacity: .6; transition: transform .14s var(--ease-out), opacity .14s var(--ease-out); }
+.metric-card.is-openable { cursor: pointer; transition: transform .14s var(--ease-out), box-shadow .14s var(--ease-out), border-color .14s var(--ease-out); }
+.metric-card.is-openable .metric-card__go { display: grid; place-items: center; }
+.metric-card.is-openable:hover { transform: translateY(-2px); }
+.metric-card.is-openable:hover .metric-card__go { opacity: 1; transform: translateX(-3px); }
+.metric-card.is-openable:active { transform: translateY(1px); }
+.metric-card.is-openable:focus-visible { outline: 3px solid #f3cf70; outline-offset: 2px; }
+@media (max-width: 419px) { .metric-card__body em.metric-card__hint { font-size: 9.5px; } .metric-card__body > strong { letter-spacing: -.5px; } }
+@media (min-width: 600px) { .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* ثلاث أعمدة فقط حين يسعّ الرقم سطره كاملًا؛ وما دونها عمودان — لا عصر للأرقام عند 960 */
+@media (min-width: 1120px) { .metric-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* في العمود الثلاثي يضيق سطر العنوان: تسقط الدلالة بدل أن يُبتر العنوان أو الرقم */
+@media (min-width: 1120px) and (max-width: 1399px) { .metric-card .metric-card__hint { display: none; } }
+@media (min-width: 1400px) { .metric-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* التناوب: فردة غامقة وفردة فاتحة — :where() تُبقي الأولوية منخفضة فتعلو سلبيةُ الرقم عليها */
+.metric-grid > .metric-card:where(:nth-child(odd)) { color: #f4fbf7; background: #12634f; border: 2px solid #0d4d3e; box-shadow: 0 4px 0 #093d31, 0 12px 22px rgba(9, 61, 49, .16); }
+.metric-grid > .metric-card:where(:nth-child(odd)) .metric-card__icon { color: #13342a; background: #f3cf70; border-color: #ffe9b5; }
+.metric-grid > .metric-card:where(:nth-child(odd)):hover { border-color: #f3cf70; }
+.metric-grid > .metric-card:where(:nth-child(even)) { color: #13342a; background: #fffdf7; border: 2px solid #dbe8df; box-shadow: 0 4px 0 #e6ece7, 0 12px 22px rgba(23, 52, 45, .08); }
+.metric-grid > .metric-card:where(:nth-child(even)) .metric-card__icon { color: #fffdf7; background: #12634f; border-color: #0d4d3e; }
+.metric-grid > .metric-card:where(:nth-child(even)):hover { border-color: #12634f; }
+/* رقم سالِب: يبقى أحمر بغضّ النظر عن صفّ لونه (هذا دلالة لا زينة) */
+.metric-grid > .metric-card.is-negative { color: #fff; background: #a73340; border-color: #6f1e28; box-shadow: 0 4px 0 #6f1e28, 0 12px 22px rgba(111, 30, 40, .24); }
+.metric-grid > .metric-card.is-negative .metric-card__icon { color: #7d222c; background: #ffd9dd; border-color: #ffb9c0; }
+.metric-grid > .metric-card.is-negative strong { color: #fff; }
+/* قاعدة قديمة في الملف (.is-negative { color: var(--danger) !important }) تصبغ البطاقة السالبة
+   بلون خلفتها، فيختفي العنوان والدلالة والسهم. تُنقذها هذه بألوان فاتحة على الأحمر. */
+.metric-grid > .metric-card.is-negative small,
+.metric-grid > .metric-card.is-negative .metric-card__hint,
+.metric-grid > .metric-card.is-negative .metric-card__go { color: #ffe7ea !important; }
+/* الوضع الليلي: نفس الفكرة بسطح أغمق بدل ورقية فاتحة */
+[data-theme="dark"] .metric-grid > .metric-card:where(:nth-child(even)) { color: #eaf6ef; background: #12302a; border-color: #2f5b49; box-shadow: 0 4px 0 #08201a, 0 12px 22px rgba(0, 0, 0, .34); }
+[data-theme="dark"] .metric-grid > .metric-card:where(:nth-child(even)) .metric-card__icon { color: #13342a; background: #f3cf70; border-color: #4a7c66; }
+[data-theme="dark"] .metric-grid > .metric-card:where(:nth-child(odd)) { color: #f4fbf7; background: #12634f; border-color: #b3f3d5; box-shadow: 0 4px 0 #072c23, 0 12px 22px rgba(0, 0, 0, .34); }
+[data-theme="dark"] .metric-grid > .metric-card:where(:nth-child(odd)) .metric-card__icon { color: #fffdf7; background: #0d4d3e; border-color: rgba(255, 255, 255, .34); }

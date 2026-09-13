@@ -894,18 +894,18 @@ function dashboardMarkup() {
   <section class="app-search-launch"><button type="button" class="app-search-launch__button" data-action="open-app-search"><span class="app-search-launch__icon">${icon("search", 20)}</span><span class="app-search-launch__text"><strong>ابحث في التطبيق</strong><small>أي صفحة أو خانة أو إجراء — المخزون، الديون، الحوالات، الرواتب، التقارير...</small></span><span class="app-search-launch__hint">بحث</span></button></section>
   <section class="daily-ribbon"><div><span class="presence-dot"></span><strong>اليوم التشغيلي</strong><small>كل عملية تحفظ على هذا الجهاز تلقائيًا</small></div><div class="daily-ribbon__date">${new Intl.DateTimeFormat("ar-SA-u-nu-latn", { weekday: "long" }).format(new Date())}، ${dateOnly(new Date())}</div></section>
   <section class="metric-grid">
-    ${metricCard("مبيعات اليوم", money(dashboard.todaySales), "trend", "قيمة الفواتير المكتملة", dashboard.todaySales)}
-    ${metricCard("مشتريات اليوم", money(dashboard.todayPurchases), "truck", "توريد محفوظ", dashboard.todayPurchases)}
-    ${metricCard("مصروفات اليوم", money(dashboard.todayExpenses), "wallet", "تؤثر على صافي الربح", dashboard.todayExpenses)}
-    ${metricCard("أرباح اليوم", money(dashboard.todayProfit), "chart", "صافي بعد التكلفة والمصروفات", dashboard.todayProfit)}
-    ${metricCard("المنتجات", amountLatin(dashboard.productCount), "package", "منتجات فعّالة")}
-    ${metricCard("قيمة المخزون", money(dashboard.inventoryValue), "layers", "وفق سعر الشراء")}
-    ${metricCard("فواتير اليوم", amountLatin(dashboard.todayInvoiceCount), "receipt", "عملية بيع محفوظة")}
-    ${metricCard("ديون العملاء", money(dashboard.customerDebt), "users", "رصيد مستحق")}
-    ${metricCard("تحويلات اليوم", money(transfers.total), "transfer", transfers.count ? `${amount(transfers.count)} تحصيل بتحويل` : "لا توجد تحويلات اليوم", transfers.total)}
-    ${metricCard("دفعات اليوم", money(dashboard.todayCustomerPayments), "wallet", "تسديد ديون سابقة")}
-    ${metricCard("مستحقات الموردين", money(dashboard.supplierDebt), "truck", "شراء آجل غير مسدد")}
-    ${metricCard("الداخل للصندوق", money(dashboard.todayCashIn), "wallet", "نقد وارد اليوم فقط", dashboard.todayCashIn)}
+    ${metricCard("مبيعات اليوم", money(dashboard.todaySales), "cart", "قيمة الفواتير المكتملة", dashboard.todaySales, "invoices")}
+    ${metricCard("مشتريات اليوم", money(dashboard.todayPurchases), "package", "توريد محفوظ", dashboard.todayPurchases, "purchases")}
+    ${metricCard("مصروفات اليوم", money(dashboard.todayExpenses), "wallet", "تؤثر على صافي الربح", dashboard.todayExpenses, "expenses")}
+    ${metricCard("أرباح اليوم", money(dashboard.todayProfit), "trend", "صافي بعد التكلفة والمصروفات", dashboard.todayProfit, "reports")}
+    ${metricCard("المنتجات", amountLatin(dashboard.productCount), "box", "منتجات فعّالة", 0, "products")}
+    ${metricCard("قيمة المخزون", money(dashboard.inventoryValue), "layers", "وفق سعر الشراء", dashboard.inventoryValue, "inventory")}
+    ${metricCard("فواتير اليوم", amountLatin(dashboard.todayInvoiceCount), "receipt", "عملية بيع محفوظة", 0, "invoices")}
+    ${metricCard("ديون العملاء", money(dashboard.customerDebt), "users", "رصيد مستحق", dashboard.customerDebt, "customers")}
+    ${metricCard("تحويلات اليوم", money(transfers.total), "transfer", transfers.count ? `${amount(transfers.count)} تحصيل بتحويل` : "لا توجد تحويلات اليوم", transfers.total, "transfers")}
+    ${metricCard("دفعات اليوم", money(dashboard.todayCustomerPayments), "check", "تسديد ديون سابقة", dashboard.todayCustomerPayments, "customer-payments")}
+    ${metricCard("مستحقات الموردين", money(dashboard.supplierDebt), "truck", "شراء آجل غير مسدد", dashboard.supplierDebt, "suppliers")}
+    ${metricCard("الداخل للصندوق", money(dashboard.todayCashIn), "plus", "نقد وارد اليوم فقط", dashboard.todayCashIn, "cashbox")}
   </section>
   <section class="dashboard-split">
     <article class="panel panel--low-stock"><div class="panel__head"><div><span class="eyebrow">تنبيه انتهاء الصلاحية</span><h2>منتجات تحتاج متابعة</h2></div><button class="text-button" data-action="navigate" data-view="inventory">عرض المخزون ${icon("arrow", 16)}</button></div>${expiring.length ? `<div class="warning-list">${expiring.map((batch) => { const days = Math.ceil((new Date(`${batch.expiryDate}T00:00:00`).getTime() - todayAtMidnight) / 86400000); return `<button class="warning-row" data-action="open-product" data-id="${batch.productId}"><div class="warning-row__icon">${icon("alert", 18)}</div><div><strong>${escapeHtml(batch.product.name)}</strong><small>${batch.batchNumber ? `تشغيلة ${escapeHtml(batch.batchNumber)} · ` : ""}المتبقي ${amount(batch.remainingQuantity)} ${escapeHtml(batch.product.unit)} · تنتهي ${formatDate(batch.expiryDate)}</small></div><strong class="${days <= 30 ? "is-negative" : ""}">${days < 0 ? "منتهٍ" : `بعد ${amount(days)} يوم`}</strong></button>`; }).join("")}</div>` : `<p class="panel__empty">لا توجد منتجات تنتهي خلال 90 يومًا.</p>`}</article>
@@ -917,8 +917,22 @@ function dashboardMarkup() {
   </section>`;
 }
 
-function metricCard(label, value, iconName, helper, rawValue = 0) {
-  return `<article class="metric-card ${toNumber(rawValue) < 0 ? "is-negative" : ""}"><div class="metric-card__icon">${icon(iconName, 19)}</div><div><small>${label}</small><strong>${value}</strong><span>${helper}</span></div></article>`;
+/**
+ * بطاقة الرقم في لوحة التحكم: مستطيلة، أيقونة كبيرة تدلّ على وظيفتها، ورقمها في سطر واحد.
+ * navigateTo اختياري: إن كانت الوجهة معروفة ومسموحة للمستخدم صارت البطاقة زرًا يقود إليها،
+ * وإلا تبقى نصًا خاملًا — لا نولّد مسارًا لا يستطيع المستخدم سلوكه.
+ */
+function metricCard(label, value, iconName, helper, rawValue = 0, navigateTo = "") {
+  const classes = ["metric-card", toNumber(rawValue) < 0 ? "is-negative" : ""].filter(Boolean).join(" ");
+  const mark = `<span class="metric-card__icon" aria-hidden="true">${icon(iconName, 26)}</span>`;
+  const hint = helper ? `<em class="metric-card__hint">${helper}</em>` : "";
+  const body = `<span class="metric-card__body"><span class="metric-card__head"><small>${label}</small>${hint}</span><strong>${value}</strong></span>`;
+  const view = String(navigateTo || "").trim();
+  if (view && canAccessView(state.currentUser, view)) {
+    const target = NAV_ITEMS.find((item) => item.id === view)?.label || "الصفحة المرتبطة";
+    return `<button type="button" class="${classes} is-openable" data-action="navigate" data-view="${view}" title="يُفتح ${target}" aria-label="${label}: افتح ${target}">${mark}${body}<span class="metric-card__go" aria-hidden="true">${icon("arrow", 18)}</span></button>`;
+  }
+  return `<article class="${classes}">${mark}${body}</article>`;
 }
 function packageFieldLabels(packageUnit, stockUnit = "حبة") { const forms = { "حبة": ["حبة", "الحبات"], "علبة": ["علبة", "العلب"], "كرتون": ["كرتون", "الكراتين"], "كيس": ["كيس", "الأكياس"], "حزمة": ["حزمة", "الحزم"], "ربطة": ["ربطة", "الربطات"], "صندوق": ["صندوق", "الصناديق"], "كيلو": ["كيلو", "الكيلوات"], "جرام": ["جرام", "الجرامات"], "لتر": ["لتر", "اللترات"], "متر": ["متر", "الأمتار"], "شريط": ["شريط", "الأشرطة"], "عبوة": ["عبوة", "العبوات"], "دزينة": ["دزينة", "الدزائن"], "قطعة": ["قطعة", "القطع"], "طقم": ["طقم", "الأطقم"], "جهاز": ["جهاز", "الأجهزة"] }; const get = (unit) => forms[unit] || [unit || "وحدة", `ال${unit || "وحدات"}`]; const [packageSingular, packagePlural] = get(packageUnit); const [saleSingular] = get(stockUnit); return { quantity: `عدد ${packagePlural.replace(/^ال/, "")}`, units: `${saleSingular}/${packageSingular}`, cost: `سعر ${packageSingular}`, salePrice: `سعر البيع لل${saleSingular}`, minimumStock: `الحد الأدنى بال${saleSingular}`, summary: `سعر ${saleSingular}` }; }
 
