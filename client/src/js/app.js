@@ -2098,6 +2098,7 @@ async function handleSetup(event) {
     await db.configureInitialAdmin({ username: values.username, pin: values.pin, name: values.accountName });
     const { username, pin, pinConfirm, accountName, ...settings } = values;
     await db.saveSettings(settings);
+    state.accounts = await db.listAccounts();
   } catch (error) { showToast(error.message || "تعذر إنشاء الحساب الأول.", "error"); return; }
   state.showSetupHome = false;
   state.settings = await db.getSettings();

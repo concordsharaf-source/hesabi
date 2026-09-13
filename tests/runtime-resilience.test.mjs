@@ -17,3 +17,8 @@ test("يحتوي التطبيق أخطاء العرض والإجراءات وي�
   assert.match(app, /لم نحذف أي بيانات محلية/);
   assert.match(styles, /\.runtime-recovery \{/);
 });
+
+test("تحدّث عملية التسجيل قائمة الحسابات قبل عرض شاشة الدخول", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /await db\.saveSettings\(settings\);\s*state\.accounts = await db\.listAccounts\(\);/);
+});
