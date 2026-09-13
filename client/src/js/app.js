@@ -1066,6 +1066,18 @@ function salesSheetGeometry(panel) {
   return { full, peek: Math.min(full, peek), nav, bar };
 }
 
+/** آخر هندسة مقيسة تُكتب في القالب نفسه: بلا هذا التلميح تُرسم الورقة إطارًا بلا طبقتها
+    وبلا ارتفاعها (افتراضي CSS ثم قفزة إلى المقيس) — وهو ما كان يظهر انكماشًا وتمدّدًا مع كل ضغطة. */
+const salesSheetPaint = { mobile: false, height: 0, nav: 0, reserve: 0 };
+let salesSheetAnimTimer = 0;
+
+function salesSheetPaintStyle(kind) {
+  if (!salesSheetPaint.mobile || salesSheetPaint.height <= 0) return "";
+  return kind === "layout"
+    ? ` style="--sales-sheet-reserve:${salesSheetPaint.reserve}px"`
+    : ` style="--sales-sheet-h:${salesSheetPaint.height}px;--sales-sheet-nav:${salesSheetPaint.nav}px"`;
+}
+
 /** يضبط الارتفاعات بخصائص CSS، فتبقى القواعد في style.css والقياس هنا فقط. */
 function applySalesSheetGeometry() {
   const panel = root.querySelector(".cart-panel.cart-sheet");
@@ -1081,6 +1093,10 @@ function applySalesSheetGeometry() {
     panel.style.removeProperty("--sales-sheet-nav");
     layout.style.removeProperty("--sales-sheet-reserve");
     delete panel.dataset.sheet;
+    salesSheetPaint.mobile = false;
+    salesSheetPaint.height = 0;
+    salesSheetPaint.reserve = 0;
+    panel.classList.remove("is-sheet-animating");
     return true;
   }
   const { full, peek, nav } = salesSheetGeometry(panel);
@@ -1090,13 +1106,27 @@ function applySalesSheetGeometry() {
   panel.style.setProperty("--sales-sheet-h", `${height}px`);
   panel.style.setProperty("--sales-sheet-nav", `${nav}px`);
   layout.style.setProperty("--sales-sheet-reserve", `${peek + SALES_SHEET_EDGE * 2 + 14}px`);
+  salesSheetPaint.mobile = true;
+  salesSheetPaint.height = height;
+  salesSheetPaint.nav = nav;
+  salesSheetPaint.reserve = peek + SALES_SHEET_EDGE * 2 + 14;
   return true;
 }
 
 /** يبدّل الحالة بلا إعادة رسم: يحفظ موضع التمرير ويجعل الحركة انتقالية لا قفزة. */
 function commitSalesSheet(mode) {
   const next = mode === "full" ? "full" : "peek";
+  const changed = state.salesSheet !== next;
   state.salesSheet = next;
+  // الانتقالي يعمل فقط حين يقرّر المستخدم التبديل أو يُفلت السحب — لا عند إعادة التصيير.
+  const animated = root.querySelector(".cart-panel.cart-sheet");
+  if (changed && animated?.classList.contains("is-sheet-mobile")) {
+    animated.classList.add("is-sheet-animating");
+    // المتصفح لا يشغّل انتقالًا أُضيف في نفس تحديث النمط: نُثبّت النمط أولًا ثم نُغيّر الارتفاع.
+    void animated.offsetHeight;
+    window.clearTimeout(salesSheetAnimTimer);
+    salesSheetAnimTimer = window.setTimeout(() => animated.classList.remove("is-sheet-animating"), 280);
+  }
   if (!applySalesSheetGeometry()) return state.salesSheet;
   const panel = root.querySelector(".cart-panel.cart-sheet");
   const handle = panel?.querySelector(".cart-sheet__handle");
@@ -1230,14 +1260,14 @@ function salesMarkup() {
   const heldCount = state.heldInvoices?.length || 0;
   const topbarActions = `<div class="sales-topbar-actions">${heldCount ? `<button class="button button--secondary button--compact held-topbar-btn" data-action="open-held-invoices" title="الفواتير المعلقة">${icon("clock", 16)}<span>معلقة (${heldCount})</span></button>` : ""}<button class="button button--secondary" data-action="navigate" data-view="invoices">${icon("receipt", 17)}<span>الفواتير</span></button></div>`;
   return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.", topbarActions)}
-  <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div><p class="desktop-barcode-reader-note">${icon("scan", 15)} قارئ الباركود المتصل بالكمبيوتر يعمل مباشرةً في صفحة المبيعات؛ امسح الرمز ثم Enter أو Tab.</p>
+  <section class="sales-layout"${salesSheetPaintStyle("layout")}><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div><p class="desktop-barcode-reader-note">${icon("scan", 15)} قارئ الباركود المتصل بالكمبيوتر يعمل مباشرةً في صفحة المبيعات؛ امسح الرمز ثم Enter أو Tab.</p>
   <div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => {
     const isFlash = state.lastAddedProductId === product.id;
     const inCart = cartProductIds.has(product.id);
     const cartQty = inCart ? state.cart.reduce((sum, line) => (line.productId === product.id ? sum + toNumber(line.quantity) : sum), 0) : 0;
     return `<div class="sale-product-line"><button class="sale-product ${product.quantity <= 0 && !state.settings?.allowNegativeSales ? "is-disabled" : ""} ${inCart ? "is-in-cart" : ""} ${isFlash ? "is-flash-added" : ""}" data-action="add-cart" data-id="${product.id}" ${product.quantity <= 0 && !state.settings?.allowNegativeSales ? "disabled" : ""} aria-pressed="${inCart}"${inCart ? ` title="${escapeHtml(product.name)}: ${amount(cartQty)} ${escapeHtml(product.unit)} في السلة الحالية"` : ""}><div><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)} متاح${inCart ? ` · ${amount(cartQty)} في السلة` : ""}</small></div><span>${money(product.salePrice)}</span><i class="${inCart ? "sale-product__count" : ""}"${inCart ? ` dir="ltr" aria-label="${amount(cartQty)} في السلة"` : ""}>${inCart ? (cartQty > 1 ? `${amount(cartQty)}` : icon("check", 18)) : icon("plus", 18)}</i></button>${productSupplierActions(product)}</div>`;
   }).join("") : `<div class="no-match"><strong>لا توجد نتيجة</strong><span>تحقق من الاسم أو الباركود أو أضف منتجًا جديدًا.</span><button class="text-button" data-action="new-product">إنشاء منتج</button></div>`}</div></div>
-  <aside class="cart-panel cart-sheet" data-sheet="${state.salesSheet === "full" ? "full" : "peek"}" data-cart-empty="${state.cart.length ? "0" : "1"}"><button class="cart-sheet__handle" type="button" data-action="toggle-sales-sheet" aria-expanded="${state.salesSheet === "full" ? "true" : "false"}" aria-label="${state.salesSheet === "full" ? "تصغير سلة البيع" : "توسيع سلة البيع إلى كامل الشاشة"}"><span class="cart-sheet__grip" aria-hidden="true"></span><span class="cart-sheet__label">${state.salesSheet === "full" ? "تصغير السلة" : "توسيع السلة"}</span></button><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div><div class="cart-head-actions">${heldCount ? `<button class="button button--secondary button--compact held-badge-btn" data-action="open-held-invoices" title="عرض الفواتير المعلقة">${icon("clock", 15)}<span>معلقة (${heldCount})</span></button>` : ""}${state.cart.length ? `<button class="button button--secondary button--compact" data-action="hold-cart" title="تعليق الفاتورة الحالية">${icon("pause", 15)}<span>تعليق</span></button><button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div></div>
+  <aside class="cart-panel cart-sheet${salesSheetPaint.mobile ? " is-sheet-mobile" : ""}"${salesSheetPaintStyle("panel")} data-sheet="${state.salesSheet === "full" ? "full" : "peek"}" data-cart-empty="${state.cart.length ? "0" : "1"}"><button class="cart-sheet__handle" type="button" data-action="toggle-sales-sheet" aria-expanded="${state.salesSheet === "full" ? "true" : "false"}" aria-label="${state.salesSheet === "full" ? "تصغير سلة البيع" : "توسيع سلة البيع إلى كامل الشاشة"}"><span class="cart-sheet__grip" aria-hidden="true"></span><span class="cart-sheet__label">${state.salesSheet === "full" ? "تصغير السلة" : "توسيع السلة"}</span></button><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div><div class="cart-head-actions">${heldCount ? `<button class="button button--secondary button--compact held-badge-btn" data-action="open-held-invoices" title="عرض الفواتير المعلقة">${icon("clock", 15)}<span>معلقة (${heldCount})</span></button>` : ""}${state.cart.length ? `<button class="button button--secondary button--compact" data-action="hold-cart" title="تعليق الفاتورة الحالية">${icon("pause", 15)}<span>تعليق</span></button><button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div></div>
   <div class="cart-lines">${state.cart.length ? state.cart.map(cartLine).join("") : `<div class="cart-empty">${icon("cart", 30)}<p>اختر منتجًا من القائمة لتبدأ البيع.</p></div>`}</div>
   <div class="cart-total"><div class="cart-total__summary"><div><span>إجمالي السلة</span><strong data-cart-subtotal>${money(totals.subtotal)}</strong></div></div><div class="cart-actions-grid">${state.cart.length ? `<button class="button button--secondary button--hold" data-action="hold-cart" title="تعليق الفاتورة مؤقتًا">${icon("pause", 17)}<span>تعليق</span></button>` : ""}<button class="button button--primary ${state.cart.length ? "checkout-launch" : "button--wide"}" data-action="checkout" ${state.cart.length ? "" : "disabled"}>إتمام البيع ${icon("arrow", 18)}</button></div></div></aside></section><section class="sales-bottom-action"><div><span class="eyebrow">سجل المبيعات</span><strong>فواتير المبيعات</strong><small>اعرض الفواتير المحفوظة وابحث عنها وراجع تفاصيل كل فاتورة.</small></div><button class="button button--primary" data-action="navigate" data-view="invoices">${icon("receipt", 22)}<span>الانتقال إلى فواتير المبيعات</span></button></section>`;
 }
@@ -1761,6 +1791,35 @@ function fitMetricValues(scope) {
   }
 }
 
+/** يعيد التصيير ثم يُرجع موضع الصفحة: استبدال جذر العرض في Chromium يُسقط scrollY إلى صفر،
+    فتبدو نقرة «عرض محتويات خانة» كأنها قفزة إلى أعلى الصفحة. قياسٌ وعرضٌ فقط — لا يمس الحساب. */
+function renderKeepingScroll() {
+  const y = Math.round(window.scrollY || document.documentElement.scrollTop || 0);
+  const x = Math.round(window.scrollX || document.documentElement.scrollLeft || 0);
+  const innerTop = root.querySelector(".cart-lines")?.scrollTop || 0;
+  // «مرساة التمرير» في المتصفح تُزيح الصفحة بضع بيكسلات حين يتغيّر المحتوى؛ ونحن نُعيد الموضع
+  // بأنفسنا، فتُعطَّل أثناء هذا التصيير فقط ثم تُعاد كما كانت.
+  const html = document.documentElement;
+  const anchorWas = html.style.overflowAnchor;
+  html.style.overflowAnchor = "none";
+  const restore = () => {
+    if (Math.abs(Math.round(window.scrollY || 0) - y) > 1 || Math.abs(Math.round(window.scrollX || 0) - x) > 1) window.scrollTo(x, y);
+    const list = root.querySelector(".cart-lines");
+    if (list && innerTop && list.scrollTop !== innerTop) list.scrollTop = innerTop;
+  };
+  render();
+  restore();
+  // المتصفح يعيد «ترسيخ» الموضع بعد إطار أو اثنين من التصيير؛ نتابعه بأربع فرص ثم نتركه.
+  let frames = 0;
+  const tail = () => {
+    restore();
+    frames += 1;
+    if (frames < 4) requestAnimationFrame(tail);
+    else html.style.overflowAnchor = anchorWas;
+  };
+  requestAnimationFrame(tail);
+}
+
 function render() {
   try { renderApplication(); }
   catch (error) { renderRecovery(error); }
@@ -1998,7 +2057,7 @@ function bindEvents() {
   root.querySelector("#expense-filter")?.addEventListener("change", async (event) => { state.expenseFrom = event.currentTarget.querySelector("[name=from]").value; state.expenseTo = event.currentTarget.querySelector("[name=to]").value; try { await refresh(); render(); } catch (error) { showToast(error.message || "تعذر تحديث المصروفات.", "error"); } });
   root.querySelector("#report-filter")?.addEventListener("change", async (event) => { state.reportFrom = event.currentTarget.querySelector("[name=from]").value; state.reportTo = event.currentTarget.querySelector("[name=to]").value; state.analytics = await db.getAnalytics({ from: state.reportFrom, to: state.reportTo }); render(); });
   root.querySelector("#periodic-inventory-filter")?.addEventListener("change", async (event) => { const form = event.currentTarget; const selectedCycle = form.querySelector("[name=cycle]").value; const cycleChanged = selectedCycle !== state.auditCycle; state.auditCycle = selectedCycle; const defaults = periodicInventoryDefaultRange(selectedCycle); state.auditFrom = cycleChanged ? defaults.from : form.querySelector("[name=from]").value; state.auditTo = cycleChanged ? defaults.to : form.querySelector("[name=to]").value; await refresh(); render(); });
-  root.querySelector("#cash-filter")?.addEventListener("change", async (event) => { state.cashFrom = event.currentTarget.querySelector("[name=from]").value; state.cashTo = event.currentTarget.querySelector("[name=to]").value; await refresh(); render(); });
+  root.querySelector("#cash-filter")?.addEventListener("change", async (event) => { state.cashFrom = event.currentTarget.querySelector("[name=from]").value; state.cashTo = event.currentTarget.querySelector("[name=to]").value; await refresh(); renderKeepingScroll(); /* تغيير الفترة لا يستحق قفزة إلى أعلى الصفحة */ });
   root.querySelector("#settings-form")?.addEventListener("submit", saveSettings);
   root.querySelector("#store-logo-file")?.addEventListener("change", handleStoreLogoFile);
   root.querySelector("#restore-file")?.addEventListener("change", restoreBackupFromFile);
@@ -2019,8 +2078,15 @@ function bindEvents() {
 
 function syncMobileNavigation() {
   const bottomNav = root.querySelector("[data-bottom-nav]");
-  const activeItem = bottomNav?.querySelector(`[data-view="${state.view}"]`);
-  activeItem?.scrollIntoView({ block: "nearest", inline: "center", behavior: "auto" });
+  // الشريط السفلي مخفيّ على الحاسوب: عنصر بلا تخطيط يُجيب مستطيلًا صفريًا، وتمريره نحو
+  // «الأنسب» يزيح الصفحة كلها. كما لا شيء يجب توسيطه حين يتّسع الشريط لكل عناصره.
+  if (!bottomNav || !bottomNav.offsetWidth || bottomNav.scrollWidth <= bottomNav.clientWidth + 1) return;
+  const activeItem = bottomNav.querySelector(`[data-view="${state.view}"]`);
+  if (!activeItem) return;
+  const keepY = Math.round(window.scrollY || 0);
+  activeItem.scrollIntoView({ block: "nearest", inline: "center", behavior: "auto" });
+  // توسيط أفقي فقط — لا نتركه يلمس الموضع الرأسي للصفحة.
+  if (Math.abs(Math.round(window.scrollY || 0) - keepY) > 1) window.scrollTo(Math.round(window.scrollX || 0), keepY);
 }
 
 async function handleSetup(event) {
@@ -2108,7 +2174,7 @@ async function handleActionUnsafe(event) {
   if (action === "reset-notification-history") { clearNotificationHistory(); showToast("أُعيد ضبط سجل التكرار. ستصلك التنبيهات من جديد."); void syncNotificationAlerts(); return; }
   if (action === "toggle-theme") { toggleTheme(); return; }
   if (action === "quick-lock") { openScreenLockDialog(); return; }
-  if (action === "toggle-report-panel") { const key = event.currentTarget.dataset.panel; if (!state.reportPanels) state.reportPanels = {}; state.reportPanels[key] = !state.reportPanels[key]; render(); return; }
+  if (action === "toggle-report-panel") { const key = event.currentTarget.dataset.panel; if (!state.reportPanels) state.reportPanels = {}; state.reportPanels[key] = !state.reportPanels[key]; renderKeepingScroll(); return; }
   if (action === "filter-activity-type") { state.activityType = event.currentTarget.dataset.type; render(); return; }
   if (action === "open-reorder-list") { openReorderDialog(); return; }
   if (action === "new-product") { openProductDialog(); return; }
@@ -2120,7 +2186,7 @@ async function handleActionUnsafe(event) {
   if (action === "toggle-carton-sale") { toggleCartonSale(id); return; }
   if (action === "cart-increment") { changeCart(id, 1); return; }
   if (action === "cart-decrement") { changeCart(id, -1); return; }
-  if (action === "cart-remove") { state.cart = state.cart.filter((line) => line.productId !== id); if (!state.cart.length) state.cartDiscount = ""; render(); return; }
+  if (action === "cart-remove") { state.cart = state.cart.filter((line) => line.productId !== id); if (!state.cart.length) state.cartDiscount = ""; renderKeepingScroll(); return; }
   if (action === "clear-cart") { state.cart = []; state.cartDiscount = ""; render(); return; }
   if (action === "hold-cart") { openHoldInvoiceDialog(); return; }
   if (action === "open-held-invoices") { openHeldInvoicesDialog(); return; }
@@ -2219,7 +2285,7 @@ function addToCart(productId) {
   if (navigator.vibrate) {
     try { navigator.vibrate(25); } catch {}
   }
-  render();
+  renderKeepingScroll(); // القائمة تبقى حيث هي: الإضافة إلى السلة ليست سببًا للعودة إلى أعلاها
   return true;
 }
 
@@ -2231,7 +2297,7 @@ function changeCart(productId, delta) {
   if (!state.settings?.allowNegativeSales && delta > 0 && toNumber(line.quantity) + step > product.quantity) { showToast("الكمية المتوفرة غير كافية", "error"); return; }
   line.quantity += delta * step;
   if (line.quantity <= 0) state.cart = state.cart.filter((item) => item.productId !== productId);
-  render();
+  renderKeepingScroll(); // الضغطة على + أو − لا تستحق أن يقفز المستخدم إلى أعلى القائمة
 }
 
 function setCartQuantity(productId, quantity, { renderNow = true } = {}) {

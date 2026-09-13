@@ -54,13 +54,16 @@ test("لا إعادة رسم عند التبديل: الحالة تُطبَّق 
   assert.ok(commitBody.length > 300, "تعذّر استخراج جسم commitSalesSheet");
   assert.match(commitBody, /applySalesSheetGeometry\(\)/, "التبديل لا يطبّق الهندسة");
   assert.doesNotMatch(commitBody, /\brender\(\)/, "التبديل يعيد رسم الصفحة كله — يفقد موضع التمرير ويكسر الحركة");
-  assert.doesNotMatch(commitBody, /await |setTimeout\(/, "التبديل صار غير متزامن");
+  assert.doesNotMatch(commitBody, /await |\bPromise\b|\.then\(/, "التبديل صار غير متزامن");
+  assert.match(commitBody, /setTimeout\([\s\S]{0,90}classList\.remove\("is-sheet-animating"\)/, "طبقة الحركة لا تُرفع بعد انتهاء الانتقال — ستُمنع حركة التبديل التالي");
+  assert.match(commitBody, /classList\.add\("is-sheet-animating"\)[\s\S]{0,160}offsetHeight[\s\S]{0,240}applySalesSheetGeometry\(\)/, "الحركة لا تبدأ: يجب إضافة الطبقة، ثم تثبيت النمط، ثم تغيير الارتفاع");
   assert.match(sheet, /handle\.setAttribute\("aria-expanded"/, "حالة التوسّع لا تُبلّغ قارئ الشاشة");
   assert.match(appJs, /if \(action === "toggle-sales-sheet"\) \{ commitSalesSheet\(state\.salesSheet === "full" \? "peek" : "full"\); return; \}/, "زر المقبض غير موصول بالإجراء");
 });
 
 test("الوسوم: مقبض داخل اللوحة، ومُختبئ على الشاشات الأكبر", () => {
-  assert.match(salesMarkup, /class="cart-panel cart-sheet"/, "اللوحة لم تعد تحمل هوية الورقة");
+  assert.match(salesMarkup, /class="cart-panel cart-sheet\$\{salesSheetPaint\.mobile \? " is-sheet-mobile" : ""\}"\$\{salesSheetPaintStyle\("panel"\)\}/, "اللوحة لم تعد تحمل هوية الورقة وتلميح هندستها من أول إطار");
+  assert.match(salesMarkup, /<section class="sales-layout"\$\{salesSheetPaintStyle\("layout"\)\}>/, "مساحة السلة المحجوزة لا تُكتب مع القالب ⇒ قفزة في تخطيط القائمة");
   assert.match(salesMarkup, /data-sheet="\$\{state\.salesSheet === "full" \? "full" : "peek"\}"/, "سمة الحالة مفقودة");
   assert.match(salesMarkup, /data-cart-empty="\$\{state\.cart\.length \? "0" : "1"\}"/, "سمة السلة الفارغة مفقودة");
   assert.match(salesMarkup, /class="cart-sheet__handle" type="button" data-action="toggle-sales-sheet"/, "المقبض ليس زرًا حقيقيًا");
@@ -126,4 +129,42 @@ test("لا انزلاق في التخطيط الأكبر: لا قاعدة وسا
   const block = /\/\* ===== سلة البيع كورقة سفلية[\s\S]*?(?=\n\/\* =====|$)/.exec(css)[0];
   assert.doesNotMatch(block, /@media \((?:max|min)-width/, "ورقة الهاتف مفُعّلة بوسائط عرض — تتعارض مع عمود السلة الجانبي من 600px");
   assert.match(appJs, /window\.matchMedia\?\.\("\(max-width: 599px\)"\)\.matches/, "البوابة الوحيدة ليست مطابقة عرض الهاتف");
+});
+
+test("لا وميض حجم ولا تحديد نص: الورقة تُرسم بطبقتها وارتفاعها، والحركة عند الطلب", () => {
+  const hint = appJs.slice(appJs.indexOf("const salesSheetPaint = {"), appJs.indexOf("function salesSheetPaintStyle"));
+  assert.ok(hint.length > 80 && hint.length < 900, "تعذّر استخراج تلميح الرسم");
+  assert.match(appJs, /function salesSheetPaintStyle\(kind\) \{[\s\S]{0,320}if \(!salesSheetPaint\.mobile \|\| salesSheetPaint\.height <= 0\) return "";/, "التلميح يُولّد سمة فارغة قبل أول قياس — يعود الوميض");
+  assert.match(appJs, /--sales-sheet-h:\$\{salesSheetPaint\.height\}px;--sales-sheet-nav:\$\{salesSheetPaint\.nav\}px/, "الارتفاع المقيس لا يُكتب في القالب");
+  const block = /\/\* ===== سلة البيع كورقة سفلية[\s\S]*?(?=\n\/\* =====|$)/.exec(css)[0];
+  assert.match(block, /\.cart-sheet\.is-sheet-mobile \{[\s\S]*?transition: none;/, "الانتقال على الحالة الدائمة: كل إعادة تصيير ستُنشئ حركة لا يطلبها المستخدم");
+  assert.match(block, /\.cart-sheet\.is-sheet-mobile\.is-sheet-animating \{ transition: height \.22s var\(--ease-out\); \}/, "لا حركة عند التبديل الفعلي");
+  assert.match(block, /:where\(\.cart-sheet__handle,[^)]*\) \{ -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; \}/, "أزرار الورقة تقبل تحديد النص ⇒ منبّه نسخ/لصق/تحديد مع الضغط المتكرر");
+  assert.match(block, /\.cart-sheet\.is-sheet-mobile input, \.cart-sheet\.is-sheet-mobile select, \.cart-sheet\.is-sheet-mobile textarea \{ -webkit-user-select: text; user-select: text; \}/, "حقول الكمية والسعر والخصم صارت غير قابلة للتحرير/التحديد");
+  assert.match(block, /\.cart-sheet\.is-sheet-mobile \{ -webkit-tap-highlight-color: transparent; \}/, "مربع اللمس الرمادي يبقى على الأزرار");
+});
+
+test("لا قفزة إلى أعلى الصفحة: تصيير يحفظ الموضع للسلة وخانات الطي", () => {
+  const helper = appJs.slice(appJs.indexOf("function renderKeepingScroll() {"), appJs.indexOf("function render() {"));
+  assert.ok(helper.length > 250 && helper.length < 1400, "تعذّر استخراج renderKeepingScroll");
+  assert.match(helper, /const y = Math\.round\(window\.scrollY \|\| document\.documentElement\.scrollTop \|\| 0\);/, "موضع النافذة لا يُؤخذ قبل التصيير");
+  assert.match(helper, /window\.scrollTo\(x, y\)/, "موضع النافذة لا يُعاد");
+  assert.match(helper, /querySelector\("\.cart-lines"\)\?\.scrollTop \|\| 0/, "تمرير قائمة الأسطر داخل الورقة لا يُحفظ");
+  assert.match(helper, /list\.scrollTop = innerTop/, "قائمة الأسطر تعود لأعلى القائمة مع كل ضغطة");
+  assert.match(helper, /html\.style\.overflowAnchor = "none";[\s\S]{0,200}const restore = \(\)/, "مرساة التمرير في المتصفح تُزحزح الصفحة أثناء إعادة التصيير");
+  assert.match(helper, /render\(\);\n  restore\(\);[\s\S]{0,140}let frames = 0;\n  const tail = \(\) => \{\n    restore\(\);/, "الاسترجاء لا يعمل بعد التصيير مباشرة")
+  assert.match(helper, /const tail = \(\) => \{\n    restore\(\);\n    frames \+= 1;\n    if \(frames < 4\) requestAnimationFrame\(tail\);\n    else html\.style\.overflowAnchor = anchorWas;/, "الاسترجاء لا يُعيد الضبط بعد إطار التسوية (مرساة التمرير)");
+  const cartStart = appJs.indexOf("function changeCart(productId, delta) {");
+  const cart = appJs.slice(cartStart, appJs.indexOf("\n}\n", cartStart) + 3);
+  assert.match(cart, /renderKeepingScroll\(\)/, "الضغط على + أو − يعيد التصيير الكامل ويهدر موضع المستخدم");
+  assert.doesNotMatch(cart, /[^a-zA-Z]render\(\)/, "changeCart ما زال يستدعي render مباشرة");
+  assert.match(appJs, /if \(action === "cart-remove"\)[\s\S]{0,200}renderKeepingScroll\(\)/, "حذف سطر يعيد التصيير بقفزة للأعلى");
+  assert.match(appJs, /if \(action === "add-cart"\) \{ addToCart\(id\); return; \}/, "الإجراء نفسه تغيّر — راجع اختبار الإضافة");
+  const add = appJs.slice(appJs.indexOf("function addToCart("), appJs.indexOf("function addToCart(") + 1600);
+  assert.match(add, /renderKeepingScroll\(\)/, "إضافة منتج من منتصف القائمة تُرجع المستخدم إلى أعلاها");
+  assert.match(appJs, /if \(action === "toggle-report-panel"\)[\s\S]{0,240}renderKeepingScroll\(\)/, "خانة الطي في الصندوق/التقارير تقفز بالصفحة إلى الأعلى");
+  assert.match(appJs, /#cash-filter[\s\S]{0,260}await refresh\(\); renderKeepingScroll\(\)/, "فلترة الفترة في الصندوق تعيد التصيير بقفزة إلى الأعلى");
+  const sync = appJs.slice(appJs.indexOf("function syncMobileNavigation() {"), appJs.indexOf("async function handleSetup(event) {"));
+  assert.match(sync, /if \(!bottomNav \|\| !bottomNav\.offsetWidth \|\| bottomNav\.scrollWidth <= bottomNav\.clientWidth \+ 1\) return;/, "توسيط عنصر التنقّل يعمل على الحاسوب حيث الشريط مخفيّ — فيزيح الصفحة كلها");
+  assert.match(sync, /const keepY = Math\.round\(window\.scrollY \|\| 0\);[\s\S]{0,220}window\.scrollTo\(Math\.round\(window\.scrollX \|\| 0\), keepY\);/, "توسيط الشريط السفلي لا يعيد الموضع الرأسي للصفحة");
 });

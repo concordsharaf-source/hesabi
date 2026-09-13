@@ -1540,9 +1540,16 @@ html[data-theme="dark"] #app { background-color: transparent; }
   overflow: hidden;
   border-radius: 20px;
   box-shadow: 0 -8px 34px rgba(9, 29, 22, .34);
-  transition: height .2s var(--ease-out);
+  transition: none; /* لا انتقال إلا عند قرار المستخدم: انظر .is-sheet-animating */
 }
+/* الحركة تُمنح للتبديل والنقر والإفلات من السحب وحدها — لا لإعادة التصيير بعد + أو −. */
+.cart-sheet.is-sheet-mobile.is-sheet-animating { transition: height .22s var(--ease-out); }
 .cart-sheet.is-sheet-mobile.is-dragging { transition: none; }
+/* أسطح الأزرار في الورقة ليست محل تحديد: لا «نسخ/لصق/تحديد» عند الضغط المتكرر على + و−. */
+.cart-sheet.is-sheet-mobile { -webkit-tap-highlight-color: transparent; }
+.cart-sheet.is-sheet-mobile :where(.cart-sheet__handle, .cart-panel__head, .cart-lines, .cart-line, .cart-total, .cart-actions-grid, .quantity-control, .carton-toggle, .remove-line, .checkout-launch, .button) { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.cart-sheet.is-sheet-mobile .quantity-control button, .cart-sheet.is-sheet-mobile .carton-toggle, .cart-sheet.is-sheet-mobile .remove-line { touch-action: manipulation; }
+.cart-sheet.is-sheet-mobile input, .cart-sheet.is-sheet-mobile select, .cart-sheet.is-sheet-mobile textarea { -webkit-user-select: text; user-select: text; }
 .cart-sheet.is-sheet-mobile .cart-panel__head { padding-bottom: 10px; }
 .cart-sheet.is-sheet-mobile .cart-lines {
   flex: 1 1 auto;
