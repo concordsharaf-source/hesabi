@@ -983,7 +983,7 @@ function inventoryMarkup() {
   <section class="panel inventory-list">${products.length ? products.map((product) => `<article class="inventory-row"><div class="inventory-row__main"><div class="inventory-icon">${icon("package", 20)}</div><div><strong dir="rtl">${escapeHtml(product.name)}</strong><small dir="auto">${escapeHtml(product.barcode || "دون باركود")} · ${escapeHtml(product.category || product.unit)} · شراء: ${money(product.purchasePrice)} · بيع: ${money(product.salePrice)}</small><small>قيمة المخزون: ${money(product.purchasePrice * product.quantity)}</small>${expiryMeterMarkup(product)}${expiryStatusMarkup(product)}</div></div><div class="inventory-row__stock"><div>${formatStatus(product)}<strong>${amount(product.quantity)} <small>${escapeHtml(product.unit)}</small></strong></div>${productSupplierActions(product)}<button class="button button--secondary" data-action="count-stock" data-id="${product.id}">جرد</button><button class="button button--secondary" data-action="adjust-stock" data-id="${product.id}">تعديل</button><button class="icon-button" data-action="open-stock-history" data-id="${product.id}" aria-label="سجل الحركة">${icon("history", 18)}</button></div></article>`).join("") : emptyState("المخزون بانتظار أول منتج", "أضف منتجًا مع كمية افتتاحية ليظهر هنا.")}</section><div class="dialog__actions"><button class="button button--secondary button--wide" data-action="open-stock-history">${icon("history", 17)} سجل حركة المخزون</button></div>`;
 }
 
-const SALES_CATALOG_LIMIT = 40;
+const SALES_CATALOG_LIMIT = 10;
 
 /* ترتيب الأصناف المعروضة في صفحة المبيعات: الأحدث بيعًا ثم الأكثر مبيعًا، ثم باقي المتوفر.
    يعتمد على state.saleItems و state.sales المحمّلين أصلًا — لا قراءة جديدة ولا كتابة على القاعدة. */
@@ -1021,15 +1021,6 @@ function salesMarkup() {
   const cartProductIds = new Set(state.cart.map((line) => line.productId));
   const ranked = salesRankedProducts().filter((product) => !query || [product.name, product.barcode, product.internalCode].some((value) => value?.toLocaleLowerCase("ar").includes(query)));
   const matches = ranked.slice(0, SALES_CATALOG_LIMIT);
-  /* صنف أضيف للسلة لكنه خارج أعلى 40: يُدرج في أول قائمة حتى يبقى توهّجه ظاهرًا.
-     ترتيب العرض فقط — لا يمس السلة ولا الحسابات. */
-  if (!query && matches.length && cartProductIds.size) {
-    const shown = new Set(matches.map((product) => product.id));
-    for (const product of ranked) {
-      if (matches.length >= SALES_CATALOG_LIMIT + 4) break;
-      if (cartProductIds.has(product.id) && !shown.has(product.id)) { shown.add(product.id); matches.unshift(product); }
-    }
-  }
   const totals = calculateSaleTotals(state.cart);
   const heldCount = state.heldInvoices?.length || 0;
   const topbarActions = `<div class="sales-topbar-actions">${heldCount ? `<button class="button button--secondary button--compact held-topbar-btn" data-action="open-held-invoices" title="الفواتير المعلقة">${icon("clock", 16)}<span>معلقة (${heldCount})</span></button>` : ""}<button class="button button--secondary" data-action="navigate" data-view="invoices">${icon("receipt", 17)}<span>الفواتير</span></button></div>`;

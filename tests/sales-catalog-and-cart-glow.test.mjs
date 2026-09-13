@@ -8,9 +8,9 @@ const appJs = await readFile(new URL("../client/src/js/app.js", import.meta.url)
 const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
 const salesMarkup = appJs.slice(appJs.indexOf("function salesMarkup() {"), appJs.indexOf("\nfunction cartLine(line) {"));
 
-test("قائمة المبيعات تعرض 40 صنفًا على الأقل وترتّبها بالأحدث ثم الأكثر مبيعًا", () => {
+test("قائمة المبيعات محدودة بعشر بطاقات لترى السلة دون تمرير، ومرتّبة بالأحدث ثم الأكثر مبيعًا", () => {
   const limit = Number(appJs.match(/const SALES_CATALOG_LIMIT = (\d+);/)?.[1]);
-  assert.ok(Number.isInteger(limit) && limit >= 40, `الحد يجب أن يكون 40 فأكثر، الحالي ${limit}`);
+  assert.equal(limit, 10, `الحد يجب أن يبقى 10 حتى لا تُدفع السلة تحت القائمة، الحالي ${limit}`);
   assert.match(appJs, /\.slice\(0, SALES_CATALOG_LIMIT\)/, "يجب تطبيق الحد على نتائج المبيعات بدل رقم ثابت");
   assert.doesNotMatch(salesMarkup, /\.slice\(0, 7\)/, "عاد حد السبعة الأصناف القديم");
   assert.match(appJs, /function salesRankedProducts\(\)/, "ترتيب الأصناف يجب أن يكون في دالة مستقلة");
@@ -26,15 +26,17 @@ test("الصنف المضاف للسلة الحالية يظهر حوله توه
   assert.match(salesMarkup, /const cartProductIds = new Set\(state\.cart\.map\(\(line\) => line\.productId\)\);/, "مجموعة أصناف السلة");
   assert.match(salesMarkup, /inCart \? "is-in-cart"/, "الكلاس يُربط بوجود الصنف في السلة");
   assert.match(salesMarkup, /aria-pressed="\$\{inCart\}"/, "حالة الضغط معلَمة لقارئ الشاشة");
-  assert.match(salesMarkup, /cartProductIds\.has\(product\.id\) && !shown\.has\(product\.id\)/, "الصنف المضاف يُدرج ولو كان خارج الحد");
+  // لا يُدرج شي فوق الحد: الإضافة كانت تدفع السلة للأسفل مرة أخرى
+  assert.doesNotMatch(salesMarkup, /matches\.unshift\(product\)/, "عادت إضافة أصناف السلة خارج الحد");
+  assert.doesNotMatch(salesMarkup, /SALES_CATALOG_LIMIT \+ 4/, "عاد سقف الإضافة +4");
   assert.match(css, /\.sale-product\.is-in-cart \{[^}]*box-shadow:/, "التوهج مرسوم بـ box-shadow");
   assert.match(css, /animation:hesabiCartHalo/, "نبض التوهج بطيء وخفيف");
   assert.match(css, /@keyframes hesabiCartHalo \{[\s\S]*?from \{ box-shadow:[\s\S]*?\} to \{ box-shadow:/, "التوهج يتنفس بين حالتين");
   assert.match(css, /\[data-theme="dark"\] \.sale-product\.is-in-cart/, "الوضع الداكن مغطى");
 });
 
-test("الترتيب محجوب عند البحث والتوهج لا يتعارض مع الوميض عند الإضافة", () => {
+test("البحث يسبق القطع، والتوهج لا يتعارض مع وميض الإضافة", () => {
   assert.match(salesMarkup, /\.filter\(\(product\) => !query \|\|/, "البحث يبقى مطبّقًا قبل القطع");
-  assert.match(salesMarkup, /if \(!query && matches\.length && cartProductIds\.size\) \{/, "إدراج أصناف السلة يعمل في وضع التصفح فقط");
+  assert.match(salesMarkup, /const matches = ranked\.slice\(0, SALES_CATALOG_LIMIT\);/, "الحد يُطبّق بعد الترتيب والبحث");
   assert.match(salesMarkup, /\$\{isFlash \? "is-flash-added" : ""\}/, "وميض الإضافة الأصلي لم يُزل");
 });
