@@ -8,11 +8,14 @@ const appJs = await readFile(new URL("../client/src/js/app.js", import.meta.url)
 const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
 const salesMarkup = appJs.slice(appJs.indexOf("function salesMarkup() {"), appJs.indexOf("\nfunction cartLine(line) {"));
 
-test("قائمة المبيعات محدودة بعشر بطاقات لترى السلة دون تمرير، ومرتّبة بالأحدث ثم الأكثر مبيعًا", () => {
+test("قائمة المبيعات محدودة بسقف ثابت وترتيبها بالأحدث ثم الأكثر مبيعًا", () => {
+  // لم يبقَ السقف حارسًا للسلة — السلة الآن ورقة مثبّتة أسفل الشاشة، فالسقف للتحكّم في حجم DOM فقط
   const limit = Number(appJs.match(/const SALES_CATALOG_LIMIT = (\d+);/)?.[1]);
-  assert.equal(limit, 10, `الحد يجب أن يبقى 10 حتى لا تُدفع السلة تحت القائمة، الحالي ${limit}`);
+  assert.ok(limit >= 40, `السقف كان 40 صنفًا بعد ثبات السلة، الحالي ${limit}`);
+  assert.ok(limit <= 60, `سقف ${limit} كبير على قائمة تُعرض كاملة في DOM`);
   assert.match(appJs, /\.slice\(0, SALES_CATALOG_LIMIT\)/, "يجب تطبيق الحد على نتائج المبيعات بدل رقم ثابت");
   assert.doesNotMatch(salesMarkup, /\.slice\(0, 7\)/, "عاد حد السبعة الأصناف القديم");
+  assert.doesNotMatch(salesMarkup, /\.slice\(0, 10\)/, "عاد الحصر العشري اليدوي خارج الثابت");
   assert.match(appJs, /function salesRankedProducts\(\)/, "ترتيب الأصناف يجب أن يكون في دالة مستقلة");
   assert.match(appJs, /if \(a\.lastSoldAt !== b\.lastSoldAt\) return a\.lastSoldAt < b\.lastSoldAt \? 1 : -1;/, "الأحدث بيعًا أولًا");
   assert.match(appJs, /if \(a\.sold !== b\.sold\) return b\.sold - a\.sold;/, "ثم الأكثر مبيعًا بالكمية");

@@ -57,6 +57,19 @@ service cloud.firestore {
         allow create: if member(storeId) && request.resource.data.deviceId == get(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)).data.deviceId;
         allow update, delete: if admin(storeId);
       }
+      /* إشعارات Web Push: مفتاح VAPID للمتجر يسجّله الأدمن فقط (فيه السرّ الخاص)،
+         واشتراك كل جهاز يكتبه صاحبه وحده حتى لا يسجّل جهازًا على حساب غيره. */
+      match /push/config {
+        allow read: if member(storeId);
+        allow write: if admin(storeId) || ownsStore(storeId);
+      }
+      match /pushDevices/{uid} {
+        allow read: if member(storeId);
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.uid == uid
+          && request.resource.data.storeId == storeId;
+        allow delete: if signedIn() && (request.auth.uid == uid || admin(storeId));
+      }
     }
 
     match /{document=**} { allow read, write: if false; }

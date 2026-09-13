@@ -14,6 +14,29 @@ let unsubscribe = null;
 let beforePayload = null;
 let applyingRemote = false;
 
+/* يجمع تغيّرات اللحظة في تنبيه واحد لكل جهاز. لا شيء هنا ينتظر الشبكة ولا يرفع استثناءً:
+   الإشعار تكميلي، والتزامن البيانات هو الأساس وقد تمّ قبله. */
+function notifyPeers(changes) {
+  const list = Array.from(changes || []);
+  if (!list.length) return;
+  import("./push-alerts.js")
+    .then(({ notifyStorePeers }) =>
+      notifyStorePeers([
+        {
+          topic: "sync",
+          key: `sync-${Date.now()}`,
+          title: "تحديث في متجرك",
+          body:
+            list.length === 1
+              ? `تم تحديث ${list[0].entity || list[0].collection || "البيانات"}`
+              : `تم تحديث ${list.length} عناصر`,
+          url: "/",
+        },
+      ]),
+    )
+    .catch(() => {});
+}
+
 export async function installSyncCoordinator(db, { onStatus = () => {}, onRemoteApplied = () => {} } = {}) {
   if (!installed) {
     installed = true;
@@ -27,7 +50,9 @@ export async function installSyncCoordinator(db, { onStatus = () => {}, onRemote
         try {
           const after = await db.exportBackup();
           beforePayload = after;
-          for (const change of diffBackupPayloads(before, after)) await pushSyncOperation(change);
+          const changes = Array.from(diffBackupPayloads(before, after));
+          for (const change of changes) await pushSyncOperation(change);
+          notifyPeers(changes);
         } catch (error) {
           onStatus("pending");
           console.warn("[Hesabi sync queue]", error);

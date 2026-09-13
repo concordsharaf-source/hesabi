@@ -1493,3 +1493,71 @@ html[data-theme="dark"] #app { background-color: transparent; }
     to   { transform: translateY(-46px); }
   }
 }
+
+/* عدّاد الصنف في السلة: رقم بدل علامة الصح عند أكثر من حبة */
+/* أسبقية أعلى من .sale-product i (0,1,1) وإلا مُحت width من القاعدة القديمة */
+.sale-product i.sale-product__count { width: max-content; min-width: 28px; padding-inline: 4px; font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.2px; }
+/* أرقام بطاقات الرئيسية تبقى في سطر واحد */
+.metric-card strong, .daily-ribbon__value { white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
+
+/* ===== سلة البيع كورقة سفلية في صفحة المبيعات (الهاتف) =====
+   النصف السفلي محجوز للسلة دائمًا؛ تُرفع بالمقبض أو بالنقرة إلى كامل الشاشة،
+   وقائمة المنتجات تمرّ فوقها كالمعتاد. لا شيء هنا يغيّر السلوك البيعي. */
+.cart-sheet__handle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin: -4px 0 8px;
+  padding: 11px 0 7px;
+  color: rgba(255, 255, 255, .62);
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: grab;
+  touch-action: none;
+}
+.cart-sheet__grip { width: 44px; height: 4px; border: 0; border-radius: 999px; background: currentColor; opacity: .8; }
+.cart-sheet.is-sheet-mobile .cart-sheet__handle { display: flex; }
+.cart-sheet.is-sheet-mobile .cart-sheet__handle:hover { color: rgba(255, 255, 255, .82); }
+.cart-sheet.is-sheet-mobile .cart-sheet__handle:active { cursor: grabbing; }
+.cart-sheet.is-sheet-mobile .cart-sheet__handle:focus-visible { outline: 3px solid #f3cf70; outline-offset: 2px; }
+.cart-sheet.is-sheet-mobile {
+  position: fixed;
+  z-index: 26;
+  right: 8px;
+  bottom: calc(var(--sales-sheet-nav, 0px) + 8px + env(safe-area-inset-bottom));
+  left: 8px;
+  height: var(--sales-sheet-h, 46vh);
+  height: var(--sales-sheet-h, 46svh);
+  min-height: 0;
+  margin: 0;
+  padding: 8px 14px 12px;
+  overflow: hidden;
+  border-radius: 20px;
+  box-shadow: 0 -8px 34px rgba(9, 29, 22, .34);
+  transition: height .2s var(--ease-out);
+}
+.cart-sheet.is-sheet-mobile.is-dragging { transition: none; }
+.cart-sheet.is-sheet-mobile .cart-panel__head { padding-bottom: 10px; }
+.cart-sheet.is-sheet-mobile .cart-lines {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+/* سلة فارغة في الوضع المصغّر: شريط صغير نظيف بدل مساحة ميتة */
+.cart-sheet.is-sheet-mobile[data-cart-empty="1"][data-sheet="peek"] .cart-lines { display: none; }
+.cart-sheet.is-sheet-mobile[data-cart-empty="1"][data-sheet="peek"] .cart-panel__head { padding-bottom: 0; border-bottom: 0; }
+.cart-sheet.is-sheet-mobile .cart-total { padding-top: 10px; border-top: 1px solid rgba(255, 255, 255, .13); }
+.cart-sheet.is-sheet-mobile .cart-actions-grid { padding-top: 2px; }
+.cart-sheet.is-sheet-mobile .checkout-launch,
+.cart-sheet.is-sheet-mobile .button--hold { min-height: 46px; }
+html.is-sales-sheet-mobile .sales-layout { padding-bottom: var(--sales-sheet-reserve, 0px); }
+html.is-sales-sheet-open body { overflow: hidden; }
+html.is-sales-sheet-open .toolbar--sales { position: static; }

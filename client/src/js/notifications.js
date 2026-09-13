@@ -1,5 +1,5 @@
 /* إشعارات حسابي: تنبيهات تصل حتى والتطبيق في الخلفية.
-   الطبقة المحلية تعمل دون خادم؛ وطبقة Push تُفعّل تلقائيًا عند توفر مفتاح VAPID وخادم إرسال. */
+   الطبقة المحلية تعمل دون خادم؛ وطبقة Push تُفعَّل بمفتاح VAPID يولّده جهاز الأدمن نفسه — بلا خادم. */
 
 const SEEN_KEY = "hesabi-notified-keys";
 const SETTINGS_KEY = "hesabi-notification-settings";
@@ -226,6 +226,9 @@ export async function enableBackgroundChecks() {
 }
 
 /* اشتراك Push حقيقي: يعمل والجهاز مغلق تمامًا، ويحتاج مفتاح VAPID وخادم إرسال. */
+/** نعيد الاشتراك قبل انتهائه بهامش أمان، فيبقى الوصول حيًّا بلا ملاحظَة. */
+export const RENEW_BEFORE_MS = 6 * 3600 * 1000;
+
 const urlBase64ToUint8Array = (base64String) => {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
@@ -233,13 +236,24 @@ const urlBase64ToUint8Array = (base64String) => {
   return Uint8Array.from([...raw].map((char) => char.charCodeAt(0)));
 };
 
-export async function subscribeToPush(vapidPublicKey) {
+/** صدق الاشتراك: موجود، وغير منتهٍ، وبعيد عن نافذة التجديد. */
+export function pushSubscriptionIsValid(subscription) {
+  if (!subscription?.endpoint) return false;
+  const expires = subscription.expirationTime;
+  if (expires === null || expires === undefined) return true;
+  return expires - Date.now() >= RENEW_BEFORE_MS;
+}
+
+export async function subscribeToPush(vapidPublicKey, { event = null } = {}) {
   if (!vapidPublicKey) return null;
   const reg = await registration();
   if (!reg?.pushManager) return null;
   try {
     const existing = await reg.pushManager.getSubscription();
-    if (existing) return existing.toJSON();
+    // الاشتراك القديم صالح؟ نكتفي به — إلا إذا كان على وشك الانتهاء، أو جاءنا push_event
+    // (وهذا وحده دليل قاطع أن مزوّد الدفع أسقط الاشتراك).
+    if (existing && !event && pushSubscriptionIsValid(existing)) return existing.toJSON();
+    if (existing && event) await existing.unsubscribe().catch(() => {});
     const subscription = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),

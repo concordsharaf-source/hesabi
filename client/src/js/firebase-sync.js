@@ -1,6 +1,6 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { browserLocalPersistence, getAuth, setPersistence, signInAnonymously, signOut } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, getFirestore, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc } from "firebase/firestore";
 import { createDeviceIdentity, createPairingCode, isPairingCodeUsable } from "./sync-domain.js";
 
 const fallbackConfig = {
@@ -39,6 +39,8 @@ const pairingRef = (firestore, storeId, code) => doc(firestore, "stores", storeI
 const operationRef = (firestore, storeId, operationId) => doc(firestore, "stores", storeId, "operations", operationId);
 const directoryRef = (firestore, emailKey) => doc(firestore, "storeDirectory", emailKey);
 const requestRef = (firestore, storeId, requestId) => doc(firestore, "stores", storeId, "pairRequests", requestId);
+const pushConfigRef = (firestore, storeId) => doc(firestore, "stores", storeId, "push", "config");
+const pushDeviceRef = (firestore, storeId, uid) => doc(firestore, "stores", storeId, "pushDevices", uid);
 const emailKey = async (email) => { const bytes = new TextEncoder().encode(String(email || "").trim().toLowerCase()); const digest = await crypto.subtle.digest("SHA-256", bytes); return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join(""); };
 
 async function ensureAnonymousUser() {
@@ -150,6 +152,115 @@ export async function watchAssistantRequests(storeId, onRequests, onError = () =
   const identity = readIdentity(); if (!identity || identity.storeId !== storeId || identity.role !== "admin") return () => {};
   const { firestore } = await services();
   return onSnapshot(query(collection(firestore, "stores", storeId, "pairRequests"), orderBy("createdAt", "desc")), (snapshot) => onRequests(snapshot.docs.map((item) => ({ id: item.id, ...item.data() }))), onError);
+}
+
+/* ============================ إشعارات Web Push ============================
+ * سجلّ أجهزة المتجر: مفتاح VAPID للمتجر + اشتراك كل جهاز. الغرض أن يصل تنبيه
+ * العملية الواحدة إلى كل أجهزة نفس المتجر (نفس الإيميل) والتطبيق مغلق، لأن
+ * التسليم يمشي عبر مزوّد دفع المتصفح (fcm.googleapis.com على أندرويد).
+ * ملاحظة صراحةً: لا خادم عندنا في بناء PWA/APK، فالجهاز نفسه هو المُرسِل.
+ */
+
+/**
+ * يقرأ مفاتيح VAPID للمتجر، وينشئها محليًا من جهاز الأدمن إن لم تكن موجودة.
+ * تُكتب في Firestore لتصل لكل أجهزة المتجر بلا أي خادم. تُقرأ مرة واحدة لكل تشغيل.
+ */
+let vapidCacheStore = "";
+let vapidCacheValue = null;
+export async function getStoreVapidKeys(storeId, { force = false } = {}) {
+  if (!storeId) return null;
+  const { auth, firestore } = await services();
+  if (!force && vapidCacheStore === storeId && vapidCacheValue) return vapidCacheValue;
+  const ref = pushConfigRef(firestore, storeId);
+  const snapshot = await getDoc(ref);
+  if (snapshot.exists() && snapshot.data().publicKey) {
+    vapidCacheStore = storeId;
+    vapidCacheValue = snapshot.data();
+    return vapidCacheValue;
+  }
+  const user = await ensureOwnerUser();
+  const member = await getCloudStoreMember(storeId, user.uid);
+  if (!(member && member.role === "admin")) throw new Error("إنشاء مفاتيح الإشعارات من جهاز الأدمن فقط.");
+  const { generateVapidKeypair } = await import("./push-relay.js");
+  const generated = await generateVapidKeypair();
+  const record = {
+    ...generated,
+    subject: `mailto:${user.email || `owner-${storeId}@hesabi.app`}`,
+    createdAt: serverTimestamp(),
+    createdBy: user.uid,
+  };
+  await setDoc(ref, record, { merge: true });
+  const stored = { ...record, createdAt: null };
+  vapidCacheStore = storeId;
+  vapidCacheValue = stored;
+  return stored;
+}
+
+/** يسجّل اشتراك هذا الجهاز تحت حسابه هو فقط — القواعد تمنع كتابة حساب غيره. */
+export async function registerPushDevice({ storeId, subscription, meta = {} }) {
+  const { auth, firestore } = await services();
+  const user = auth.currentUser;
+  if (!user || !storeId || !subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) return null;
+  await setDoc(
+    pushDeviceRef(firestore, storeId, user.uid),
+    {
+      uid: user.uid,
+      storeId,
+      deviceId: readDeviceId(),
+      accountName: readIdentity()?.accountName || "",
+      endpoint: String(subscription.endpoint).slice(0, 2048),
+      keys: { p256dh: String(subscription.keys.p256dh), auth: String(subscription.keys.auth) },
+      expirationTime: subscription.expirationTime ?? null,
+      platform: meta.platform || "",
+      userAgent: String(meta.userAgent || (typeof navigator !== "undefined" ? navigator.userAgent : "") || "").slice(0, 200),
+      lastSeenAt: serverTimestamp(),
+    },
+    { merge: true },
+  );
+  return { uid: user.uid };
+}
+
+export async function unregisterPushDevice(storeId) {
+  const { auth, firestore } = await services();
+  const user = auth.currentUser;
+  if (!user || !storeId) return false;
+  await deleteDoc(pushDeviceRef(firestore, storeId, user.uid));
+  return true;
+}
+
+/** اشتراكات أجهزة المتجر، عدا جهاز مُستبعِد (من نفّذ العملية لا يُنبّه نفسه). */
+export async function listStorePushDevices(storeId, { excludeUid = "" } = {}) {
+  const { firestore } = await services();
+  const snapshot = await getDocs(collection(firestore, "stores", storeId, "pushDevices"));
+  const devices = [];
+  for (const item of snapshot.docs) {
+    const data = item.data() || {};
+    if (excludeUid && item.id === excludeUid) continue;
+    if (!data.endpoint || !data.keys?.p256dh || !data.keys?.auth) continue;
+    devices.push({ uid: item.id, accountName: data.accountName || "", subscription: { endpoint: data.endpoint, keys: data.keys, expirationTime: data.expirationTime ?? null } });
+  }
+  return devices;
+}
+
+/** حذف اشتراكات ميّتة (404/410 من مزوّد الدفع) — تُصلح نفسها في التشغيل التالي. */
+export async function removePushDevicesByEndpoints(storeId, endpoints = []) {
+  if (!storeId || !endpoints.length) return 0;
+  const { firestore } = await services();
+  const wanted = new Set(endpoints);
+  const snapshot = await getDocs(collection(firestore, "stores", storeId, "pushDevices"));
+  let removed = 0;
+  for (const item of snapshot.docs) {
+    if (wanted.has(item.data()?.endpoint)) {
+      await deleteDoc(item.ref);
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
+export async function currentCloudUid() {
+  const { auth } = await services();
+  return auth.currentUser?.uid || "";
 }
 
 export async function getCloudDeviceIdentity() { return readIdentity(); }
