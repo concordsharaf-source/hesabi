@@ -1442,9 +1442,9 @@ html[data-theme="dark"] #app { background-color: transparent; }
 }
 
 /* ===== خط المسح الليزري في نافذة قارئ الباركود (تأثير بصري خالص) ===== */
-/* لا شرط ولا حالة ولا تعلّق بعنصر آخر: يُرسم مباشرة على .scanner-box نفسها،
-   فيبقى يعمل دائمًا مهما غطى الدليل أو الحالة أو الأزرار مساحة الكاميرا.
-   لا يمس أي منطق: الكاميرا وقراءة الباركود والحسابات تبقى كما هي حرفيًا. */
+/* خط واحد يطلع وينزل داخل مساحة الكاميرا. بلا أي شرط، وبلا أي تعلّق برمجي:
+   لا يقرأ حالة، ولا يتوقف عند خطأ، ولا يعتمد على عنصر آخر، ولا يلمس أي منطق.
+   المدى بكسلات صريحة — لأن نسبة translateY() تُحسب من ارتفاع الخط نفسه (3px). */
 .scanner-box::after {
   content: "";
   position: absolute;
@@ -1452,6 +1452,7 @@ html[data-theme="dark"] #app { background-color: transparent; }
   right: 9%;
   top: 50%;
   height: 3px;
+  margin-top: -1.5px;
   border-radius: 999px;
   pointer-events: none;
   /* حافة مضيئة فوق حزمة شفافة: الأطراف نحيفة جدًا والقوة في المنتصف */
@@ -1472,17 +1473,20 @@ html[data-theme="dark"] #app { background-color: transparent; }
   filter: drop-shadow(0 0 2px rgba(43, 233, 158, .85))
           drop-shadow(0 0 7px rgba(31, 200, 140, .55))
           drop-shadow(0 0 16px rgba(23, 168, 116, .30));
-  animation: hesabi-scanner-laser 2.6s cubic-bezier(.45, .05, .55, .95) infinite alternate;
+  animation: hesabi-scanner-laser 2.4s cubic-bezier(.45, .05, .55, .95) infinite alternate;
   will-change: transform;
 }
 
-/* المدى نسبةً لارتفاع إطار الكاميرا نفسه (يغطي 54% من علوه ومتمركز على المنتصف)،
-   بلا أي متغير خارجي ولا اعتماد على عناصر أخرى */
+/* +58px أسفل المنتصف و -58px أعلى منه: يغطّي كامل إطار الدليل على كل المقاسات */
 @keyframes hesabi-scanner-laser {
-  from { transform: translateY(4%); }
-  to   { transform: translateY(-104%); }
+  from { transform: translateY(58px); }
+  to   { transform: translateY(-58px); }
 }
 
 @media (max-width: 599px) {
-  .scanner-box::after { height: 2px; }
+  .scanner-box::after { height: 2px; margin-top: -1px; }
+  @keyframes hesabi-scanner-laser {
+    from { transform: translateY(46px); }
+    to   { transform: translateY(-46px); }
+  }
 }
