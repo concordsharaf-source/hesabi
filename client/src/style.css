@@ -1815,3 +1815,39 @@ html.is-sales-page .sales-total-bar {
 .bg-theme-option__swatch--single i { flex:1; }
 .bg-theme-option__swatch--single { width:34px; height:28px; }
 .panel__head h2 svg { vertical-align:-2px; margin-inline-start:4px; color:var(--gold); }
+
+/* ═══ خانتا الخدمات الثابتتان أعلى قائمة البيع: شحن فوري + نقد مقابل تحويل ═══ */
+.sales-service-tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+.sales-service-tile { display:grid; justify-items:center; gap:3px; padding:12px 8px; border-radius:13px; border:1.5px solid transparent; color:#fff; text-align:center; box-shadow:var(--shadow-soft); transition:transform .16s var(--ease-out), box-shadow .16s var(--ease-out); }
+.sales-service-tile:hover { transform:translateY(-1px); }
+.sales-service-tile:active { transform:scale(.97); }
+.sales-service-tile span { font-size:14px; font-weight:800; }
+.sales-service-tile small { font-size:10px; opacity:.85; }
+.sales-service-tile--topup { background:linear-gradient(135deg,#1f6b59,#174c3f); border-color:rgba(255,255,255,.25); }
+.sales-service-tile--exchange { background:linear-gradient(135deg,#8a5a1f,#6b4415); border-color:rgba(255,255,255,.25); }
+[data-theme="dark"] .sales-service-tile--topup { background:linear-gradient(135deg,#1c5b4c,#123c32); border-color:#3a6d5f; }
+[data-theme="dark"] .sales-service-tile--exchange { background:linear-gradient(135deg,#7a5019,#5a3a10); border-color:#8a6a35; }
+
+/* سطر الخدمة داخل السلة: مبلغ واحد واضح بلا كمية ولا كراتين */
+.cart-line--service { grid-template-columns:1fr auto; }
+.cart-line--service .cart-line__detail strong { display:inline-flex; align-items:center; gap:6px; font-size:13px; }
+.cart-line__service-amount { display:flex; align-items:center; gap:8px; grid-column:1 / -1; }
+.cart-line__service-amount span { color:rgba(255,255,255,.62); font-size:11px; font-weight:800; }
+.cart-line__service-amount input { flex:1; min-width:0; height:44px; padding:0 10px; direction:ltr; text-align:center; color:#fff; font-weight:800; font-size:16px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.18); border-radius:11px; }
+.cart-line__service-amount input::placeholder { color:rgba(255,255,255,.4); font-size:12px; }
+
+/* ═══ نافذة توصيل النواقص: كميات لكل صنف وأزرار إرسال للمورد ═══ */
+.reorder-lines { display:grid; gap:8px; padding:10px 0; }
+.reorder-line { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:9px 10px; background:rgba(31,107,89,.05); border:1px solid rgba(31,107,89,.14); border-radius:11px; }
+.reorder-line__info strong { display:block; font-size:12px; }
+.reorder-line__info small { color:var(--muted); font-size:10px; }
+.reorder-line__qty { display:flex; align-items:center; gap:6px; }
+.reorder-line__qty span { font-size:10px; font-weight:800; color:var(--muted); }
+.reorder-line__qty small { font-size:10px; color:var(--muted); }
+.reorder-line__qty input { width:74px; height:40px; padding:0 6px; direction:ltr; text-align:center; font-weight:800; border:1px solid rgba(31,107,89,.25); border-radius:9px; background:#fffefa; }
+.reorder-group__send { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding-top:4px; }
+.reorder-group__send .button { min-height:42px; }
+.reorder-no-phone { color:var(--muted); font-size:10px; }
+[data-theme="dark"] .reorder-line { background:#1a2d26; border-color:#3f5c51; }
+[data-theme="dark"] .reorder-line__info small, [data-theme="dark"] .reorder-line__qty span, [data-theme="dark"] .reorder-line__qty small { color:#9db8ad; }
+[data-theme="dark"] .reorder-line__qty input { color:#e6f4ea; background:#122019; border-color:#3f5c51; }

@@ -490,11 +490,14 @@ test("يعرض اختصاري حساب المورد والاتصال بجانب 
   assert.match(styles, /\.sale-product-line/);
 });
 
-test("يجمع قائمة إعادة الطلب حسب المورد ويتيح حسابه واتصاله ومشاركة الطلب", async () => {
+test("يجمع قائمة إعادة الطلب حسب المورد مع كميات لكل صنف وإرسال نصي أو PDF على رقم المورد", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
   assert.match(app, /function openReorderDialog\(\)/);
   assert.match(app, /data-reorder-supplier/);
-  assert.match(app, /data-share-reorder/);
+  assert.match(app, /data-reorder-qty/);
+  assert.match(app, /data-reorder-send-text/);
+  assert.match(app, /data-reorder-send-pdf/);
+  assert.match(app, /data-reorder-share/);
   assert.match(app, /navigator\.share/);
   assert.match(app, /phoneCallButton\(group\.supplier\.phone, group\.supplier\.name\)/);
 });

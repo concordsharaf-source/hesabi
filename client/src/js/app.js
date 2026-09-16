@@ -172,6 +172,17 @@ const phoneHref = (phone) => {
   const digits = raw.replace(/\D/g, "");
   return digits ? `tel:${raw.startsWith("+") ? "+" : ""}${digits}` : "";
 };
+/* واتساب بالرقم كما هو مسجل تمامًا: بلا + وبلا أي تطبيع — كما طلب صاحب المتجر لأرقام الموردين المحلية. */
+const whatsAppExactHref = (phone, text = "") => {
+  const digits = String(phone || "").trim().replace(/\D/g, "");
+  if (!digits) return "";
+  return `https://wa.me/${digits}${text ? `?text=${encodeURIComponent(text)}` : ""}`;
+};
+function sendWhatsAppExact(phone, text) {
+  const href = whatsAppExactHref(phone, text);
+  if (href) window.open(href, "_blank", "noopener,noreferrer");
+  else showToast("لا يوجد رقم هاتف مسجل لهذا المورد.", "error");
+}
 const whatsAppHref = (phone, text = "") => {
   const raw = String(phone || "").trim();
   const digits = raw.replace(/[^0-9+]/g, "");
@@ -1020,12 +1031,51 @@ function openReorderDialog() {
     const group = map.get(key) || { supplier, products: [] };
     group.products.push(product); map.set(key, group); return map;
   }, new Map());
-  const groupText = (group) => [`قائمة إعادة طلب من ${group.supplier?.name || "مورد غير محدد"}`, ...group.products.map((product) => `- ${product.name}: المتاح ${amount(product.quantity)} ${product.unit}، الحد الأدنى ${amount(product.minimumStock)} ${product.unit}`)].join("\n");
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">تنبيه إعادة الطلب</span><h2>المنتجات المنخفضة أو النافدة</h2><p class="dialog__subtext">تُجمع النواقص بحسب آخر مورد ورد المنتج، لتتمكن من المراجعة والاتصال أو المشاركة سريعًا.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div>${groups.size ? `<section class="account-transactions">${[...groups.entries()].map(([key, group]) => `<article class="reorder-group"><div class="reorder-group__head"><div><strong>${escapeHtml(group.supplier?.name || "منتجات بلا مورد مرتبط")}</strong><small>${group.products.length} أصناف تحتاج إعادة طلب</small></div><div class="product-supplier-actions">${group.supplier ? `<button class="icon-button icon-button--supplier" data-reorder-supplier="${group.supplier.id}" aria-label="حساب المورد">${icon("truck", 18)}</button>${phoneCallButton(group.supplier.phone, group.supplier.name)}` : ""}<button class="button button--secondary" data-share-reorder="${key}">مشاركة القائمة</button></div></div><div class="warning-list">${group.products.map((product) => `<button class="warning-row" data-reorder-product="${product.id}"><div class="warning-row__icon">${icon("package", 18)}</div><div><strong>${escapeHtml(product.name)}</strong><small>المتاح ${amount(product.quantity)} ${escapeHtml(product.unit)} · الحد ${amount(product.minimumStock)} ${escapeHtml(product.unit)}</small></div>${formatStatus(product)}</button>`).join("")}</div></article>`).join("")}</section>` : `<div class="inline-empty">لا توجد منتجات منخفضة أو نافدة حاليًا.</div>`}<div class="dialog__actions"><button class="button button--primary" data-dialog-close>إغلاق</button></div>`);
+  /* الكمية المقترحة: ما يرفع المخزون إلى ضعف الحد الأدنى على الأقل (وحدة واحدة كحد أدنى). */
+  const suggestedQuantity = (product) => Math.max(1, Math.ceil(Math.max(toNumber(product.minimumStock) * 2, 1) - toNumber(product.quantity)));
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">توصيل النواقص من الموردين</span><h2>المنتجات المنخفضة أو النافدة</h2><p class="dialog__subtext">حدّد الكمية المطلوبة من كل صنف ثم أرسل طلب التوريد للمورد نصًا أو PDF على رقمه المسجل.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div>${groups.size ? `<section class="account-transactions">${[...groups.entries()].map(([key, group]) => `<article class="reorder-group" data-reorder-group="${key}"><div class="reorder-group__head"><div><strong>${escapeHtml(group.supplier?.name || "منتجات بلا مورد مرتبط")}</strong><small>${group.products.length} أصناف تحتاج إعادة طلب${group.supplier?.phone ? ` · <span dir="ltr">${escapeHtml(group.supplier.phone)}</span>` : ""}</small></div><div class="product-supplier-actions">${group.supplier ? `<button class="icon-button icon-button--supplier" data-reorder-supplier="${group.supplier.id}" aria-label="حساب المورد">${icon("truck", 18)}</button>${phoneCallButton(group.supplier.phone, group.supplier.name)}` : ""}</div></div><div class="reorder-lines">${group.products.map((product) => `<div class="reorder-line"><div class="reorder-line__info"><strong dir="rtl">${escapeHtml(product.name)}</strong><small>المتاح ${amount(product.quantity)} ${escapeHtml(product.unit)} · الحد ${amount(product.minimumStock)} ${escapeHtml(product.unit)}</small></div><label class="reorder-line__qty"><span>المطلوب</span><input type="number" inputmode="numeric" min="0" step="1" value="${suggestedQuantity(product)}" data-reorder-qty="${product.id}" aria-label="الكمية المطلوبة من ${escapeHtml(product.name)}" /><small>${escapeHtml(product.unit)}</small></label></div>`).join("")}</div><div class="reorder-group__send">${group.supplier?.phone ? `<button class="button button--primary" data-reorder-send-text="${key}">${icon("whatsapp", 17)}<span>إرسال نصي للمورد</span></button><button class="button button--secondary" data-reorder-send-pdf="${key}">${icon("share", 17)}<span>إرسال PDF</span></button>` : `<button class="button button--secondary" data-reorder-share="${key}">${icon("share", 17)}<span>مشاركة القائمة</span></button><small class="reorder-no-phone">${group.supplier ? "لا يوجد رقم مسجل لهذا المورد — أضف رقمه ليظهر زر الإرسال المباشر." : "اربط المنتجات بمورد ليظهر زر الإرسال المباشر."}</small>`}</div></article>`).join("")}</section>` : `<div class="inline-empty">لا توجد منتجات منخفضة أو نافدة حاليًا.</div>`}<div class="dialog__actions"><button class="button button--primary" data-dialog-close>إغلاق</button></div>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelectorAll("[data-reorder-supplier]").forEach((button) => button.addEventListener("click", () => { closeDialog(); openSupplierAccountDialog(button.dataset.reorderSupplier); }));
-  overlay.querySelectorAll("[data-reorder-product]").forEach((button) => button.addEventListener("click", () => { closeDialog(); openProductDialog(state.products.find((product) => product.id === button.dataset.reorderProduct)); }));
-  overlay.querySelectorAll("[data-share-reorder]").forEach((button) => button.addEventListener("click", async () => { const group = groups.get(button.dataset.shareReorder); const text = groupText(group); try { if (navigator.share) await navigator.share({ title: "قائمة إعادة طلب — حسابي", text }); else { await navigator.clipboard.writeText(text); showToast("تم نسخ قائمة إعادة الطلب للمشاركة"); } } catch (error) { if (error?.name !== "AbortError") showToast("تعذرت مشاركة قائمة إعادة الطلب.", "error"); } }));
+  /* الأصناف المطلوبة فعلًا: كمية أكبر من صفر فقط — يستطيع البائع تصفير ما لا يريده. */
+  const requestedLines = (key) => {
+    const group = groups.get(key);
+    return group.products.map((product) => ({ product, quantity: Math.max(0, Math.floor(toNumber(overlay.querySelector(`[data-reorder-qty="${product.id}"]`)?.value))) })).filter((line) => line.quantity > 0);
+  };
+  const orderText = (group, lines) => [
+    `طلب توريد من ${storeDisplayName()}`,
+    `إلى المورد: ${group.supplier?.name || "غير محدد"}`,
+    `التاريخ: ${dateKey()}`,
+    "",
+    "الأصناف المطلوبة:",
+    ...lines.map((line, index) => `${index + 1}. ${line.product.name} — الكمية: ${amount(line.quantity)} ${line.product.unit}`),
+    "",
+    `إجمالي الأصناف: ${lines.length}`,
+    "نرجو التجهيز والتوصيل، وشكرًا.",
+  ].join("\n");
+  const orderHtml = (group, lines) => `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8" /><style>body{font-family:Arial,sans-serif;margin:24px;color:#17342d;}h1{font-size:20px;margin:0 0 2px;}h2{font-size:15px;margin:0 0 14px;color:#1f6b59;}table{width:100%;border-collapse:collapse;margin-top:12px;}th,td{border:1px solid #b9cdbf;padding:8px 10px;font-size:13px;text-align:right;}th{background:#e7f1eb;}tfoot td{font-weight:bold;background:#f8f0df;}p.note{margin-top:16px;font-size:12px;color:#555;}</style></head><body><h1>طلب توريد — ${escapeHtml(storeDisplayName())}</h1><h2>إلى المورد: ${escapeHtml(group.supplier?.name || "غير محدد")}${group.supplier?.phone ? ` · <span dir="ltr">${escapeHtml(group.supplier.phone)}</span>` : ""} · التاريخ: ${dateKey()}</h2><table><thead><tr><th>#</th><th>الصنف</th><th>الكمية المطلوبة</th><th>الوحدة</th></tr></thead><tbody>${lines.map((line, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(line.product.name)}</td><td>${amount(line.quantity)}</td><td>${escapeHtml(line.product.unit)}</td></tr>`).join("")}</tbody><tfoot><tr><td colspan="4">إجمالي الأصناف: ${lines.length}</td></tr></tfoot></table><p class="note">نرجو التجهيز والتوصيل، وشكرًا.</p></body></html>`;
+  overlay.querySelectorAll("[data-reorder-send-text]").forEach((button) => button.addEventListener("click", () => {
+    const key = button.dataset.reorderSendText; const group = groups.get(key); const lines = requestedLines(key);
+    if (!lines.length) { showToast("حدّد كمية لصنف واحد على الأقل.", "error"); return; }
+    sendWhatsAppExact(group.supplier?.phone, orderText(group, lines));
+  }));
+  overlay.querySelectorAll("[data-reorder-send-pdf]").forEach((button) => button.addEventListener("click", async () => {
+    const key = button.dataset.reorderSendPdf; const group = groups.get(key); const lines = requestedLines(key);
+    if (!lines.length) { showToast("حدّد كمية لصنف واحد على الأقل.", "error"); return; }
+    button.disabled = true;
+    try {
+      const result = await shareOrDownloadPdf({ html: orderHtml(group, lines), filename: `طلب-توريد-${dateKey()}.pdf`, title: `طلب توريد — ${group.supplier?.name || ""}` });
+      if (result === "downloaded") showToast("نُزّل ملف PDF — أرسله للمورد عبر واتساب.");
+      /* بعد تجهيز الملف نفتح محادثة المورد بالرقم كما هو مسجل ليُرفق الملف مباشرة. */
+      sendWhatsAppExact(group.supplier?.phone, "");
+    } catch (error) { if (error?.name !== "AbortError") showToast("تعذر تجهيز ملف PDF لطلب التوريد.", "error"); }
+    button.disabled = false;
+  }));
+  overlay.querySelectorAll("[data-reorder-share]").forEach((button) => button.addEventListener("click", async () => {
+    const key = button.dataset.reorderShare; const group = groups.get(key); const lines = requestedLines(key);
+    if (!lines.length) { showToast("حدّد كمية لصنف واحد على الأقل.", "error"); return; }
+    const text = orderText(group, lines);
+    try { if (navigator.share) await navigator.share({ title: "طلب توريد — حسابي", text }); else { await navigator.clipboard.writeText(text); showToast("تم نسخ طلب التوريد للمشاركة"); } } catch (error) { if (error?.name !== "AbortError") showToast("تعذرت مشاركة طلب التوريد.", "error"); }
+  }));
 }
 
 function inventoryMarkup() {
@@ -1083,7 +1133,7 @@ function salesMarkup() {
   const topbarActions = `<div class="sales-topbar-actions">${heldCount ? `<button class="button button--secondary button--compact held-topbar-btn" data-action="open-held-invoices" title="الفواتير المعلقة">${icon("clock", 16)}<span>معلقة (${heldCount})</span></button>` : ""}<button class="button button--secondary" data-action="navigate" data-view="invoices">${icon("receipt", 17)}<span>الفواتير</span></button></div>`;
   return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.", topbarActions)}
   <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div><p class="desktop-barcode-reader-note">${icon("scan", 15)} قارئ الباركود المتصل بالكمبيوتر يعمل مباشرةً في صفحة المبيعات؛ امسح الرمز ثم Enter أو Tab.</p>
-  <div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => {
+  <div class="sales-service-tiles"><button class="sales-service-tile sales-service-tile--topup" type="button" data-action="add-service-line" data-service="instant-topup">${icon("phone", 20)}<span>شحن فوري</span><small>رصيد اتصالات للزبون</small></button><button class="sales-service-tile sales-service-tile--exchange" type="button" data-action="add-service-line" data-service="cash-transfer">${icon("transfer", 20)}<span>نقد مقابل تحويل</span><small>الزبون يحوّل وتسلمه نقدًا</small></button></div><div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => {
     const isFlash = state.lastAddedProductId === product.id;
     const inCart = cartProductIds.has(product.id);
     const cartQty = inCart ? state.cart.reduce((sum, line) => (line.productId === product.id ? sum + toNumber(line.quantity) : sum), 0) : 0;
@@ -1094,7 +1144,24 @@ function salesMarkup() {
   <div class="cart-total"><div class="cart-total__summary"><div><span>إجمالي السلة</span><strong data-cart-subtotal>${money(totals.subtotal)}</strong></div></div><div class="cart-actions-grid">${state.cart.length ? `<button class="button button--secondary button--hold" data-action="hold-cart" title="تعليق الفاتورة مؤقتًا">${icon("pause", 17)}<span>تعليق</span></button>` : ""}<button class="button button--primary ${state.cart.length ? "checkout-launch" : "button--wide"}" data-action="checkout" ${state.cart.length ? "" : "disabled"}>إتمام البيع ${icon("arrow", 18)}</button></div></div></aside></section><button class="sales-total-bar" type="button" data-action="scroll-to-cart" aria-label="إجمالي الفاتورة ${money(totals.subtotal)} — اضغط للانتقال إلى السلة" title="الانتقال إلى السلة أسفل الصفحة"><span class="sales-total-bar__label">${icon("cart", 18)} الإجمالي</span><strong class="sales-total-bar__value" data-sales-total-bar dir="ltr">${money(totals.subtotal)}</strong></button><section class="sales-bottom-action"><div><span class="eyebrow">سجل المبيعات</span><strong>فواتير المبيعات</strong><small>اعرض الفواتير المحفوظة وابحث عنها وراجع تفاصيل كل فاتورة.</small></div><button class="button button--primary" data-action="navigate" data-view="invoices">${icon("receipt", 22)}<span>الانتقال إلى فواتير المبيعات</span></button></section>`;
 }
 
+const SALE_SERVICE_TYPES = {
+  "instant-topup": { label: "شحن فوري", hint: "رصيد اتصالات للزبون", prefix: "svc-topup" },
+  "cash-transfer": { label: "نقد مقابل تحويل", hint: "الزبون يحوّل حوالة وتسلمه المبلغ نقدًا", prefix: "svc-exchange" },
+};
+function addServiceLine(serviceType) {
+  const service = SALE_SERVICE_TYPES[serviceType];
+  if (!service) return;
+  state.cart.push({ productId: `${service.prefix}-${Date.now()}`, isService: true, serviceType, name: service.label, unitPrice: "", quantity: 1, discount: "" });
+  renderKeepingScroll();
+  requestAnimationFrame(() => { const input = root.querySelector(`[data-service-amount]:last-of-type`) || [...root.querySelectorAll("[data-service-amount]")].pop(); input?.focus(); });
+}
+function serviceCartLine(line) {
+  const service = SALE_SERVICE_TYPES[line.serviceType] || { label: line.name || "خدمة", hint: "" };
+  const lineAmount = Math.max(0, toNumber(line.unitPrice));
+  return `<article class="cart-line cart-line--service"><div class="cart-line__detail"><strong dir="rtl">${icon(line.serviceType === "cash-transfer" ? "transfer" : "phone", 15)} ${escapeHtml(service.label)}</strong><small>${escapeHtml(service.hint)}</small></div><strong data-cart-line-total="${line.productId}">${money(lineAmount)}</strong><label class="cart-line__service-amount"><span>المبلغ</span><input data-service-amount="${line.productId}" type="number" inputmode="decimal" min="0" step="1" value="${escapeHtml(line.unitPrice)}" placeholder="أدخل المبلغ" aria-label="مبلغ ${escapeHtml(service.label)}" /></label><button class="remove-line" aria-label="حذف من السلة" data-action="cart-remove" data-id="${line.productId}">${icon("close", 16)}</button></article>`;
+}
 function cartLine(line) {
+  if (line.isService) return serviceCartLine(line);
   const product = state.products.find((item) => item.id === line.productId);
   const unitsPerPackage = Math.max(1, Math.floor(toNumber(line.unitsPerPackage ?? product?.unitsPerPackage) || 1)); const packageUnit = line.packageUnit || product?.purchasePackageUnit || "كرتون"; const soldAsPackage = Boolean(line.soldAsPackage && unitsPerPackage > 1); const cartonCount = Math.max(1, Math.round(toNumber(line.quantity) / unitsPerPackage)); const totals = calculateSaleTotals([line]); const canSellCarton = unitsPerPackage > 1 && (state.settings?.allowNegativeSales || toNumber(product?.quantity) >= unitsPerPackage);
   const quantityInput = soldAsPackage ? `<input data-cart-carton-count="${line.productId}" type="number" inputmode="numeric" min="1" ${state.settings?.allowNegativeSales ? "" : `max="${Math.floor(toNumber(product?.quantity) / unitsPerPackage)}"`} step="1" value="${cartonCount}" aria-label="عدد الكراتين" />` : `<input data-cart-quantity="${line.productId}" type="number" inputmode="decimal" min="1" ${state.settings?.allowNegativeSales ? "" : `max="${toNumber(product?.quantity)}"`} step="1" value="${line.quantity}" aria-label="عدد الحبات" />`;
@@ -1997,6 +2064,7 @@ function bindEvents() {
   }));
   root.querySelectorAll("[data-cart-carton-count]").forEach((input) => input.addEventListener("change", (event) => { setCartonCount(event.currentTarget.dataset.cartCartonCount, event.currentTarget.value); }));
   root.querySelectorAll("[data-cart-carton-size]").forEach((input) => input.addEventListener("change", (event) => { setCartonSize(event.currentTarget.dataset.cartCartonSize, event.currentTarget.value); }));
+  root.querySelectorAll("[data-service-amount]").forEach((input) => input.addEventListener("change", (event) => { setServiceAmount(event.currentTarget.dataset.serviceAmount, event.currentTarget.value); }));
   root.querySelectorAll("[data-cart-line-discount]").forEach((input) => input.addEventListener("change", (event) => { setCartLineDiscount(event.currentTarget.dataset.cartLineDiscount, event.currentTarget.value); }));
   root.querySelectorAll("[data-cart-line-price]").forEach((input) => input.addEventListener("change", (event) => { setCartLinePrice(event.currentTarget.dataset.cartLinePrice, event.currentTarget.value); }));
   syncMobileNavigation();
@@ -2070,6 +2138,7 @@ async function handleActionUnsafe(event) {
   const action = event.currentTarget.dataset.action;
   const id = event.currentTarget.dataset.id;
   if (action === "fill-login") { const input = root.querySelector("#login-form [name=username]"); if (input) { input.value = event.currentTarget.dataset.username; root.querySelector("#login-form [name=pin]")?.focus(); } return; }
+  if (action === "add-service-line") { addServiceLine(event.currentTarget.dataset.service); return; }
   if (action === "scroll-to-cart") { root.querySelector("#sales-cart")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (action === "open-phone-recovery") { openPhoneRecoveryDialog(); return; }
   if (action === "cloud-password-reset") { openCloudAuthDialog(); return; }
@@ -2268,6 +2337,12 @@ function setCartLineDiscount(productId, value) {
   const raw = String(value || "").trim(); const lineSubtotal = roundMoney(toNumber(line.unitPrice) * toNumber(line.quantity)); const requested = calculateDiscountAmount(raw, lineSubtotal); const cashierLimit = roundMoney(lineSubtotal * 0.1);
   if (state.currentUser?.role === "cashier" && requested > cashierLimit) { const isPercentage = /[%٪]\s*$/.test(raw); line.discount = isPercentage ? "10%" : String(cashierLimit); showToast("أقصى خصم للكاشير هو 10% من قيمة السطر.", "error"); render(); return; }
   line.discount = raw; render();
+}
+function setServiceAmount(lineId, value) {
+  const line = state.cart.find((item) => item.productId === lineId && item.isService); if (!line) return;
+  const nextAmount = toNumber(value);
+  if (nextAmount < 0) { showToast("مبلغ الخدمة لا يمكن أن يكون سالبًا.", "error"); renderKeepingScroll(); return; }
+  line.unitPrice = nextAmount; renderKeepingScroll();
 }
 function setCartLinePrice(productId, value) {
   const line = state.cart.find((item) => item.productId === productId); if (!line) return;
@@ -3217,6 +3292,8 @@ function openHeldInvoicesDialog() {
 }
 
 function openCheckoutDialog() {
+  const emptyService = state.cart.find((line) => line.isService && toNumber(line.unitPrice) <= 0);
+  if (emptyService) { showToast(`أدخل مبلغ «${emptyService.name}» قبل إتمام البيع.`, "error"); root.querySelector(`[data-service-amount="${emptyService.productId}"]`)?.focus(); return; }
   if (state.currentUser?.role === "cashier" && !state.activeCashierShift) { showToast("سجل المبلغ المستلم من الصندوق قبل إتمام أول عملية بيع.", "error"); openCashierShiftStartDialog(); return; }
   const initial = calculateSaleTotals(state.cart); const isCashierSale = state.currentUser?.role === "cashier";
   const paymentMethodToggle = `<fieldset class="payment-method-toggle"><legend>طريقة التحصيل</legend><input type="hidden" name="paymentMethod" value="نقدي" /><button class="payment-method-toggle__button is-selected is-cash" type="button" data-sale-payment-method="نقدي">كاش</button><button class="payment-method-toggle__button is-transfer" type="button" data-sale-payment-method="تحويل">تحويل</button></fieldset>`;
