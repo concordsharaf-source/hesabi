@@ -1781,3 +1781,31 @@ html.is-sales-sheet-open .toolbar--sales { position: static; }
 .cart-sheet-close { color: #fff4bd; background: #174b40; border-color: #d6ad50; }
 .cart-sheet-close:hover { color: #14372f; background: #f3cf70; }
 [data-theme="dark"] .cart-sheet-close:hover { color: #123d38; background: #f3cf70; }
+
+/* ═══ إعدادات المظهر: منتقي وضع العرض (نظام/فاتح/داكن) ═══ */
+.theme-mode-picker { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+@media (max-width:599px) { .theme-mode-picker { grid-template-columns:1fr; } }
+.theme-mode-option { display:flex; align-items:center; gap:11px; padding:13px 12px; background:var(--paper); border:1px solid var(--line); border-radius:13px; cursor:pointer; transition:border-color .16s var(--ease-out), background-color .16s var(--ease-out), box-shadow .16s var(--ease-out); }
+.theme-mode-option input { position:absolute; width:1px; height:1px; opacity:0; pointer-events:none; }
+.theme-mode-option__icon { display:grid; place-items:center; flex:0 0 40px; width:40px; height:40px; color:var(--green); background:var(--green-pale); border-radius:11px; }
+.theme-mode-option__text { display:grid; gap:2px; min-width:0; }
+.theme-mode-option__text strong { font-size:13px; }
+.theme-mode-option__text small { color:var(--muted); font-size:10.5px; line-height:1.5; }
+.theme-mode-option.is-active { border-color:var(--green); background:var(--green-pale); box-shadow:0 0 0 1px var(--green); }
+.theme-mode-option.is-active .theme-mode-option__icon { color:#fff; background:var(--green); }
+.theme-mode-option:focus-within { outline:2px solid var(--green); outline-offset:2px; }
+[data-theme="dark"] .theme-mode-option { background:#1a2d26; border-color:#58756a; }
+[data-theme="dark"] .theme-mode-option.is-active { background:rgba(123,216,170,.16); border-color:var(--green); }
+[data-theme="dark"] .theme-mode-option.is-active .theme-mode-option__icon { color:#10241b; background:var(--green); }
+
+/* ═══ الوضع الداكن: تباين شارات الحسابات والحالة الذي كان باهتًا ═══ */
+[data-theme="dark"] .account-badge--admin { color:#ffe9c4; background:rgba(255,208,125,.16); border-color:rgba(255,208,125,.42); }
+[data-theme="dark"] .account-badge--cashier { color:#a9f0cd; background:rgba(123,216,170,.16); border-color:rgba(123,216,170,.42); }
+[data-theme="dark"] .account-badge--employee { color:#ffe9c4; background:rgba(255,208,125,.16); border-color:rgba(255,208,125,.42); }
+[data-theme="dark"] .status--available { color:#a9f0cd; background:rgba(123,216,170,.15); }
+[data-theme="dark"] .activity-badge--sale { color:#7ee2a8; background:rgba(34,197,94,.18); }
+[data-theme="dark"] .activity-badge--return { color:#ffb38a; background:rgba(234,88,12,.2); }
+[data-theme="dark"] .activity-badge--payment { color:#9ec5ff; background:rgba(59,130,246,.2); }
+[data-theme="dark"] .activity-badge--stock { color:#d3adff; background:rgba(147,51,234,.22); }
+[data-theme="dark"] .activity-badge--salary { color:#ffd08a; background:rgba(217,119,6,.2); }
+[data-theme="dark"] .activity-badge--auth { color:#cbd5e1; background:rgba(148,163,184,.2); }

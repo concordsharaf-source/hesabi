@@ -3,6 +3,17 @@
    Official Thermal Receipt & Sales Invoice Template
 ═══════════════════════════════════════════════════════════════════════════════ */
 
+/* عرض ورق الطابعة الحرارية المدعوم: 80 مم (الافتراضي) أو 58 مم. */
+export const THERMAL_PAPER_WIDTHS = ["80", "58"];
+export const DEFAULT_THERMAL_FOOTER = "شكرًا لتعاملكم معنا";
+
+export function normalizeThermalPrintOptions(settings = null) {
+  const paperWidth = THERMAL_PAPER_WIDTHS.includes(String(settings?.thermalPaperWidth)) ? String(settings.thermalPaperWidth) : "80";
+  const footerText = typeof settings?.thermalFooterText === "string" && settings.thermalFooterText.trim() ? settings.thermalFooterText.trim() : DEFAULT_THERMAL_FOOTER;
+  const showLogo = settings?.thermalShowLogo === undefined ? true : Boolean(settings.thermalShowLogo);
+  return { paperWidth, footerText, showLogo };
+}
+
 export function renderThermalInvoiceHtml({
   invoice,
   customer = null,
@@ -14,7 +25,10 @@ export function renderThermalInvoiceHtml({
   formatDateTime,
   escapeHtml,
   paymentLabel,
+  printOptions = null,
 }) {
+  const { paperWidth, footerText, showLogo } = normalizeThermalPrintOptions(printOptions || storeInfo);
+  const bodyWidthMm = paperWidth === "58" ? 50 : 72;
   const rows = invoice.items.map((item) => `<tr>
     <td>${escapeHtml(item.productName)}<br><small>${formatAmount(item.quantity)} ${escapeHtml(item.unit)} × ${formatMoney(item.unitPrice)}</small></td>
     <td>${formatMoney(item.total)}</td>
@@ -38,10 +52,10 @@ export function renderThermalInvoiceHtml({
   <title>${escapeHtml(invoice.invoiceNumber)}</title>
   <style>
     @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap");
-    @page{size:80mm auto;margin:4mm}
+    @page{size:${paperWidth}mm auto;margin:4mm}
     *, *::before, *::after{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
     body{
-      width:72mm;
+      width:${bodyWidthMm}mm;
       margin:0 auto;
       color:#111;
       font-family:"HesabiArabicPdf","Noto Naskh Arabic","Cairo",Tahoma,Arial,sans-serif;
@@ -84,7 +98,7 @@ export function renderThermalInvoiceHtml({
   </style>
 </head>
 <body>
-  ${logoDataUrl ? `<img class="invoice-logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر" />` : ""}
+  ${showLogo && logoDataUrl ? `<img class="invoice-logo" src="${escapeHtml(logoDataUrl)}" alt="شعار المتجر" />` : ""}
   <h1>${escapeHtml(storeName || "حسابي")}</h1>
   ${storeDetails ? `<p class="store-details-muted">${storeDetails}</p>` : ""}
   <h2>فاتورة بيع ${escapeHtml(invoice.invoiceNumber)}</h2>
@@ -108,7 +122,7 @@ export function renderThermalInvoiceHtml({
     <div><span>المدفوع</span><strong>${formatMoney(invoice.paidAmount)}</strong></div>
     ${remaining}
   </section>
-  <p class="footer">شكرًا لتعاملكم معنا</p>
+  <p class="footer">${escapeHtml(footerText)}</p>
 </body>
 </html>`;
 }
