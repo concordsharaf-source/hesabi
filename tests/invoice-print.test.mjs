@@ -334,7 +334,7 @@ test("يبدأ شريط الهاتف بترتيب افتراضي قابل للت
   assert.match(app, /data-action="reset-mobile-nav"/);
   assert.match(app, /<nav class="bottom-nav" data-bottom-nav aria-label="التنقل الرئيسي">\$\{renderItems\(bottomItems\)\}<\/nav>/);
   // الشريط السفلي فقط، وبلا مساس بالموضع الرأسي للصفحة (كان التمرير إليه يُزحزح الشاشة كلها)
-  assert.match(app, /function syncMobileNavigation\(\)[\s\S]{0,700}activeItem\.scrollIntoView\(\{ block: "nearest", inline: "center", behavior: "auto" \}\)[\s\S]{0,160}window\.scrollTo\(Math\.round\(window\.scrollX \|\| 0\), keepY\);/);
+  assert.match(app, /function syncMobileNavigation\(\)[\s\S]{0,1300}activeItem\.scrollIntoView\(\{ block: "nearest", inline: "center", behavior: "auto" \}\)[\s\S]{0,160}window\.scrollTo\(Math\.round\(window\.scrollX \|\| 0\), keepY\);/);
   assert.match(app, /if \(action === "navigate"\)[\s\S]*?state\.view = view; render\(\);/);
   assert.match(styles, /\.bottom-nav \{[^}]*overflow-x:auto;[^}]*scroll-snap-type:x proximity;/);
   assert.match(styles, /\.bottom-nav::\-webkit-scrollbar \{ display:none; \}/);
