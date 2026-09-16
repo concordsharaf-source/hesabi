@@ -1621,35 +1621,59 @@ function settingsMarkup() {
   <div class="settings-page settings-hub"><section class="settings-hub__intro panel"><span class="eyebrow">لوحة إدارة</span><h2>ضبط المتجر من مكان واحد</h2><p>كل الأقسام مطوية افتراضيًا لتبقى الشاشة مرتبة على الهاتف وسطح المكتب.</p></section>${panels}${notificationsPanelMarkup()}${settingsContactMarkup()}</div>`;
 }
 
-/* ألوان خلفية جاهزة لكل وضع: قيم فاتحة وداكنة منسجمة مع أخضر وذهبي الهوية. */
-const BACKGROUND_THEMES = [
-  { id: "ivory", label: "عاجي دافئ", hint: "الافتراضي", light: "#f4f3ec", dark: "#101d18" },
-  { id: "mint", label: "أخضر نعناعي", hint: "قريب من لون الأزرار", light: "#ecf4ee", dark: "#0d211b" },
-  { id: "sky", label: "أزرق هادئ", hint: "مريح في الإضاءة القوية", light: "#edf3f5", dark: "#0e1d22" },
-  { id: "sand", label: "رملي ذهبي", hint: "دافئ مثل لمسات الذهبي", light: "#f7f1e2", dark: "#1e1910" },
-  { id: "pearl", label: "رمادي لؤلؤي", hint: "حيادي أنيق", light: "#f1f2f3", dark: "#171b1d" },
+/* ألوان الخلفية: قائمتان مستقلتان — واحدة للوضع الفاتح وأخرى للداكن —
+   ليغيّر المستخدم أحدهما دون أن يمسّ الآخر. */
+const BACKGROUND_LIGHT_THEMES = [
+  { id: "ivory", label: "عاجي دافئ", hint: "الافتراضي", color: "#f4f3ec" },
+  { id: "mint", label: "أخضر نعناعي", hint: "قريب من لون الأزرار", color: "#ecf4ee" },
+  { id: "sky", label: "أزرق هادئ", hint: "مريح في الإضاءة القوية", color: "#edf3f5" },
+  { id: "sand", label: "رملي ذهبي", hint: "دافئ مثل لمسات الذهبي", color: "#f7f1e2" },
+  { id: "pearl", label: "رمادي لؤلؤي", hint: "حيادي أنيق", color: "#f1f2f3" },
 ];
-function backgroundThemeId() {
-  const stored = state.settings?.backgroundTheme;
-  return BACKGROUND_THEMES.some((themeOption) => themeOption.id === stored) ? stored : "ivory";
+const BACKGROUND_DARK_THEMES = [
+  { id: "forest", label: "أخضر غابي", hint: "الافتراضي", color: "#101d18" },
+  { id: "deep-mint", label: "نعناعي غامق", hint: "أخضر أعمق قليلًا", color: "#0d211b" },
+  { id: "night-sky", label: "أزرق ليلي", hint: "مائل للزرقة الهادئة", color: "#0e1d22" },
+  { id: "amber-night", label: "بني رملي", hint: "دافئ مثل لمسات الذهبي", color: "#1e1910" },
+  { id: "charcoal", label: "فحمي لؤلؤي", hint: "حيادي أنيق", color: "#171b1d" },
+];
+/* توافق خلفي: من كان مختارًا لونًا بالنظام القديم الموحد تُشتق منه القيمتان. */
+const LEGACY_BACKGROUND_MAP = { ivory: ["ivory", "forest"], mint: ["mint", "deep-mint"], sky: ["sky", "night-sky"], sand: ["sand", "amber-night"], pearl: ["pearl", "charcoal"] };
+function backgroundLightId() {
+  const stored = state.settings?.backgroundLight;
+  if (BACKGROUND_LIGHT_THEMES.some((themeOption) => themeOption.id === stored)) return stored;
+  return LEGACY_BACKGROUND_MAP[state.settings?.backgroundTheme]?.[0] || "ivory";
 }
-function backgroundPalette() { return BACKGROUND_THEMES.find((themeOption) => themeOption.id === backgroundThemeId()) || BACKGROUND_THEMES[0]; }
+function backgroundDarkId() {
+  const stored = state.settings?.backgroundDark;
+  if (BACKGROUND_DARK_THEMES.some((themeOption) => themeOption.id === stored)) return stored;
+  return LEGACY_BACKGROUND_MAP[state.settings?.backgroundTheme]?.[1] || "forest";
+}
+function backgroundPalette() {
+  const light = BACKGROUND_LIGHT_THEMES.find((themeOption) => themeOption.id === backgroundLightId()) || BACKGROUND_LIGHT_THEMES[0];
+  const dark = BACKGROUND_DARK_THEMES.find((themeOption) => themeOption.id === backgroundDarkId()) || BACKGROUND_DARK_THEMES[0];
+  return { light: light.color, dark: dark.color };
+}
 
 /* قسم «المظهر»: وضع العرض ولون الخلفية — يظهر داخل قسم المظهر مع شعار المتجر. */
 function displaySettingsMarkup() {
   const preference = themePreference();
-  const activeBackground = backgroundThemeId();
+  const activeLight = backgroundLightId();
+  const activeDark = backgroundDarkId();
   const themeChoices = [
     { value: "system", label: "حسب النظام", hint: `يتبع ضبط الجهاز (الآن: ${systemPrefersDark() ? "داكن" : "فاتح"})`, glyph: "monitor" },
     { value: "light", label: "فاتح دائمًا", hint: "خلفية فاتحة في كل الأوقات", glyph: "sun" },
     { value: "dark", label: "داكن دائمًا", hint: "خلفية داكنة مريحة ليلًا", glyph: "moon" },
   ];
+  const backgroundOption = (themeOption, name, active) => `<label class="bg-theme-option ${active === themeOption.id ? "is-active" : ""}"><input type="radio" name="${name}" value="${themeOption.id}" ${active === themeOption.id ? "checked" : ""} /><span class="bg-theme-option__swatch bg-theme-option__swatch--single" aria-hidden="true"><i style="background:${themeOption.color}"></i></span><span class="bg-theme-option__text"><strong>${themeOption.label}</strong><small>${themeOption.hint}</small></span></label>`;
   return `<form id="display-settings-form" class="panel form-grid">
     <div class="panel__head form-full"><div><span class="eyebrow">وضع العرض</span><h2>الوضع الفاتح والداكن</h2></div></div>
     <div class="theme-mode-picker form-full" role="radiogroup" aria-label="وضع العرض">${themeChoices.map((choice) => `<label class="theme-mode-option ${preference === choice.value ? "is-active" : ""}"><input type="radio" name="theme" value="${choice.value}" ${preference === choice.value ? "checked" : ""} /><span class="theme-mode-option__icon">${icon(choice.glyph, 20)}</span><span class="theme-mode-option__text"><strong>${choice.label}</strong><small>${choice.hint}</small></span></label>`).join("")}</div>
-    <div class="panel__head form-full"><div><span class="eyebrow">لون الخلفية</span><h2>خلفية التطبيق</h2></div></div>
-    <p class="form-full field-hint">يتغير اللون فورًا عند الاختيار، ولكل لون درجة فاتحة وأخرى داكنة تُطبَّق حسب الوضع الحالي.</p>
-    <div class="bg-theme-picker form-full" role="radiogroup" aria-label="لون الخلفية">${BACKGROUND_THEMES.map((themeOption) => `<label class="bg-theme-option ${activeBackground === themeOption.id ? "is-active" : ""}"><input type="radio" name="backgroundTheme" value="${themeOption.id}" ${activeBackground === themeOption.id ? "checked" : ""} /><span class="bg-theme-option__swatch" aria-hidden="true"><i style="background:${themeOption.light}"></i><i style="background:${themeOption.dark}"></i></span><span class="bg-theme-option__text"><strong>${themeOption.label}</strong><small>${themeOption.hint}</small></span></label>`).join("")}</div>
+    <div class="panel__head form-full"><div><span class="eyebrow">لون الخلفية</span><h2>خلفية الوضع الفاتح ${icon("sun", 16)}</h2></div></div>
+    <div class="bg-theme-picker form-full" role="radiogroup" aria-label="خلفية الوضع الفاتح">${BACKGROUND_LIGHT_THEMES.map((themeOption) => backgroundOption(themeOption, "backgroundLight", activeLight)).join("")}</div>
+    <div class="panel__head form-full"><div><span class="eyebrow">لون الخلفية</span><h2>خلفية الوضع الداكن ${icon("moon", 16)}</h2></div></div>
+    <div class="bg-theme-picker form-full" role="radiogroup" aria-label="خلفية الوضع الداكن">${BACKGROUND_DARK_THEMES.map((themeOption) => backgroundOption(themeOption, "backgroundDark", activeDark)).join("")}</div>
+    <p class="form-full field-hint">كل وضع له لونه المستقل: تغيير خلفية الفاتح لا يمس الداكن والعكس. يظهر اللون فورًا إذا كان وضعه هو المعروض الآن.</p>
   </form>`;
 }
 
@@ -2132,15 +2156,17 @@ function bindEvents() {
       showToast(theme === "system" ? `يتبع ضبط الجهاز الآن (${systemPrefersDark() ? "داكن" : "فاتح"})` : theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح");
     } catch (error) { showToast(error.message, "error"); }
   }));
-  root.querySelectorAll("#display-settings-form [name=backgroundTheme]").forEach((input) => input.addEventListener("change", async (event) => {
+  root.querySelectorAll("#display-settings-form [name=backgroundLight], #display-settings-form [name=backgroundDark]").forEach((input) => input.addEventListener("change", async (event) => {
     try {
-      const backgroundTheme = event.currentTarget.value;
-      await db.saveSettings({ ...state.settings, backgroundTheme });
+      const isDarkPicker = event.currentTarget.name === "backgroundDark";
+      const value = event.currentTarget.value;
+      await db.saveSettings({ ...state.settings, [isDarkPicker ? "backgroundDark" : "backgroundLight"]: value });
       state.settings = await db.getSettings();
       applyTheme();
       renderKeepingScroll();
-      const palette = BACKGROUND_THEMES.find((themeOption) => themeOption.id === backgroundTheme);
-      showToast(`تم تطبيق خلفية «${palette?.label || backgroundTheme}»`);
+      const palette = (isDarkPicker ? BACKGROUND_DARK_THEMES : BACKGROUND_LIGHT_THEMES).find((themeOption) => themeOption.id === value);
+      const applied = resolvedTheme() === (isDarkPicker ? "dark" : "light");
+      showToast(`حُفظت خلفية الوضع ${isDarkPicker ? "الداكن" : "الفاتح"}: «${palette?.label || value}»${applied ? "" : " — ستظهر عند التبديل إليه"}`);
     } catch (error) { showToast(error.message, "error"); }
   }));
   root.querySelector("#store-logo-file")?.addEventListener("change", handleStoreLogoFile);

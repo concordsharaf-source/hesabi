@@ -103,16 +103,22 @@ test("قسم المظهر يضم وضع العرض ولون الخلفية دا�
   assert.match(app, /eyebrow: "الأجهزة", title: "الباركود والطباعة"/);
 });
 
-test("منتقي لون الخلفية: خمسة ألوان بدرجتين فاتحة وداكنة مع تذكر الاختيار", async () => {
+test("منتقيا لون الخلفية مستقلان: قائمة للفاتح وقائمة للداكن مع توافق خلفي", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
-  assert.match(app, /const BACKGROUND_THEMES = \[/);
+  assert.match(app, /const BACKGROUND_LIGHT_THEMES = \[/);
+  assert.match(app, /const BACKGROUND_DARK_THEMES = \[/);
   for (const id of ["ivory", "mint", "sky", "sand", "pearl"]) assert.match(app, new RegExp(`id: "${id}"`));
-  assert.match(app, /function backgroundThemeId/);
+  for (const id of ["forest", "deep-mint", "night-sky", "amber-night", "charcoal"]) assert.match(app, new RegExp(`id: "${id}"`));
+  assert.match(app, /function backgroundLightId/);
+  assert.match(app, /function backgroundDarkId/);
   assert.match(app, /function backgroundPalette/);
-  assert.match(app, /name="backgroundTheme"/);
+  assert.match(app, /backgroundOption\(themeOption, "backgroundLight", activeLight\)/);
+  assert.match(app, /backgroundOption\(themeOption, "backgroundDark", activeDark\)/);
   assert.match(app, /localStorage\.setItem\("hesabi-bg"/);
-  // كل لون يحمل درجتين
-  assert.match(app, /light: "#f4f3ec", dark: "#101d18"/);
+  // تغيير أحد الوضعين لا يمس الآخر: كل حقل يُحفظ باسمه المستقل
+  assert.match(app, /\[isDarkPicker \? "backgroundDark" : "backgroundLight"\]: value/);
+  // التوافق الخلفي مع الاختيار الموحد القديم
+  assert.match(app, /LEGACY_BACKGROUND_MAP/);
 });
 
 test("سكربت الرأس يطبق لون الخلفية المحفوظ قبل أول رسم", async () => {
