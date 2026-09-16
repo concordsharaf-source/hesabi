@@ -3961,7 +3961,7 @@ async function getBarcodeFormats() {
 }
 
 function scannerDialogMarkup(title, description, continuous = false) {
-  return `<section class="scanner-dialog" role="dialog" aria-modal="true" aria-labelledby="scanner-title"><div class="dialog__head"><div><span class="eyebrow">ماسح الباركود</span><h2 id="scanner-title">${title}</h2></div><button class="icon-button" id="scanner-close" aria-label="${continuous ? "إنهاء المسح" : "إغلاق"}">${icon("close", 20)}</button></div><p class="dialog__subtext">${description}</p>${continuous ? `<p class="scanner-session-note">المسح المتواصل مفعّل: أبعد الرمز عن الإطار بعد إضافته ثم امسح المنتج التالي.</p>` : ""}<div id="scanner-content"></div><div class="scanner-dialog__actions"><button id="scanner-retry" class="button button--secondary" type="button">${icon("scan", 16)} إعادة المحاولة</button><button id="scanner-close-bottom" class="button button--primary" type="button">${continuous ? "إنهاء المسح" : "إغلاق"}</button></div></section>`;
+  return `<section class="scanner-dialog" role="dialog" aria-modal="true" aria-labelledby="scanner-title"><div class="dialog__head"><div><span class="eyebrow">ماسح الباركود</span><h2 id="scanner-title">${title}</h2></div><button class="icon-button" id="scanner-close" aria-label="${continuous ? "إنهاء المسح" : "إغلاق"}">${icon("close", 20)}</button></div>${description ? `<p class="dialog__subtext">${description}</p>` : ""}<div id="scanner-content"></div><div class="scanner-dialog__actions"><button id="scanner-retry" class="button button--secondary" type="button">${icon("scan", 16)} إعادة المحاولة</button><button id="scanner-close-bottom" class="button button--primary" type="button">${continuous ? "إنهاء المسح" : "إغلاق"}</button></div></section>`;
 }
 
 function closeScannerDialog() {
@@ -4129,15 +4129,29 @@ async function listScannerCameras() {
     return devices.filter((device) => device.kind === "videoinput");
   } catch { return []; }
 }
-function scannerCameraLabel(camera, index) {
+function scannerCameraLabel(camera, index, cameras = []) {
   const label = String(camera.label || "").trim();
+  const back = /back|rear|environment|خلفي/i.test(label);
+  const front = /front|user|selfie|أمامي/i.test(label);
+  const facing = back ? "خلفية" : front ? "أمامية" : "";
+  /* نميز العدسة من الاسم الأصلي إن وُجد (عريضة/مقربة/ماكرو)، وإلا نرقم كاميرات نفس الجهة. */
+  const lens = /ultra[\s-]?wide|0\.5/i.test(label) ? " فائقة العرض" : /tele|zoom/i.test(label) ? " مقربة" : /macro/i.test(label) ? " ماكرو" : /wide/i.test(label) ? " عريضة" : "";
+  if (facing) {
+    const sameFacing = cameras.filter((item) => {
+      const itemLabel = String(item.label || "");
+      return back ? /back|rear|environment|خلفي/i.test(itemLabel) : /front|user|selfie|أمامي/i.test(itemLabel);
+    });
+    const position = sameFacing.indexOf(camera);
+    const ordinal = sameFacing.length > 1 && !lens ? ` ${position + 1}` : "";
+    return `${facing}${lens}${ordinal}`;
+  }
   if (label) return label;
   return `كاميرا ${index + 1}`;
 }
 function renderScannerCameraPicker(content, cameras, activeDeviceId, onSwitch) {
   const slot = content.querySelector("#scanner-camera-slot");
   if (!slot || cameras.length < 2) return;
-  slot.innerHTML = `<label class="scanner-camera-picker"><span>${icon("scan", 15)} الكاميرا</span><select id="scanner-camera-select" aria-label="اختيار الكاميرا">${cameras.map((camera, index) => `<option value="${escapeHtml(camera.deviceId)}" ${camera.deviceId === activeDeviceId ? "selected" : ""}>${escapeHtml(scannerCameraLabel(camera, index))}</option>`).join("")}</select></label>`;
+  slot.innerHTML = `<label class="scanner-camera-picker"><span>${icon("scan", 15)} الكاميرا</span><select id="scanner-camera-select" aria-label="اختيار الكاميرا">${cameras.map((camera, index) => `<option value="${escapeHtml(camera.deviceId)}" ${camera.deviceId === activeDeviceId ? "selected" : ""}>${escapeHtml(scannerCameraLabel(camera, index, cameras))}</option>`).join("")}</select></label>`;
   slot.querySelector("#scanner-camera-select").addEventListener("change", (event) => {
     const deviceId = event.currentTarget.value;
     rememberScannerCamera(deviceId);
@@ -4254,7 +4268,8 @@ function openScanner(mode) {
   const continuous = mode === "sale";
   openScannerOverlay({
     title: continuous ? "مسح منتجات متواصل" : "وجّه الكاميرا نحو الباركود",
-    description: continuous ? "أضف عدة منتجات إلى السلة في جلسة واحدة، ثم اختر «إنهاء المسح» عند الانتهاء." : "سنفتح المنتج المسجل مباشرة أو نقترح إنشاء منتج جديد عند عدم العثور عليه.",
+    /* بلا وصف في المسح المتواصل: النافذة أقصر وأزرار الأسفل ظاهرة بوضوح على الشاشات الصغيرة. */
+    description: continuous ? "" : "سنفتح المنتج المسجل مباشرة أو نقترح إنشاء منتج جديد عند عدم العثور عليه.",
     unsupportedMessage: "يمكنك البحث بالكود الداخلي أو الضغط على إعادة المحاولة بعد منح إذن الكاميرا.",
     manualMode: mode,
     onManualEntry: () => {

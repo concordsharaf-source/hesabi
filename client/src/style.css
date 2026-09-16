@@ -1838,3 +1838,14 @@ html.is-sales-sheet-open .toolbar--sales { position: static; }
   .cart-panel:not(.is-sheet-mobile) .cart-total,
   .cart-panel:not(.is-sheet-mobile) .cart-actions-grid { flex:0 0 auto; }
 }
+
+/* ═══ نافذة الماسح أقصر: الكاميرا لا تلتهم الشاشة والأزرار السفلية ظاهرة دائمًا ═══ */
+.scanner-box { aspect-ratio:16/10; max-height:min(46vh, 340px); }
+.scanner-box video { max-height:inherit; }
+@media (max-height:700px) {
+  .scanner-box { max-height:38vh; }
+  .scanner-dialog { padding:14px; }
+  .scanner-dialog .dialog__head { padding-bottom:8px; }
+  .scanner-dialog__actions { margin-top:10px; }
+  .scanner-status { padding:7px 0 0; }
+}
