@@ -515,3 +515,20 @@ test("مشاركة صورة في كل الأقسام: فاتورة البيع و
   // طلب الشراء يمر عبر المساعد الموحد أيضًا (رمادي)
   assert.match(appJs, /shareDocumentImage\(\{ html: orderHtml\(order\), filename: `طلب-شراء-\$\{dateKey\(\)\}\.png`/, "طلب الشراء لا يمر عبر المسار الرمادي");
 });
+
+/* ===== v52: الشريط السفلي — أيقونات أكبر ونبضة وتمييز الصفحة الحالية ===== */
+
+test("الشريط السفلي: أيقونات أكبر والصفحة الحالية أكبر وأكثر تباينًا مع نبضة عند الضغط", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  assert.match(css, /\.bottom-nav \{ height:80px; \}/, "ارتفاع الشريط لم يكبر");
+  assert.match(css, /\.bottom-nav \.nav-item svg \{ width:23px; height:23px; \}/, "الأيقونات لم تكبر");
+  assert.match(css, /\.bottom-nav \.nav-item\.is-active \{ color:#fff; background:linear-gradient\(145deg,#21755f,#16473b\)/, "الصفحة الحالية بلا تباين عالٍ");
+  assert.match(css, /\.bottom-nav \.nav-item\.is-active svg \{ width:27px; height:27px; \}/, "أيقونة الصفحة الحالية ليست أكبر");
+  assert.match(css, /@keyframes bottom-nav-pulse/, "حركة النبضة مفقودة");
+  assert.match(css, /\.bottom-nav \.nav-item--pulse \{ animation:bottom-nav-pulse \.38s var\(--ease-out\); \}/, "صنف النبضة مفقود");
+  assert.match(css, /\[data-theme="dark"\] \.bottom-nav \.nav-item\.is-active \{ color:#fff; background:linear-gradient\(145deg,#2a9a77,#175a46\)/, "تباين الوضع الداكن مفقود");
+  // JS: النبضة تضاف عند تغيّر الصفحة فقط وتُزال بعد انتهاء الحركة
+  assert.match(appJs, /let lastPulsedNavigationView = null;/, "متغير تتبع النبضة مفقود");
+  assert.match(appJs, /activeItem\.classList\.add\("nav-item--pulse"\);/, "النبضة لا تُضاف");
+  assert.match(appJs, /activeItem\.addEventListener\("animationend", \(\) => activeItem\.classList\.remove\("nav-item--pulse"\), \{ once: true \}\);/, "النبضة لا تُزال بعد الحركة");
+});

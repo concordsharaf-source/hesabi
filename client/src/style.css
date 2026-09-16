@@ -1922,3 +1922,15 @@ html.is-sales-page .sales-total-bar {
 .screen-lock-user-info { display:flex; align-items:center; gap:12px; }
 .screen-lock-icon { display:grid; place-items:center; width:52px; height:52px; color:#fff; background:linear-gradient(145deg,#c42a47,#84132b); border-radius:14px; box-shadow:0 10px 22px rgba(132,19,43,.25); }
 .screen-lock-note { margin:0; color:var(--muted); font-size:10px; text-align:center; }
+
+
+/* ===== الشريط السفلي: أيقونات أكبر + تمييز الصفحة الحالية بتباين عالٍ + نبضة عند الضغط ===== */
+.bottom-nav { height:80px; }
+.bottom-nav .nav-item { flex:0 0 64px; gap:4px; min-width:64px; min-height:64px; font-size:10.5px; }
+.bottom-nav .nav-item svg { width:23px; height:23px; }
+.bottom-nav .nav-item.is-active { color:#fff; background:linear-gradient(145deg,#21755f,#16473b); border-radius:12px; box-shadow:0 4px 12px rgba(15,90,71,.35); font-size:11px; font-weight:800; }
+.bottom-nav .nav-item.is-active svg { width:27px; height:27px; }
+@keyframes bottom-nav-pulse { 0% { transform:scale(1); } 45% { transform:scale(1.14); } 100% { transform:scale(1); } }
+.bottom-nav .nav-item--pulse { animation:bottom-nav-pulse .38s var(--ease-out); }
+[data-theme="dark"] .bottom-nav .nav-item.is-active { color:#fff; background:linear-gradient(145deg,#2a9a77,#175a46); box-shadow:0 4px 12px rgba(0,0,0,.4); }
+@media (max-width:599px) { .bottom-nav .nav-item { min-width:64px; font-size:11px; } .bottom-nav .nav-item.is-active { font-size:11.5px; } }

@@ -2265,12 +2265,20 @@ function bindEvents() {
   syncMobileNavigation();
 }
 
+let lastPulsedNavigationView = null;
 function syncMobileNavigation() {
   const bottomNav = root.querySelector("[data-bottom-nav]");
+  if (!bottomNav) return;
+  const activeItem = bottomNav.querySelector(`[data-view="${state.view}"]`);
+  // نبضة خفيفة على أيقونة الصفحة الحالية عند الانتقال إليها فقط — لا عند كل إعادة رسم.
+  if (activeItem && lastPulsedNavigationView !== state.view) {
+    lastPulsedNavigationView = state.view;
+    activeItem.classList.add("nav-item--pulse");
+    activeItem.addEventListener("animationend", () => activeItem.classList.remove("nav-item--pulse"), { once: true });
+  }
   // الشريط السفلي مخفيّ على الحاسوب: عنصر بلا تخطيط يُجيب مستطيلًا صفريًا، وتمريره نحو
   // «الأنسب» يزيح الصفحة كلها. كما لا شيء يجب توسيطه حين يتّسع الشريط لكل عناصره.
-  if (!bottomNav || !bottomNav.offsetWidth || bottomNav.scrollWidth <= bottomNav.clientWidth + 1) return;
-  const activeItem = bottomNav.querySelector(`[data-view="${state.view}"]`);
+  if (!bottomNav.offsetWidth || bottomNav.scrollWidth <= bottomNav.clientWidth + 1) return;
   if (!activeItem) return;
   const keepY = Math.round(window.scrollY || 0);
   activeItem.scrollIntoView({ block: "nearest", inline: "center", behavior: "auto" });
