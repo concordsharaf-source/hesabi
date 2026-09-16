@@ -40,6 +40,17 @@ test("واجهة الماسح تضم قائمة اختيار الكاميرا م
   assert.match(app, /جرّب كاميرا أخرى من القائمة/);
 });
 
+test("الكاميرا لا تُحفظ إلا بعد قراءة ناجحة بها — لا علوق على عدسة لا تقرأ", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  // مفتاح تخزين جديد v2 يتجاهل الاختيار المعطوب المحفوظ بالمنطق القديم
+  assert.match(app, /hesabi-scanner-camera-v2/);
+  // معالج تغيير القائمة يجرّب الكاميرا فقط ولا يحفظها
+  const picker = app.slice(app.indexOf("function renderScannerCameraPicker"), app.indexOf("async function startCameraScanner"));
+  assert.doesNotMatch(picker, /rememberScannerCamera\(deviceId\)/, "الاختيار يُحفظ قبل التأكد أن الكاميرا تقرأ — يعلق الماسح على عدسة معطوبة");
+  // الحفظ يحدث فقط عند نجاح القراءة داخل حلقة المسح
+  assert.match(app, /if \(code\) \{\n[\s\S]{0,220}if \(activeDeviceId\) rememberScannerCamera\(activeDeviceId\);/, "لا حفظ للكاميرا بعد أول قراءة ناجحة");
+});
+
 test("القائمة لا تظهر إلا عند وجود أكثر من كاميرا", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
   assert.match(app, /cameras\.length < 2\) return/);

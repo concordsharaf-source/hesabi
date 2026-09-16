@@ -3953,7 +3953,10 @@ function addScannerCameraAssist(content, session, video) {
 }
 
 /* اختيار الكاميرا: يتذكر آخر كاميرا نجح بها المسح، ويتيح التبديل إذا كانت كاميرا معطلة أو لا تقرأ. */
-const SCANNER_CAMERA_STORAGE_KEY = "hesabi-scanner-camera";
+/* v2: المفتاح القديم كان يحفظ الكاميرا فور اختيارها ولو كانت عدسة لا تقرأ الباركود،
+   فيعلق الماسح عليها في كل الجلسات. المفتاح الجديد يتجاهل ذلك الاختيار المعطوب،
+   ولا يُحفظ فيه إلا كاميرا نجح بها المسح فعلًا. */
+const SCANNER_CAMERA_STORAGE_KEY = "hesabi-scanner-camera-v2";
 function preferredScannerCameraId() {
   try { return localStorage.getItem(SCANNER_CAMERA_STORAGE_KEY) || ""; } catch { return ""; }
 }
@@ -3994,9 +3997,9 @@ function renderScannerCameraPicker(content, cameras, activeDeviceId, onSwitch) {
   if (!slot || cameras.length < 2) return;
   slot.innerHTML = `<label class="scanner-camera-picker"><span>${icon("scan", 15)} الكاميرا</span><select id="scanner-camera-select" aria-label="اختيار الكاميرا">${cameras.map((camera, index) => `<option value="${escapeHtml(camera.deviceId)}" ${camera.deviceId === activeDeviceId ? "selected" : ""}>${escapeHtml(scannerCameraLabel(camera, index, cameras))}</option>`).join("")}</select></label>`;
   slot.querySelector("#scanner-camera-select").addEventListener("change", (event) => {
-    const deviceId = event.currentTarget.value;
-    rememberScannerCamera(deviceId);
-    onSwitch(deviceId);
+    /* لا حفظ هنا: الاختيار يُجرَّب أولًا، ولا يُحفظ إلا بعد أول قراءة ناجحة به —
+       وإلا علِق الماسح للأبد على عدسة تفتح لكنها لا تقرأ (ماكرو/مقربة/فائقة العرض). */
+    onSwitch(event.currentTarget.value);
   });
 }
 
@@ -4041,6 +4044,8 @@ async function startCameraScanner(overlay, onDetected, unsupportedMessage, manua
           const codes = await detector.detect(video);
           const code = codes[0]?.rawValue?.trim();
           if (code) {
+            /* القراءة نجحت بهذه الكاميرا: الآن فقط نحفظها لتكون الافتراضية في الجلسات القادمة. */
+            if (activeDeviceId) rememberScannerCamera(activeDeviceId);
             session.absentSince = 0;
             if (continuous && !isNewContinuousBarcode(session.lastCode, code)) { session.frame = requestAnimationFrame(scanFrame); return; }
             session.reading = true;
