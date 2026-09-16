@@ -109,7 +109,7 @@ function generateQuickCashOptions(total) {
   return list.slice(0, 6);
 }
 
-const state = { view: "dashboard", lastStableView: "dashboard", viewHistory: [], isNavigatingBack: false, showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, salesSheet: "peek", productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false, cashIn: false, cashOut: false, cashMoves: false, transfers: false, cashExpenses: false, shifts: false, shiftStats: false, salaries: false, notifications: false, setGeneral: false, setBrand: false, setAccounts: false, setActivity: false, setNav: false, setData: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
+const state = { view: "dashboard", lastStableView: "dashboard", viewHistory: [], isNavigatingBack: false, showSetupHome: false, settings: null, accounts: [], currentUser: null, activeCashierShift: null, cashierShifts: [], cashierSalarySummaries: [], cashierMonthlySalaryExpenses: [], cashierShiftStatistics: [], vault: null, products: [], productSuppliers: {}, sales: [], saleItems: [], suppliers: [], supplierPayments: [], customers: [], customerPayments: [], purchases: [], purchaseItems: [], expenses: [], stockMovements: [], cashMovements: [], transferVaultDeposits: [], cashbox: null, dashboard: null, analytics: null, periodicInventories: [], periodicInventorySummary: null, auditCycle: "monthly", auditFrom: "", auditTo: "", cart: [], heldInvoices: loadHeldInvoicesFromStorage(), lastAddedProductId: null, productQuery: "", productCategory: "الكل", inventoryCategory: "الكل", saleQuery: "", invoiceQuery: "", supplierQuery: "", customerQuery: "", paymentQuery: "", paymentFrom: "", paymentTo: "", supplierPaymentQuery: "", supplierPaymentFrom: "", supplierPaymentTo: "", cashFrom: "", cashTo: "", debtQuery: "", debtSort: "highest", expenseQuery: "", expenseFrom: "", expenseTo: "", reportFrom: "", reportTo: "", reportPanels: { topVolume: false, topProfit: false, hourly: false, deadStock: false, cashIn: false, cashOut: false, cashMoves: false, transfers: false, cashExpenses: false, shifts: false, shiftStats: false, salaries: false, notifications: false, setGeneral: false, setBrand: false, setAccounts: false, setActivity: false, setNav: false, setData: false }, scanner: null, cartDiscount: "", cloud: { user: null, backups: [], loading: false, busy: "", error: "", identity: null, pairing: null, pairRequests: [], syncStatus: "local" } };
 const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "purchases", ...NAV_ITEMS.map((item) => item.id).filter((id) => !["dashboard", "sales", "purchases"].includes(id))];
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
@@ -1040,190 +1040,6 @@ function inventoryMarkup() {
   <section class="panel inventory-list">${products.length ? products.map((product) => `<article class="inventory-row"><div class="inventory-row__main"><div class="inventory-icon">${icon("package", 20)}</div><div><strong dir="rtl">${escapeHtml(product.name)}</strong><small dir="auto">${escapeHtml(product.barcode || "دون باركود")} · ${escapeHtml(product.category || product.unit)} · شراء: ${money(product.purchasePrice)} · بيع: ${money(product.salePrice)}</small><small>قيمة المخزون: ${money(product.purchasePrice * product.quantity)}</small>${expiryMeterMarkup(product)}${expiryStatusMarkup(product)}</div></div><div class="inventory-row__stock"><div>${formatStatus(product)}<strong>${amount(product.quantity)} <small>${escapeHtml(product.unit)}</small></strong></div>${productSupplierActions(product)}<button class="button button--secondary" data-action="count-stock" data-id="${product.id}">جرد</button><button class="button button--secondary" data-action="adjust-stock" data-id="${product.id}">تعديل</button><button class="icon-button" data-action="open-stock-history" data-id="${product.id}" aria-label="سجل الحركة">${icon("history", 18)}</button></div></article>`).join("") : emptyState("المخزون بانتظار أول منتج", "أضف منتجًا مع كمية افتتاحية ليظهر هنا.")}</section><div class="dialog__actions"><button class="button button--secondary button--wide" data-action="open-stock-history">${icon("history", 17)} سجل حركة المخزون</button></div>`;
 }
 
-/* ===== سلة البيع كورقة سفلية في الهاتف (شكل فقط) =====
-   لا قراءة من القاعدة ولا كتابة فيها: كل ما تفعله هذه الدوال هو ضبط ارتفاع وقوائم أصناف
-   على عنصرين موجودين. المنطق المحاسبي ومسار البيع يمرّان كما كانا تمامًا. */
-const SALES_SHEET_PEEK_RATIO = 0.46; // النصف السفلي تقريبًا للسلة كما طلب البائع
-const SALES_SHEET_EMPTY_PEEK = 146; // سلة فارغة ⇒ شريط صغير لا نصف شاشة ميتة
-const SALES_SHEET_EDGE = 8;
-const SALES_SHEET_SNAP = 0.3; // نسبة السحب اللازمة للتحوّل إلى ملء الشاشة
-const SALES_SHEET_FLICK = 0.5; // أو دفعة سريعة بالبكسل/المللي ثانية
-
-const salesSheetIsMobile = () => typeof window !== "undefined" && window.matchMedia?.("(max-width: 599px)").matches;
-
-/** أدنى ارتفاع للورقة: ما يظهر المقبض والرأس والإجمالي بلا قصّ (الأسطر وحدها تُقصّ وتتمرّر). */
-function salesSheetBarHeight(panel) {
-  const parts = [".cart-sheet__handle", ".cart-panel__head", ".cart-total"].map((selector) => panel?.querySelector(selector)?.offsetHeight || 0);
-  const shown = parts.filter((height) => height > 0);
-  if (!shown.length) return 0;
-  const styles = panel ? getComputedStyle(panel) : null;
-  const pad = styles ? (parseFloat(styles.paddingTop) || 0) + (parseFloat(styles.paddingBottom) || 0) : 0;
-  const gap = styles ? parseFloat(styles.rowGap) || 0 : 0;
-  return Math.ceil(pad + shown.reduce((sum, height) => sum + height, 0) + gap * (shown.length - 1));
-}
-
-function salesSheetGeometry(panel) {
-  const viewport = Math.round(window.visualViewport?.height || window.innerHeight || 640);
-  const nav = Math.round(document.querySelector(".bottom-nav")?.getBoundingClientRect().height || 0);
-  const full = Math.max(260, viewport - nav - SALES_SHEET_EDGE * 2);
-  const bar = salesSheetBarHeight(panel || document.querySelector(".cart-panel.cart-sheet"));
-  const wanted = state.cart.length ? viewport * SALES_SHEET_PEEK_RATIO : SALES_SHEET_EMPTY_PEEK;
-  const peek = Math.max(120, bar, Math.round(wanted));
-  return { full, peek: Math.min(full, peek), nav, bar };
-}
-
-/** آخر هندسة مقيسة تُكتب في القالب نفسه: بلا هذا التلميح تُرسم الورقة إطارًا بلا طبقتها
-    وبلا ارتفاعها (افتراضي CSS ثم قفزة إلى المقيس) — وهو ما كان يظهر انكماشًا وتمدّدًا مع كل ضغطة. */
-const salesSheetPaint = { mobile: false, height: 0, nav: 0, reserve: 0 };
-let salesSheetAnimTimer = 0;
-
-function salesSheetPaintStyle(kind) {
-  if (!salesSheetPaint.mobile || salesSheetPaint.height <= 0) return "";
-  return kind === "layout"
-    ? ` style="--sales-sheet-reserve:${salesSheetPaint.reserve}px"`
-    : ` style="--sales-sheet-h:${salesSheetPaint.height}px;--sales-sheet-nav:${salesSheetPaint.nav}px"`;
-}
-
-/** يضبط الارتفاعات بخصائص CSS، فتبقى القواعد في style.css والقياس هنا فقط. */
-function applySalesSheetGeometry() {
-  const panel = root.querySelector(".cart-panel.cart-sheet");
-  const layout = root.querySelector(".sales-layout");
-  const mobile = Boolean(panel && layout) && salesSheetIsMobile();
-  // طبقتا <html> تصحبان الورقة دائمًا: مغادرة صفحة المبيعات تُحرّر قفل التمرير وتُظهر زر الماسح
-  document.documentElement.classList.toggle("is-sales-sheet-mobile", mobile);
-  document.documentElement.classList.toggle("is-sales-sheet-open", mobile && state.salesSheet === "full");
-  if (!panel || !layout) return false;
-  panel.classList.toggle("is-sheet-mobile", mobile);
-  if (!mobile) {
-    panel.style.removeProperty("--sales-sheet-h");
-    panel.style.removeProperty("--sales-sheet-nav");
-    layout.style.removeProperty("--sales-sheet-reserve");
-    delete panel.dataset.sheet;
-    salesSheetPaint.mobile = false;
-    salesSheetPaint.height = 0;
-    salesSheetPaint.reserve = 0;
-    panel.classList.remove("is-sheet-animating");
-    return true;
-  }
-  const { full, peek, nav } = salesSheetGeometry(panel);
-  const height = state.salesSheet === "full" ? full : peek;
-  panel.dataset.sheet = state.salesSheet === "full" ? "full" : "peek";
-  panel.dataset.cartEmpty = state.cart.length ? "0" : "1";
-  panel.style.setProperty("--sales-sheet-h", `${height}px`);
-  panel.style.setProperty("--sales-sheet-nav", `${nav}px`);
-  layout.style.setProperty("--sales-sheet-reserve", `${peek + SALES_SHEET_EDGE * 2 + 14}px`);
-  salesSheetPaint.mobile = true;
-  salesSheetPaint.height = height;
-  salesSheetPaint.nav = nav;
-  salesSheetPaint.reserve = peek + SALES_SHEET_EDGE * 2 + 14;
-  return true;
-}
-
-/** يبدّل الحالة بلا إعادة رسم: يحفظ موضع التمرير ويجعل الحركة انتقالية لا قفزة. */
-function commitSalesSheet(mode) {
-  const next = mode === "full" ? "full" : "peek";
-  const changed = state.salesSheet !== next;
-  state.salesSheet = next;
-  // الانتقالي يعمل فقط حين يقرّر المستخدم التبديل أو يُفلت السحب — لا عند إعادة التصيير.
-  const animated = root.querySelector(".cart-panel.cart-sheet");
-  if (changed && animated?.classList.contains("is-sheet-mobile")) {
-    animated.classList.add("is-sheet-animating");
-    // المتصفح لا يشغّل انتقالًا أُضيف في نفس تحديث النمط: نُثبّت النمط أولًا ثم نُغيّر الارتفاع.
-    void animated.offsetHeight;
-    window.clearTimeout(salesSheetAnimTimer);
-    salesSheetAnimTimer = window.setTimeout(() => animated.classList.remove("is-sheet-animating"), 280);
-  }
-  if (!applySalesSheetGeometry()) return state.salesSheet;
-  const panel = root.querySelector(".cart-panel.cart-sheet");
-  const handle = panel?.querySelector(".cart-sheet__handle");
-  if (handle) {
-    handle.setAttribute("aria-expanded", next === "full" ? "true" : "false");
-    handle.setAttribute("aria-label", next === "full" ? "تصغير سلة البيع" : "توسيع سلة البيع إلى كامل الشاشة");
-    const label = handle.querySelector(".cart-sheet__label");
-    if (label) label.textContent = next === "full" ? "تصغير السلة" : "توسيع السلة";
-  }
-  return next;
-}
-
-let salesSheetGesturesInstalled = false;
-/** السحب بالإصبع من المقبض فقط — جسم السلة يبقى للتمرير العادي، فلا تعارض لمسات. */
-function installSalesSheetGestures() {
-  if (salesSheetGesturesInstalled) return;
-  salesSheetGesturesInstalled = true;
-  let drag = null;
-  const onDown = (event) => {
-    const handle = event.target.closest?.(".cart-sheet__handle");
-    const panel = handle?.closest(".cart-panel.cart-sheet");
-    if (!panel || !salesSheetIsMobile() || event.pointerType === "mouse") return;
-    const { full, peek } = salesSheetGeometry(panel);
-    drag = {
-      handle,
-      panel,
-      startY: event.clientY,
-      startHeight: Math.round(panel.getBoundingClientRect().height) || (state.salesSheet === "full" ? full : peek),
-      from: state.salesSheet === "full" ? full : peek,
-      full,
-      peek,
-      lastY: event.clientY,
-      lastT: event.timeStamp || Date.now(),
-      velocity: 0,
-      moved: 0,
-    };
-    panel.classList.add("is-dragging");
-    handle.setPointerCapture?.(event.pointerId);
-  };
-  const onMove = (event) => {
-    if (!drag) return;
-    const dy = event.clientY - drag.startY;
-    drag.moved = Math.max(drag.moved, Math.abs(dy));
-    const now = event.timeStamp || Date.now();
-    const dt = Math.max(1, now - drag.lastT);
-    drag.velocity = (drag.lastY - event.clientY) / dt; // موجب = للأعلى
-    drag.lastY = event.clientY;
-    drag.lastT = now;
-    // من peek: نتحرك للأعلى فقط (سالب dy)، ومن full: للأسفل فقط — بلا مطاط زائد
-    const target = drag.from - dy;
-    const clamped = Math.round(Math.min(drag.full, Math.max(drag.peek, target)));
-    drag.current = clamped;
-    drag.panel.style.setProperty("--sales-sheet-h", `${clamped}px`);
-    if (Math.abs(dy) > 4) event.preventDefault();
-  };
-  const onUp = () => {
-    if (!drag) return;
-    const { panel, full, peek, velocity } = drag;
-    panel.classList.remove("is-dragging");
-    // نقرة بلا حركة: لا قرار هنا — زر المقبض (data-action) يتكفّل بالتبديل
-    if (drag.moved < 8) {
-      drag = null;
-      applySalesSheetGeometry();
-      return;
-    }
-    const height = drag.current ?? drag.from;
-    const progress = full > peek ? (height - peek) / (full - peek) : 0;
-    const flickUp = velocity > SALES_SHEET_FLICK;
-    const flickDown = velocity < -SALES_SHEET_FLICK;
-    const wantsFull = drag.from === peek ? progress > SALES_SHEET_SNAP || flickUp : !(progress < 1 - SALES_SHEET_SNAP || flickDown);
-    drag = null;
-    commitSalesSheet(wantsFull ? "full" : "peek");
-  };
-  window.addEventListener("pointerdown", onDown, { passive: true });
-  window.addEventListener("pointermove", onMove, { passive: false });
-  window.addEventListener("pointerup", onUp, { passive: true });
-  window.addEventListener("pointercancel", onUp, { passive: true });
-  // Escape يُغلق الورقة المفتوحة كما يُغلق أي طبقة علوية
-  window.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && state.salesSheet === "full") {
-      event.preventDefault();
-      commitSalesSheet("peek");
-    }
-  });
-  const onResize = () => {
-    if (state.view === "sales") applySalesSheetGeometry();
-  };
-  window.addEventListener("resize", onResize);
-  window.visualViewport?.addEventListener("resize", onResize);
-}
-
 const SALES_CATALOG_LIMIT = 40;
 
 /* ترتيب الأصناف المعروضة في صفحة المبيعات: الأحدث بيعًا ثم الأكثر مبيعًا، ثم باقي المتوفر.
@@ -1266,16 +1082,16 @@ function salesMarkup() {
   const heldCount = state.heldInvoices?.length || 0;
   const topbarActions = `<div class="sales-topbar-actions">${heldCount ? `<button class="button button--secondary button--compact held-topbar-btn" data-action="open-held-invoices" title="الفواتير المعلقة">${icon("clock", 16)}<span>معلقة (${heldCount})</span></button>` : ""}<button class="button button--secondary" data-action="navigate" data-view="invoices">${icon("receipt", 17)}<span>الفواتير</span></button></div>`;
   return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.", topbarActions)}
-  <section class="sales-layout"${salesSheetPaintStyle("layout")}><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div><p class="desktop-barcode-reader-note">${icon("scan", 15)} قارئ الباركود المتصل بالكمبيوتر يعمل مباشرةً في صفحة المبيعات؛ امسح الرمز ثم Enter أو Tab.</p>
+  <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div><p class="desktop-barcode-reader-note">${icon("scan", 15)} قارئ الباركود المتصل بالكمبيوتر يعمل مباشرةً في صفحة المبيعات؛ امسح الرمز ثم Enter أو Tab.</p>
   <div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => {
     const isFlash = state.lastAddedProductId === product.id;
     const inCart = cartProductIds.has(product.id);
     const cartQty = inCart ? state.cart.reduce((sum, line) => (line.productId === product.id ? sum + toNumber(line.quantity) : sum), 0) : 0;
     return `<div class="sale-product-line"><button class="sale-product ${product.quantity <= 0 && !state.settings?.allowNegativeSales ? "is-disabled" : ""} ${inCart ? "is-in-cart" : ""} ${isFlash ? "is-flash-added" : ""}" data-action="add-cart" data-id="${product.id}" ${product.quantity <= 0 && !state.settings?.allowNegativeSales ? "disabled" : ""} aria-pressed="${inCart}"${inCart ? ` title="${escapeHtml(product.name)}: ${amount(cartQty)} ${escapeHtml(product.unit)} في السلة الحالية"` : ""}><div><strong class="arabic-product-name" dir="rtl" lang="ar">${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)} متاح${inCart ? ` · ${amount(cartQty)} في السلة` : ""}</small></div><span>${money(product.salePrice)}</span><i class="${inCart ? "sale-product__count" : ""}"${inCart ? ` dir="ltr" aria-label="${amount(cartQty)} في السلة"` : ""}>${inCart ? (cartQty > 1 ? `${amount(cartQty)}` : icon("check", 18)) : icon("plus", 18)}</i></button>${productSupplierActions(product)}</div>`;
   }).join("") : `<div class="no-match"><strong>لا توجد نتيجة</strong><span>تحقق من الاسم أو الباركود أو أضف منتجًا جديدًا.</span><button class="text-button" data-action="new-product">إنشاء منتج</button></div>`}</div></div>
-  <aside class="cart-panel cart-sheet${salesSheetPaint.mobile ? " is-sheet-mobile" : ""}"${salesSheetPaintStyle("panel")} data-sheet="${state.salesSheet === "full" ? "full" : "peek"}" data-cart-empty="${state.cart.length ? "0" : "1"}"><button class="cart-sheet__handle" type="button" data-action="toggle-sales-sheet" aria-expanded="${state.salesSheet === "full" ? "true" : "false"}" aria-label="${state.salesSheet === "full" ? "تصغير سلة البيع" : "توسيع سلة البيع إلى كامل الشاشة"}"><span class="cart-sheet__grip" aria-hidden="true"></span><span class="cart-sheet__label">${state.salesSheet === "full" ? "تصغير السلة" : "توسيع السلة"}</span></button><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div><div class="cart-head-actions"><button class="cart-sheet-close" type="button" data-action="close-sales-sheet" aria-label="إغلاق نافذة السلة" title="إغلاق نافذة السلة">${icon("close", 17)}</button>${heldCount ? `<button class="button button--secondary button--compact held-badge-btn" data-action="open-held-invoices" title="عرض الفواتير المعلقة">${icon("clock", 15)}<span>معلقة (${heldCount})</span></button>` : ""}${state.cart.length ? `<button class="button button--secondary button--compact" data-action="hold-cart" title="تعليق الفاتورة الحالية">${icon("pause", 15)}<span>تعليق</span></button><button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div></div>
+  <aside class="cart-panel" id="sales-cart" data-cart-empty="${state.cart.length ? "0" : "1"}"><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div><div class="cart-head-actions">${heldCount ? `<button class="button button--secondary button--compact held-badge-btn" data-action="open-held-invoices" title="عرض الفواتير المعلقة">${icon("clock", 15)}<span>معلقة (${heldCount})</span></button>` : ""}${state.cart.length ? `<button class="button button--secondary button--compact" data-action="hold-cart" title="تعليق الفاتورة الحالية">${icon("pause", 15)}<span>تعليق</span></button><button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div></div>
   <div class="cart-lines">${state.cart.length ? state.cart.map(cartLine).join("") : `<div class="cart-empty">${icon("cart", 30)}<p>اختر منتجًا من القائمة لتبدأ البيع.</p></div>`}</div>
-  <div class="cart-total"><div class="cart-total__summary"><div><span>إجمالي السلة</span><strong data-cart-subtotal>${money(totals.subtotal)}</strong></div></div><div class="cart-actions-grid">${state.cart.length ? `<button class="button button--secondary button--hold" data-action="hold-cart" title="تعليق الفاتورة مؤقتًا">${icon("pause", 17)}<span>تعليق</span></button>` : ""}<button class="button button--primary ${state.cart.length ? "checkout-launch" : "button--wide"}" data-action="checkout" ${state.cart.length ? "" : "disabled"}>إتمام البيع ${icon("arrow", 18)}</button></div></div></aside></section><section class="sales-bottom-action"><div><span class="eyebrow">سجل المبيعات</span><strong>فواتير المبيعات</strong><small>اعرض الفواتير المحفوظة وابحث عنها وراجع تفاصيل كل فاتورة.</small></div><button class="button button--primary" data-action="navigate" data-view="invoices">${icon("receipt", 22)}<span>الانتقال إلى فواتير المبيعات</span></button></section>`;
+  <div class="cart-total"><div class="cart-total__summary"><div><span>إجمالي السلة</span><strong data-cart-subtotal>${money(totals.subtotal)}</strong></div></div><div class="cart-actions-grid">${state.cart.length ? `<button class="button button--secondary button--hold" data-action="hold-cart" title="تعليق الفاتورة مؤقتًا">${icon("pause", 17)}<span>تعليق</span></button>` : ""}<button class="button button--primary ${state.cart.length ? "checkout-launch" : "button--wide"}" data-action="checkout" ${state.cart.length ? "" : "disabled"}>إتمام البيع ${icon("arrow", 18)}</button></div></div></aside></section><button class="sales-total-bar" type="button" data-action="scroll-to-cart" aria-label="إجمالي الفاتورة ${money(totals.subtotal)} — اضغط للانتقال إلى السلة" title="الانتقال إلى السلة أسفل الصفحة"><span class="sales-total-bar__label">${icon("cart", 18)} الإجمالي</span><strong class="sales-total-bar__value" data-sales-total-bar dir="ltr">${money(totals.subtotal)}</strong></button><section class="sales-bottom-action"><div><span class="eyebrow">سجل المبيعات</span><strong>فواتير المبيعات</strong><small>اعرض الفواتير المحفوظة وابحث عنها وراجع تفاصيل كل فاتورة.</small></div><button class="button button--primary" data-action="navigate" data-view="invoices">${icon("receipt", 22)}<span>الانتقال إلى فواتير المبيعات</span></button></section>`;
 }
 
 function cartLine(line) {
@@ -1632,13 +1448,13 @@ const BACKGROUND_LIGHT_THEMES = [
 ];
 const BACKGROUND_DARK_THEMES = [
   { id: "forest", label: "أخضر غابي", hint: "الافتراضي", color: "#101d18" },
-  { id: "deep-mint", label: "نعناعي غامق", hint: "أخضر أعمق قليلًا", color: "#0d211b" },
-  { id: "night-sky", label: "أزرق ليلي", hint: "مائل للزرقة الهادئة", color: "#0e1d22" },
-  { id: "amber-night", label: "بني رملي", hint: "دافئ مثل لمسات الذهبي", color: "#1e1910" },
-  { id: "charcoal", label: "فحمي لؤلؤي", hint: "حيادي أنيق", color: "#171b1d" },
+  { id: "night-sky", label: "أزرق ليلي", hint: "مائل للزرقة بوضوح", color: "#12283f" },
+  { id: "plum", label: "بنفسجي ليلي", hint: "غامق بلمسة بنفسجية", color: "#241a33" },
+  { id: "amber-night", label: "بني دافئ", hint: "دافئ مثل لمسات الذهبي", color: "#2c1d0e" },
+  { id: "charcoal", label: "فحمي محايد", hint: "رمادي بلا أي صبغة", color: "#202428" },
 ];
 /* توافق خلفي: من كان مختارًا لونًا بالنظام القديم الموحد تُشتق منه القيمتان. */
-const LEGACY_BACKGROUND_MAP = { ivory: ["ivory", "forest"], mint: ["mint", "deep-mint"], sky: ["sky", "night-sky"], sand: ["sand", "amber-night"], pearl: ["pearl", "charcoal"] };
+const LEGACY_BACKGROUND_MAP = { ivory: ["ivory", "forest"], mint: ["mint", "forest"], sky: ["sky", "night-sky"], sand: ["sand", "amber-night"], pearl: ["pearl", "charcoal"] };
 function backgroundLightId() {
   const stored = state.settings?.backgroundLight;
   if (BACKGROUND_LIGHT_THEMES.some((themeOption) => themeOption.id === stored)) return stored;
@@ -1910,7 +1726,7 @@ function render() {
   catch (error) { renderRecovery(error); }
   requestAnimationFrame(() => {
     try { fitMetricValues(); } catch { /* القياس تجميلي */ }
-    try { installSalesSheetGestures(); applySalesSheetGeometry(); } catch { /* الورقة تجميلية */ }
+    try { document.documentElement.classList.toggle("is-sales-page", state.view === "sales"); } catch { /* تجميلي */ }
   });
 }
 
@@ -2254,8 +2070,7 @@ async function handleActionUnsafe(event) {
   const action = event.currentTarget.dataset.action;
   const id = event.currentTarget.dataset.id;
   if (action === "fill-login") { const input = root.querySelector("#login-form [name=username]"); if (input) { input.value = event.currentTarget.dataset.username; root.querySelector("#login-form [name=pin]")?.focus(); } return; }
-  if (action === "toggle-sales-sheet") { commitSalesSheet(state.salesSheet === "full" ? "peek" : "full"); return; }
-  if (action === "close-sales-sheet") { state.cart = []; state.cartDiscount = ""; state.salesSheet = "peek"; renderKeepingScroll(); return; }
+  if (action === "scroll-to-cart") { root.querySelector("#sales-cart")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (action === "open-phone-recovery") { openPhoneRecoveryDialog(); return; }
   if (action === "cloud-password-reset") { openCloudAuthDialog(); return; }
   if (action === "cloud-restore-start") { openCloudRestoreOnSetupDialog(); return; }

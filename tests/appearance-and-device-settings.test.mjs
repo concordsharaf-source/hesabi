@@ -108,7 +108,7 @@ test("منتقيا لون الخلفية مستقلان: قائمة للفاتح
   assert.match(app, /const BACKGROUND_LIGHT_THEMES = \[/);
   assert.match(app, /const BACKGROUND_DARK_THEMES = \[/);
   for (const id of ["ivory", "mint", "sky", "sand", "pearl"]) assert.match(app, new RegExp(`id: "${id}"`));
-  for (const id of ["forest", "deep-mint", "night-sky", "amber-night", "charcoal"]) assert.match(app, new RegExp(`id: "${id}"`));
+  for (const id of ["forest", "night-sky", "plum", "amber-night", "charcoal"]) assert.match(app, new RegExp(`id: "${id}"`));
   assert.match(app, /function backgroundLightId/);
   assert.match(app, /function backgroundDarkId/);
   assert.match(app, /function backgroundPalette/);
@@ -129,10 +129,10 @@ test("سكربت الرأس يطبق لون الخلفية المحفوظ قبل
 
 test("سلة البيع على الشاشات الواسعة لاصقة والإجمالي لا يغيب مع التمرير", async () => {
   const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
-  assert.match(css, /\.cart-panel:not\(\.is-sheet-mobile\) \{ position:sticky/);
-  assert.match(css, /\.cart-panel:not\(\.is-sheet-mobile\) \.cart-lines \{ flex:1 1 auto; min-height:0; overflow-y:auto/);
-  // الجوال يحتفظ بالورقة السفلية كما هي
-  assert.match(css, /\.cart-sheet\.is-sheet-mobile \{/);
+  assert.match(css, /\.cart-panel \{ position:sticky/);
+  assert.match(css, /\.cart-panel \.cart-lines \{ flex:1 1 auto; min-height:0; overflow-y:auto/);
+  // الجوال: السلة داخل تدفّق الصفحة وشريط الإجمالي الثابت أسفل الشاشة
+  assert.match(css, /html\.is-sales-page \.sales-total-bar \{/);
 });
 
 test("أنماط منتقي لون الخلفية موجودة مع دعم الوضع الداكن", async () => {
