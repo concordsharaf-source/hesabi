@@ -2902,7 +2902,8 @@ function openCashMovementDialog(type) {
   }
   const staff = state.accounts.filter((account) => ["admin", "cashier", "employee"].includes(account.role) && account.isActive);
   const staffOptions = staff.map((account) => `<option value="${account.id}">${escapeHtml(account.name)} · ${roleLabel(account.role)}${account.jobTitle ? ` · ${escapeHtml(account.jobTitle)}` : ""}</option>`).join("");
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حركة صندوق</span><h2>سحب من الخزنة</h2><p class="dialog__subtext">اختر بند السحب ليدخل المبلغ مكانه الصحيح في الحسابات والتقارير.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="cash-withdrawal-form" class="form-grid"><fieldset class="payment-type form-full"><legend>بند السحب</legend><label><input name="withdrawalKind" type="radio" value="withdrawal" checked /> سحب عادي</label><label><input name="withdrawalKind" type="radio" value="daily" /> مصروف يومي</label><label><input name="withdrawalKind" type="radio" value="monthly" /> مصروف شهري</label><label><input name="withdrawalKind" type="radio" value="advance" /> سلفة موظف</label></fieldset><label>المبلغ${quantityControlMarkup({ value: "", min: 0.01, step: "0.01", inputAttrs: "name=\"amount\" required autofocus" })}</label><label id="cw-date-label">التاريخ<input name="date" required type="date" value="${dateKey()}" /></label><label id="cw-category-field" class="form-full" hidden>فئة المصروف<select name="category"></select></label><label id="cw-staff-field" class="form-full" hidden>الموظف<select name="staffId">${staffOptions}</select></label><p id="cw-advance-note" class="form-full scanner-session-note" hidden></p><label class="form-full">السبب أو الوصف<textarea name="notes" maxlength="180" placeholder="مثال: سحب شخصي، فاتورة كهرباء، سلفة من راتب الشهر..."></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ السحب ${icon("check", 17)}</button></div></form>`);
+  const payableSuppliers = state.suppliers.filter((supplier) => toNumber(supplier.balance) > 0);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حركة صندوق</span><h2>سحب من الخزنة</h2><p class="dialog__subtext">اختر بند السحب ليدخل المبلغ مكانه الصحيح في الحسابات والتقارير.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="cash-withdrawal-form" class="form-grid"><fieldset class="payment-type form-full"><legend>بند السحب</legend><label><input name="withdrawalKind" type="radio" value="withdrawal" checked /> سحب عادي</label><label><input name="withdrawalKind" type="radio" value="daily" /> مصروف يومي</label><label><input name="withdrawalKind" type="radio" value="monthly" /> مصروف شهري</label><label><input name="withdrawalKind" type="radio" value="advance" /> سلفة موظف</label><label><input name="withdrawalKind" type="radio" value="supplier" /> تسديد مورد</label></fieldset><label>المبلغ${quantityControlMarkup({ value: "", min: 0.01, step: "0.01", inputAttrs: "name=\"amount\" required autofocus" })}</label><label id="cw-date-label">التاريخ<input name="date" required type="date" value="${dateKey()}" /></label><label id="cw-category-field" class="form-full" hidden>فئة المصروف<select name="category"></select></label><label id="cw-staff-field" class="form-full" hidden>الموظف<select name="staffId">${staffOptions}</select></label><p id="cw-advance-note" class="form-full scanner-session-note" hidden></p><label id="cw-supplier-field" class="form-full" hidden>المورد<select name="supplierId">${payableSuppliers.map((supplier) => `<option value="${supplier.id}">${escapeHtml(supplier.name)} — المستحق ${money(supplier.balance)}</option>`).join("")}</select></label><p id="cw-supplier-note" class="form-full scanner-session-note" hidden></p><label class="form-full">السبب أو الوصف<textarea name="notes" maxlength="180" placeholder="مثال: سحب شخصي، فاتورة كهرباء، سلفة من راتب الشهر..."></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ السحب ${icon("check", 17)}</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   bindQuantityControl(overlay.querySelector(".quantity-control"), { min: 0.01, step: 0.01, onChange: () => {} });
   const form = overlay.querySelector("#cash-withdrawal-form");
@@ -2919,18 +2920,29 @@ function openCashMovementDialog(type) {
     const remaining = summary ? toNumber(summary.remainingSalary) : salary;
     advanceNote.textContent = salary > 0 ? `راتب ${account?.name || "الموظف"}: ${money(salary)} · المتبقي القابل للسلفة: ${money(remaining)} — تُخصم السلفة من راتبه تلقائيًا.` : "لم يُسجل راتب شهري لهذا الموظف؛ عدّل بيانات حسابه أولًا.";
   };
+  const supplierField = overlay.querySelector("#cw-supplier-field");
+  const supplierNote = overlay.querySelector("#cw-supplier-note");
+  const syncSupplierNote = () => {
+    if (form.withdrawalKind.value !== "supplier") return;
+    const supplier = payableSuppliers.find((item) => item.id === form.supplierId?.value);
+    supplierNote.textContent = supplier ? `المستحق لـ${supplier.name}: ${money(supplier.balance)} — تُسوى فواتيره الآجلة الأقدم أولًا ويُحدث رصيده تلقائيًا.` : "";
+  };
   const syncKind = () => {
     const kind = form.withdrawalKind.value;
     const isExpense = kind === "daily" || kind === "monthly";
     categoryField.hidden = !isExpense;
     staffField.hidden = kind !== "advance";
     advanceNote.hidden = kind !== "advance";
+    supplierField.hidden = kind !== "supplier";
+    supplierNote.hidden = kind !== "supplier";
+    if (kind === "supplier") { if (!payableSuppliers.length) { showToast("لا يوجد مورد لديه مستحق مفتوح حاليًا.", "error"); form.withdrawalKind.value = "withdrawal"; syncKind(); return; } syncSupplierNote(); }
     dateLabel.firstChild.textContent = kind === "monthly" ? "شهر الاستحقاق" : "التاريخ";
     if (isExpense) { const categories = kind === "monthly" ? MONTHLY_EXPENSE_CATEGORIES : DAILY_EXPENSE_CATEGORIES; form.category.innerHTML = categories.map((category) => `<option value="${category}">${category}</option>`).join(""); }
     if (kind === "advance") { if (!staff.length) { showToast("أضف حسابًا نشطًا قبل تسجيل السلفة.", "error"); form.withdrawalKind.value = "withdrawal"; syncKind(); return; } syncAdvanceNote(); }
   };
   form.querySelectorAll("[name=withdrawalKind]").forEach((input) => input.addEventListener("change", syncKind));
   form.staffId?.addEventListener("change", syncAdvanceNote);
+  form.supplierId?.addEventListener("change", syncSupplierNote);
   form.date.addEventListener("change", syncAdvanceNote);
   syncKind();
   form.addEventListener("submit", async (event) => {
@@ -2941,6 +2953,11 @@ function openCashMovementDialog(type) {
       if (kind === "advance") {
         await db.createExpense({ amount: values.amount, date: values.date, staffId: values.staffId, description: values.notes || "", notes: values.notes, salaryAdvance: true, cashierSalaryAdvance: true, periodType: "daily" });
         showToast("سُجلت سلفة الموظف وخُصمت من راتبه ومن الصندوق.");
+      } else if (kind === "supplier") {
+        const supplier = payableSuppliers.find((item) => item.id === values.supplierId);
+        if (!supplier) { showToast("اختر المورد أولًا.", "error"); return; }
+        await db.registerSupplierPayment({ supplierId: values.supplierId, amount: values.amount, date: values.date, notes: values.notes, paymentMethod: "نقدي" });
+        showToast(`سُددت دفعة ${supplier.name} نقدًا من الخزنة وسُوّيت فواتيره الآجلة.`);
       } else if (kind === "daily" || kind === "monthly") {
         await db.createExpense({ amount: values.amount, date: values.date, periodType: kind, category: values.category, description: values.notes || values.category, notes: values.notes });
         showToast(kind === "monthly" ? "سُجل المصروف الشهري وسيُوزع على أيام شهره." : "سُجل المصروف اليومي وخُصم من الصندوق.");

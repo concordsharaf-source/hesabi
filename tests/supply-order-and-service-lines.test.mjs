@@ -440,3 +440,41 @@ test("قفل الشاشة: لا يُفتح إلا برمز صاحب الجلسة
   await assert.rejects(() => db.verifyAccountPin("no-such-account", "4321"), /رمز الدخول غير صحيح/);
   await db.resetAllData();
 });
+
+/* ===== v50: بند «تسديد مورد» ضمن سحوبات الخزنة ===== */
+
+test("نافذة السحب: بند تسديد مورد مع قائمة الموردين المستحقين ويمر عبر registerSupplierPayment", () => {
+  const dialog = appJs.slice(appJs.indexOf("function openCashMovementDialog"), appJs.indexOf("function periodicInventoryDetailsMarkup"));
+  assert.match(dialog, /name="withdrawalKind" type="radio" value="supplier"/, "بند تسديد مورد مفقود");
+  assert.match(dialog, /تسديد مورد/, "التسمية مفقودة");
+  assert.match(dialog, /id="cw-supplier-field"[^>]*hidden>المورد<select name="supplierId">\$\{payableSuppliers\.map/, "قائمة الموردين المستحقين مفقودة");
+  assert.match(dialog, /payableSuppliers = state\.suppliers\.filter\(\(supplier\) => toNumber\(supplier\.balance\) > 0\)/, "لا يقتصر على أصحاب المستحقات");
+  assert.match(dialog, /kind === "supplier"[\s\S]*?db\.registerSupplierPayment\(\{ supplierId: values\.supplierId, amount: values\.amount, date: values\.date, notes: values\.notes, paymentMethod: "نقدي" \}\)/, "التسديد لا يمر عبر مسار دفعات الموردين");
+  assert.match(dialog, /المستحق \$\{money\(supplier\.balance\)\}/, "خيار المورد لا يعرض مستحقه");
+  assert.match(dialog, /cw-supplier-note/, "ملاحظة المستحق الحية مفقودة");
+  // حارس القائمة الفارغة يعيد للسحب العادي
+  assert.match(dialog, /if \(!payableSuppliers\.length\) \{ showToast\("لا يوجد مورد لديه مستحق مفتوح حاليًا\."/, "لا حارس لغياب المستحقين");
+});
+
+test("محاسبة تسديد المورد من الخزنة: يسوي الفواتير الآجلة ويحدث رصيد المورد ويظهر في خانة دفعات الموردين لا السحوبات", async () => {
+  await db.resetAllData();
+  const supplier = await db.createSupplier({ name: "مورد الخزنة", phone: "777000111" });
+  const product = await db.createProduct({ name: "سكر الخزنة", barcode: "cwsp-1", unit: "كيس", quantity: 0, price: 120, cost: 100, minimumStock: 1 });
+  await db.createPurchase({ supplierId: supplier.id, items: [{ productId: product.id, quantity: 10, unitCost: 100 }], paymentType: "آجل", paidAmount: 0 });
+  const before = (await db.listSuppliers()).find((item) => item.id === supplier.id);
+  assert.equal(before.balance, 1000, "المستحق بعد الشراء الآجل غير صحيح");
+  const today = new Date().toISOString().slice(0, 10);
+  // نفس نداء نافذة السحب تمامًا
+  await db.registerSupplierPayment({ supplierId: supplier.id, amount: 400, date: today, notes: "تسديد من الخزنة", paymentMethod: "نقدي" });
+  const after = (await db.listSuppliers()).find((item) => item.id === supplier.id);
+  assert.equal(after.balance, 600, "رصيد المورد لم ينقص بالدفعة");
+  const purchases = await db.listPurchases();
+  assert.equal(purchases[0].paymentStatus, "مدفوعة جزئيًا", "الفاتورة الآجلة لم تُسوَّ جزئيًا");
+  assert.equal(purchases[0].remainingAmount, 600);
+  const cashbox = await db.getCashbox({ from: today, to: today });
+  assert.equal(cashbox.supplierPayments, 400, "الدفعة لا تظهر في خانة دفعات الموردين بالخزنة");
+  assert.equal(cashbox.withdrawals, 0, "الدفعة ازدوجت كسحب عادي");
+  // تجاوز المستحق يُرفض
+  await assert.rejects(() => db.registerSupplierPayment({ supplierId: supplier.id, amount: 900, date: today, paymentMethod: "نقدي" }), /أكبر من المستحق/);
+  await db.resetAllData();
+});
