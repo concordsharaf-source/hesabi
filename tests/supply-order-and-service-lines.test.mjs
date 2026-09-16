@@ -42,10 +42,15 @@ test("نافذة توصيل النواقص: كمية قابلة للتعديل �
   assert.match(reorder, /data-reorder-share="\$\{key\}"/, "لا بديل مشاركة عند غياب رقم المورد");
 });
 
-test("صفحة المشتريات: زر «طلب شراء» مماثل بجوار زر فاتورة الشراء ونافذته كاملة", () => {
-  // الزر التوأم بنفس فئة الشكل button--primary في نفس شريط الصفحة
-  assert.match(appJs, /data-action="new-purchase">\$\{icon\("plus", 18\)\}<span>فاتورة شراء<\/span><\/button><button class="button button--primary" data-action="new-purchase-order">\$\{icon\("truck", 18\)\}<span>طلب شراء<\/span><\/button>/, "زر طلب الشراء ليس بجوار زر فاتورة الشراء أو يختلف شكله");
+test("صفحة المشتريات: بلاطة «طلب شراء» الكبيرة بجوار بطاقة فواتير الشراء وبنفس تصميمها", () => {
+  // البلاطة داخل صف الملخص نفسه بجوار بطاقة «فواتير الشراء» الحمراء
+  assert.match(appJs, /<section class="inventory-summary inventory-summary--purchases"><div><span>إجمالي المشتريات<\/span>[\s\S]{0,200}فاتورة<\/strong><\/div><button class="po-order-tile" type="button" data-action="new-purchase-order"/, "بلاطة طلب الشراء ليست بجوار بطاقة فواتير الشراء");
+  assert.match(appJs, /<strong>طلب شراء<\/strong><\/button><\/section>/, "نص البلاطة مفقود");
   assert.match(appJs, /if \(action === "new-purchase-order"\) \{ openPurchaseOrderDialog\(\); return; \}/, "إجراء فتح النافذة مفقود");
+  // نفس تصميم البطاقة الحمراء: نفس التدرج والحدود والظل ونفس بنية padding/gap/strong
+  assert.match(css, /\.po-order-tile \{ display:grid; gap:4px; padding:16px; color:#fff; text-align:right; background:linear-gradient\(145deg,#c42a47,#84132b\); border:1px solid #f28a9c; border-radius:14px; box-shadow:0 10px 22px rgba\(132,19,43,\.25\)/, "تصميم البلاطة لا يطابق بطاقة فواتير الشراء الحمراء");
+  assert.match(css, /\.po-order-tile strong \{ font-size:20px; \}/, "حجم عنوان البلاطة لا يطابق البطاقة");
+  assert.match(css, /\[data-theme="dark"\] \.po-order-tile \{ background:linear-gradient\(145deg,#c42a47,#84132b\); border-color:#ff9eb0/, "لا مطابقة للوضع الداكن");
   const dialog = appJs.slice(appJs.indexOf("function openPurchaseOrderDialog()"), appJs.indexOf("function currentMonthDateRange()"));
   assert.ok(dialog.length > 800, "تعذر استخراج نافذة طلب الشراء");
   // خانات النافذة: مورد، أصناف بكمية، إرسال واتساب وPDF
@@ -66,6 +71,26 @@ test("صفحة المشتريات: زر «طلب شراء» مماثل بجوا�
   // أنماط الأسطر موجودة مع دعم الوضع الداكن
   assert.match(css, /\.po-line \{ display:grid; grid-template-columns:minmax\(0,1fr\) 88px auto/, "أنماط سطر الطلب مفقودة");
   assert.match(css, /\[data-theme="dark"\] \.po-line__name/, "لا دعم للوضع الداكن في النافذة");
+});
+
+test("اقتراح الأصناف في طلب الشراء: كل المنتجات المسجلة فور الكتابة دون اشتراط ارتباطها بالمورد", () => {
+  const dialog = appJs.slice(appJs.indexOf("function openPurchaseOrderDialog()"), appJs.indexOf("function currentMonthDateRange()"));
+  // قائمة مقترحات مخصصة ظاهرة (لا datalist المتصفح غير الموثوق على الجوال)
+  assert.doesNotMatch(dialog, /datalist|list="po-products"/, "ما زالت القائمة تعتمد datalist المتصفح");
+  assert.match(dialog, /class="po-suggest" hidden/, "صندوق الاقتراحات مفقود من سطر الصنف");
+  assert.match(dialog, /const renderSuggest = \(input\) => \{/, "منطق الاقتراح مفقود");
+  // المصدر كل المنتجات المسجلة — لا productSuppliers ولا تصفية بالمورد المختار
+  assert.match(dialog, /state\.products\.filter\(\(product\) => !query \|\| product\.name\.toLocaleLowerCase\("ar"\)\.includes\(query\)/, "الاقتراح لا يبحث في كل المنتجات بالاسم");
+  assert.match(dialog, /String\(product\.barcode \|\| ""\)\.includes\(query\)/, "الاقتراح لا يبحث بالباركود");
+  assert.doesNotMatch(dialog, /productSuppliers|selectedSupplier\(\)[\s\S]{0,80}filter/, "الاقتراحات مقيدة بمورد المنتج — المطلوب كل الأصناف");
+  // فور الكتابة وفور التركيز، واختيار المقترح يملأ الاسم وينقل التركيز للكمية
+  assert.match(dialog, /addEventListener\("input", \(event\) => \{ if \(event\.target\.classList\?\.contains\("po-line__name"\)\) renderSuggest\(event\.target\); \}\)/, "لا اقتراح فور الكتابة");
+  assert.match(dialog, /addEventListener\("focusin"/, "لا اقتراح عند التركيز على الخانة");
+  assert.match(dialog, /data-po-suggest="\$\{escapeHtml\(product\.name\)\}"/, "عناصر الاقتراح بلا اسم الصنف");
+  assert.match(dialog, /querySelector\("\.po-line__qty"\)\.focus\(\)/, "اختيار المقترح لا ينقل التركيز إلى الكمية");
+  // الأنماط
+  assert.match(css, /\.po-suggest \{ position:absolute/, "أنماط قائمة الاقتراحات مفقودة");
+  assert.match(css, /\[data-theme="dark"\] \.po-suggest \{/, "لا دعم للوضع الداكن في الاقتراحات");
 });
 
 test("خانتا الخدمات الثابتتان أعلى قائمة البيع مع أنماطهما", () => {

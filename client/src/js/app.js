@@ -1227,8 +1227,8 @@ function customerPaymentsMarkup({ embedded = false } = {}) {
 }
 
 function purchasesMarkup() {
-  return `${topbarMarkup("المشتريات", "أنشئ فاتورة شراء لزيادة المخزون وتثبيت تكلفة المنتجات، مع إمكانية ربط المورد عند توفره.", `<button class="button button--primary" data-action="new-purchase">${icon("plus", 18)}<span>فاتورة شراء</span></button><button class="button button--primary" data-action="new-purchase-order">${icon("truck", 18)}<span>طلب شراء</span></button>`)}
-  <section class="inventory-summary"><div><span>إجمالي المشتريات</span><strong>${money(state.analytics?.purchases.total || 0)}</strong></div><div><span>فواتير الشراء</span><strong>${amount(state.purchases.length)} فاتورة</strong></div></section>
+  return `${topbarMarkup("المشتريات", "أنشئ فاتورة شراء لزيادة المخزون وتثبيت تكلفة المنتجات، مع إمكانية ربط المورد عند توفره.", `<button class="button button--primary" data-action="new-purchase">${icon("plus", 18)}<span>فاتورة شراء</span></button>`)}
+  <section class="inventory-summary inventory-summary--purchases"><div><span>إجمالي المشتريات</span><strong>${money(state.analytics?.purchases.total || 0)}</strong></div><div><span>فواتير الشراء</span><strong>${amount(state.purchases.length)} فاتورة</strong></div><button class="po-order-tile" type="button" data-action="new-purchase-order" aria-label="عمل طلب شراء وإرساله للمورد"><span>${icon("truck", 15)} مراسلة المورد</span><strong>طلب شراء</strong></button></section>
   <section class="panel invoice-list">${state.purchases.length ? state.purchases.map((purchase) => `<button class="invoice-row" data-action="open-purchase" data-id="${purchase.id}"><div class="invoice-row__mark invoice-row__mark--purchase">${icon("truck", 20)}</div><div class="invoice-row__main"><strong>${purchase.invoiceNumber}</strong><small>${escapeHtml(purchase.supplierName)} · ${dateTime(purchase.date)}</small></div><strong>${money(purchase.total)}</strong>${icon("arrow", 18)}</button>`).join("") : emptyState("لا توجد فواتير شراء", "سجّل أول فاتورة شراء لزيادة المخزون، مع المورد أو بدونه.", "new-purchase")}</section>`;
 }
 
@@ -1236,14 +1236,34 @@ function purchasesMarkup() {
    لا يمس المخزون ولا الحسابات — مجرد مراسلة منسقة للمورد. */
 function openPurchaseOrderDialog() {
   if (!state.suppliers.length) { showToast("أضف موردًا واحدًا على الأقل لعمل طلب شراء.", "error"); openSupplierDialog(); return; }
-  const productOptions = state.products.map((product) => `<option value="${escapeHtml(product.name)}"></option>`).join("");
-  const itemRow = () => `<div class="po-line"><input class="po-line__name" list="po-products" dir="rtl" placeholder="اسم الصنف المطلوب" aria-label="اسم الصنف" /><input class="po-line__qty" type="number" inputmode="decimal" min="0" step="1" placeholder="الكمية" aria-label="الكمية" /><button class="icon-button icon-button--danger po-line__remove" type="button" aria-label="حذف السطر">${icon("close", 16)}</button></div>`;
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">مراسلة المورد</span><h2>طلب شراء</h2><p class="dialog__subtext">اختر المورد واكتب الأصناف والكميات، ثم أرسل الطلب واتساب على رقمه المسجل أو كملف PDF.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="purchase-order-form" class="form-grid"><label class="form-full">المورد<select id="po-supplier" required><option value="">اختر المورد</option>${state.suppliers.map((supplier) => `<option value="${supplier.id}">${escapeHtml(supplier.name)}${supplier.phone ? ` — ${escapeHtml(supplier.phone)}` : " — بلا رقم مسجل"}</option>`).join("")}</select></label><datalist id="po-products">${productOptions}</datalist><div class="form-full"><div class="section-caption"><span class="eyebrow">البضاعة المطلوبة</span><strong>الأصناف والكميات</strong></div><div id="po-lines">${itemRow()}${itemRow()}</div><button id="po-add-line" class="button button--secondary" type="button">${icon("plus", 16)}<span>إضافة صنف</span></button></div><label class="form-full">ملاحظات للمورد<textarea id="po-notes" dir="rtl" placeholder="اختياري: موعد التوصيل، طريقة الدفع..."></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button id="po-send-whatsapp" class="button button--primary" type="button">${icon("whatsapp", 17)}<span>إرسال واتساب</span></button><button id="po-send-pdf" class="button button--secondary" type="button">${icon("share", 17)}<span>إرسال PDF</span></button></div></form>`);
+  const itemRow = () => `<div class="po-line"><div class="po-line__name-wrap"><input class="po-line__name" dir="rtl" placeholder="اسم الصنف المطلوب" aria-label="اسم الصنف" autocomplete="off" /><div class="po-suggest" hidden></div></div><input class="po-line__qty" type="number" inputmode="decimal" min="0" step="1" placeholder="الكمية" aria-label="الكمية" /><button class="icon-button icon-button--danger po-line__remove" type="button" aria-label="حذف السطر">${icon("close", 16)}</button></div>`;
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">مراسلة المورد</span><h2>طلب شراء</h2><p class="dialog__subtext">اختر المورد واكتب الأصناف والكميات، ثم أرسل الطلب واتساب على رقمه المسجل أو كملف PDF.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="purchase-order-form" class="form-grid"><label class="form-full">المورد<select id="po-supplier" required><option value="">اختر المورد</option>${state.suppliers.map((supplier) => `<option value="${supplier.id}">${escapeHtml(supplier.name)}${supplier.phone ? ` — ${escapeHtml(supplier.phone)}` : " — بلا رقم مسجل"}</option>`).join("")}</select></label><div class="form-full"><div class="section-caption"><span class="eyebrow">البضاعة المطلوبة</span><strong>الأصناف والكميات</strong></div><div id="po-lines">${itemRow()}${itemRow()}</div><button id="po-add-line" class="button button--secondary" type="button">${icon("plus", 16)}<span>إضافة صنف</span></button></div><label class="form-full">ملاحظات للمورد<textarea id="po-notes" dir="rtl" placeholder="اختياري: موعد التوصيل، طريقة الدفع..."></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button id="po-send-whatsapp" class="button button--primary" type="button">${icon("whatsapp", 17)}<span>إرسال واتساب</span></button><button id="po-send-pdf" class="button button--secondary" type="button">${icon("share", 17)}<span>إرسال PDF</span></button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   const linesHost = overlay.querySelector("#po-lines");
   const bindRemove = (row) => row.querySelector(".po-line__remove").addEventListener("click", () => { if (linesHost.children.length > 1) row.remove(); else { row.querySelector(".po-line__name").value = ""; row.querySelector(".po-line__qty").value = ""; } });
   linesHost.querySelectorAll(".po-line").forEach(bindRemove);
   overlay.querySelector("#po-add-line").addEventListener("click", () => { linesHost.insertAdjacentHTML("beforeend", itemRow()); const row = linesHost.lastElementChild; bindRemove(row); row.querySelector(".po-line__name").focus(); });
+  /* اقتراح كل الأصناف المسجلة في المنتجات فور الكتابة — دون اشتراط ارتباطها بالمورد المختار. */
+  const closeAllSuggests = () => linesHost.querySelectorAll(".po-suggest").forEach((box) => { box.hidden = true; });
+  const renderSuggest = (input) => {
+    const box = input.parentElement.querySelector(".po-suggest");
+    const query = input.value.trim().toLocaleLowerCase("ar");
+    const matches = state.products.filter((product) => !query || product.name.toLocaleLowerCase("ar").includes(query) || String(product.barcode || "").includes(query)).slice(0, 8);
+    if (!matches.length) { box.hidden = true; return; }
+    box.innerHTML = matches.map((product) => `<button type="button" class="po-suggest__item" data-po-suggest="${escapeHtml(product.name)}"><strong dir="rtl">${escapeHtml(product.name)}</strong><small>${amount(product.quantity)} ${escapeHtml(product.unit)}</small></button>`).join("");
+    box.hidden = false;
+  };
+  linesHost.addEventListener("input", (event) => { if (event.target.classList?.contains("po-line__name")) renderSuggest(event.target); });
+  linesHost.addEventListener("focusin", (event) => { if (event.target.classList?.contains("po-line__name")) { closeAllSuggests(); renderSuggest(event.target); } });
+  linesHost.addEventListener("click", (event) => {
+    const item = event.target.closest?.("[data-po-suggest]");
+    if (!item) return;
+    const wrap = item.closest(".po-line__name-wrap");
+    wrap.querySelector(".po-line__name").value = item.dataset.poSuggest;
+    wrap.querySelector(".po-suggest").hidden = true;
+    wrap.closest(".po-line").querySelector(".po-line__qty").focus();
+  });
+  overlay.addEventListener("click", (event) => { if (!event.target.closest?.(".po-line__name-wrap")) closeAllSuggests(); });
   const selectedSupplier = () => state.suppliers.find((supplier) => supplier.id === overlay.querySelector("#po-supplier").value) || null;
   const collectLines = () => [...linesHost.querySelectorAll(".po-line")].map((row) => ({ name: row.querySelector(".po-line__name").value.trim(), quantity: Math.max(0, toNumber(row.querySelector(".po-line__qty").value)) })).filter((line) => line.name && line.quantity > 0);
   const unitOf = (name) => state.products.find((product) => product.name === name)?.unit || "";

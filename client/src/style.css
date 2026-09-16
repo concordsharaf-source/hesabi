@@ -1860,3 +1860,27 @@ html.is-sales-page .sales-total-bar {
 .po-line__remove { flex:0 0 auto; }
 #po-add-line { min-height:40px; }
 [data-theme="dark"] .po-line__name, [data-theme="dark"] .po-line__qty { color:#e6f4ea; background:#122019; border-color:#3f5c51; }
+
+/* ═══ زر «طلب شراء» الكبير بجوار بطاقة فواتير الشراء الحمراء وبنفس تصميمها ═══ */
+.inventory-summary--purchases { grid-template-columns:1fr 1fr; }
+.inventory-summary--purchases > div:first-child { grid-column:1 / -1; }
+.po-order-tile { display:grid; gap:4px; padding:16px; color:#fff; text-align:right; background:linear-gradient(145deg,#c42a47,#84132b); border:1px solid #f28a9c; border-radius:14px; box-shadow:0 10px 22px rgba(132,19,43,.25); cursor:pointer; transition:transform .16s var(--ease-out), box-shadow .16s var(--ease-out); }
+.po-order-tile:hover { transform:translateY(-1px); box-shadow:0 13px 26px rgba(132,19,43,.33); }
+.po-order-tile:active { transform:scale(.98); }
+.po-order-tile span { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; opacity:.85; }
+.po-order-tile strong { font-size:20px; }
+[data-theme="dark"] .po-order-tile { background:linear-gradient(145deg,#c42a47,#84132b); border-color:#ff9eb0; box-shadow:0 12px 25px rgba(0,0,0,.38); }
+
+/* قائمة اقتراح الأصناف داخل نافذة طلب الشراء: كل المنتجات المسجلة فور الكتابة */
+.po-line__name-wrap { position:relative; min-width:0; }
+.po-line__name-wrap .po-line__name { width:100%; }
+.po-suggest { position:absolute; top:calc(100% + 4px); right:0; left:0; z-index:5; display:grid; max-height:220px; overflow-y:auto; background:#fffefa; border:1px solid rgba(31,107,89,.3); border-radius:11px; box-shadow:0 12px 26px rgba(23,52,45,.18); }
+.po-suggest__item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; text-align:right; background:transparent; border:0; border-bottom:1px solid rgba(31,107,89,.1); font:inherit; cursor:pointer; }
+.po-suggest__item:last-child { border-bottom:0; }
+.po-suggest__item:hover { background:var(--green-pale); }
+.po-suggest__item strong { font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.po-suggest__item small { flex:0 0 auto; color:var(--muted); font-size:10px; }
+[data-theme="dark"] .po-suggest { background:#16211c; border-color:#3f5c51; box-shadow:0 12px 26px rgba(0,0,0,.4); }
+[data-theme="dark"] .po-suggest__item { border-bottom-color:#2b3d35; }
+[data-theme="dark"] .po-suggest__item:hover { background:#1f322a; }
+[data-theme="dark"] .po-suggest__item strong { color:#e6f4ea; }
