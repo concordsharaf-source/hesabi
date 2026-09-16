@@ -6,10 +6,11 @@ export const DESKTOP_BARCODE_DUPLICATE_WINDOW_MS = 250;
 
 const finiteNumber = (value) => Number.isFinite(Number(value));
 
-export const getScannerCameraConstraints = () => ({
+/* يقبل معرف كاميرا محددة اختارها المستخدم؛ وبدونه يفضّل الكاميرا الخلفية. */
+export const getScannerCameraConstraints = (deviceId = "") => ({
   audio: false,
   video: {
-    facingMode: { ideal: "environment" },
+    ...(deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: "environment" } }),
     width: { ideal: 1280, max: 1920 },
     height: { ideal: 720, max: 1080 },
     frameRate: { ideal: 24, max: 30 },

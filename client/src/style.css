@@ -1809,3 +1809,10 @@ html.is-sales-sheet-open .toolbar--sales { position: static; }
 [data-theme="dark"] .activity-badge--stock { color:#d3adff; background:rgba(147,51,234,.22); }
 [data-theme="dark"] .activity-badge--salary { color:#ffd08a; background:rgba(217,119,6,.2); }
 [data-theme="dark"] .activity-badge--auth { color:#cbd5e1; background:rgba(148,163,184,.2); }
+
+/* ═══ ماسح الباركود: قائمة اختيار الكاميرا عند وجود أكثر من كاميرا ═══ */
+.scanner-camera-picker { display:flex; align-items:center; gap:10px; margin-top:10px; padding:9px 12px; background:var(--paper); border:1px solid var(--line); border-radius:11px; }
+.scanner-camera-picker>span { display:inline-flex; align-items:center; gap:5px; flex:0 0 auto; color:var(--muted); font-size:11px; font-weight:800; white-space:nowrap; }
+.scanner-camera-picker select { flex:1; min-width:0; padding:8px 10px; color:var(--ink); background:var(--canvas); border:1px solid var(--line); border-radius:9px; font-size:12px; font-family:inherit; }
+[data-theme="dark"] .scanner-camera-picker { background:#1a2d26; border-color:#58756a; }
+[data-theme="dark"] .scanner-camera-picker select { background:#101d18; border-color:#58756a; color:var(--ink); }

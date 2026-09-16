@@ -4070,21 +4070,68 @@ function addScannerCameraAssist(content, session, video) {
   video.addEventListener("click", () => { if (assist.canUseContinuousFocus && !session.manualFocus) applyScannerTrackConstraint(session, { focusMode: "continuous" }); });
 }
 
-async function startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry = null, continuous = false) {
+/* اختيار الكاميرا: يتذكر آخر كاميرا نجح بها المسح، ويتيح التبديل إذا كانت كاميرا معطلة أو لا تقرأ. */
+const SCANNER_CAMERA_STORAGE_KEY = "hesabi-scanner-camera";
+function preferredScannerCameraId() {
+  try { return localStorage.getItem(SCANNER_CAMERA_STORAGE_KEY) || ""; } catch { return ""; }
+}
+function rememberScannerCamera(deviceId) {
+  try {
+    if (deviceId) localStorage.setItem(SCANNER_CAMERA_STORAGE_KEY, deviceId);
+    else localStorage.removeItem(SCANNER_CAMERA_STORAGE_KEY);
+  } catch { /* التخزين المحلي غير متاح */ }
+}
+async function listScannerCameras() {
+  try {
+    if (!navigator.mediaDevices?.enumerateDevices) return [];
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.filter((device) => device.kind === "videoinput");
+  } catch { return []; }
+}
+function scannerCameraLabel(camera, index) {
+  const label = String(camera.label || "").trim();
+  if (label) return label;
+  return `كاميرا ${index + 1}`;
+}
+function renderScannerCameraPicker(content, cameras, activeDeviceId, onSwitch) {
+  const slot = content.querySelector("#scanner-camera-slot");
+  if (!slot || cameras.length < 2) return;
+  slot.innerHTML = `<label class="scanner-camera-picker"><span>${icon("scan", 15)} الكاميرا</span><select id="scanner-camera-select" aria-label="اختيار الكاميرا">${cameras.map((camera, index) => `<option value="${escapeHtml(camera.deviceId)}" ${camera.deviceId === activeDeviceId ? "selected" : ""}>${escapeHtml(scannerCameraLabel(camera, index))}</option>`).join("")}</select></label>`;
+  slot.querySelector("#scanner-camera-select").addEventListener("change", (event) => {
+    const deviceId = event.currentTarget.value;
+    rememberScannerCamera(deviceId);
+    onSwitch(deviceId);
+  });
+}
+
+async function startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry = null, continuous = false, requestedDeviceId = null) {
   if (!hasBarcodeScannerSupport()) { renderUnsupportedScanner(overlay, unsupportedMessage, manualMode, onManualEntry); return; }
   stopScanner();
   const content = overlay.querySelector("#scanner-content");
   const retry = overlay.querySelector("#scanner-retry");
   retry.hidden = false;
-  content.innerHTML = `<div class="scanner-box"><video id="scanner-video" autoplay muted playsinline></video><div class="scanner-box__guide"><span>ضع الباركود داخل الإطار وثبّت الجوال</span></div></div><div id="scanner-status" class="scanner-status">${icon("scan", 16)}<span>وجّه الكاميرا نحو الباركود</span></div><div id="scanner-assist-slot"></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" /><button class="button button--secondary" type="submit">ابحث</button></form>` : ""}`;
+  content.innerHTML = `<div class="scanner-box"><video id="scanner-video" autoplay muted playsinline></video><div class="scanner-box__guide"><span>ضع الباركود داخل الإطار وثبّت الجوال</span></div></div><div id="scanner-status" class="scanner-status">${icon("scan", 16)}<span>وجّه الكاميرا نحو الباركود</span></div><div id="scanner-camera-slot"></div><div id="scanner-assist-slot"></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" /><button class="button button--secondary" type="submit">ابحث</button></form>` : ""}`;
   content.querySelector("#manual-barcode-form")?.addEventListener("submit", (event) => { event.preventDefault(); findInternalCode(new FormData(event.currentTarget).get("internalCode"), manualMode, { keepScannerOpen: true }); });
   try {
+    const desiredDeviceId = requestedDeviceId !== null ? requestedDeviceId : preferredScannerCameraId();
     let stream;
-    try { stream = await navigator.mediaDevices.getUserMedia(getScannerCameraConstraints()); }
-    catch { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
+    try { stream = await navigator.mediaDevices.getUserMedia(getScannerCameraConstraints(desiredDeviceId)); }
+    catch {
+      /* الكاميرا المطلوبة معطلة أو غير متاحة: نتراجع للكاميرا الخلفية ثم أي كاميرا، وننسى الاختيار المعطل. */
+      if (desiredDeviceId) rememberScannerCamera("");
+      try { stream = await navigator.mediaDevices.getUserMedia(getScannerCameraConstraints()); }
+      catch { stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false }); }
+    }
     const video = content.querySelector("#scanner-video");
     video.srcObject = stream;
     await video.play();
+    const activeDeviceId = stream.getVideoTracks?.()[0]?.getSettings?.()?.deviceId || desiredDeviceId || "";
+    listScannerCameras().then((cameras) => {
+      if (!overlay.isConnected) return;
+      renderScannerCameraPicker(content, cameras, activeDeviceId, (deviceId) => {
+        startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry, continuous, deviceId);
+      });
+    });
     const detector = new window.BarcodeDetector({ formats: await getBarcodeFormats() });
     const session = { stream, frame: null, reading: false, overlay, continuous, lastCode: "", absentSince: 0, lastScanAt: 0, track: null, torchOn: false, manualFocus: false };
     state.scanner = session;
@@ -4125,9 +4172,16 @@ async function startCameraScanner(overlay, onDetected, unsupportedMessage, manua
     };
     session.frame = requestAnimationFrame(scanFrame);
   } catch (error) {
-    content.innerHTML = `<div class="scanner-notice scanner-notice--error">${icon("alert", 20)}<div><strong>تعذر فتح الكاميرا</strong><span>تحقق من الإذن، ثم أعد المحاولة، أو ابحث بالكود الداخلي.</span></div></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" autofocus /><button class="button button--primary" type="submit">ابحث</button></form>` : onManualEntry ? `<button id="scanner-manual-entry" class="button button--primary button--wide" type="button">البحث بالكود الداخلي</button>` : ""}`;
+    content.innerHTML = `<div class="scanner-notice scanner-notice--error">${icon("alert", 20)}<div><strong>تعذر فتح الكاميرا</strong><span>تحقق من الإذن، أو جرّب كاميرا أخرى من القائمة، أو ابحث بالكود الداخلي.</span></div></div><div id="scanner-camera-slot"></div>${manualMode ? `<form id="manual-barcode-form" class="manual-barcode"><input name="internalCode" required dir="ltr" autocomplete="off" placeholder="أدخل الكود الداخلي" autofocus /><button class="button button--primary" type="submit">ابحث</button></form>` : onManualEntry ? `<button id="scanner-manual-entry" class="button button--primary button--wide" type="button">البحث بالكود الداخلي</button>` : ""}`;
     content.querySelector("#manual-barcode-form")?.addEventListener("submit", (event) => { event.preventDefault(); findInternalCode(new FormData(event.currentTarget).get("internalCode"), manualMode, { keepScannerOpen: true }); });
     content.querySelector("#scanner-manual-entry")?.addEventListener("click", onManualEntry);
+    /* حتى عند فشل الفتح: لو للجهاز أكثر من كاميرا نعرض القائمة ليجرب المستخدم كاميرا أخرى. */
+    listScannerCameras().then((cameras) => {
+      if (!overlay.isConnected) return;
+      renderScannerCameraPicker(content, cameras, "", (deviceId) => {
+        startCameraScanner(overlay, onDetected, unsupportedMessage, manualMode, onManualEntry, continuous, deviceId);
+      });
+    });
   }
 }
 
