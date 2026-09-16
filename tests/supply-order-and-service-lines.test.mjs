@@ -277,7 +277,7 @@ test("العملاء: بلاطة حمراء كبيرة (إضافة عميل) ب�
 test("الموردون: بلاطة حمراء كبيرة (إضافة مورد) بجانب عدد الموردين بنفس تصميم بلاطة طلب الشراء", () => {
   const markup = appJs.slice(appJs.indexOf("function suppliersMarkup"), appJs.indexOf("function supplierPaymentsMarkup"));
   assert.match(markup, /inventory-summary inventory-summary--purchases/, "قسم الملخص لا يستخدم شبكة البلاطات");
-  assert.match(markup, /الموردون النشطون[\s\S]*?<button class="po-order-tile" type="button" data-action="new-supplier"/, "بلاطة إضافة مورد ليست بجانب عدد الموردين");
+  assert.match(markup, /مستحقات الموردين[\s\S]*?<button class="po-order-tile" type="button" data-action="new-supplier"/, "بلاطة إضافة مورد ليست في ملخص الموردين");
   assert.match(markup, /<strong>إضافة مورد<\/strong>/);
 });
 
@@ -531,4 +531,15 @@ test("الشريط السفلي: أيقونات أكبر والصفحة الحا
   assert.match(appJs, /let lastPulsedNavigationView = null;/, "متغير تتبع النبضة مفقود");
   assert.match(appJs, /activeItem\.classList\.add\("nav-item--pulse"\);/, "النبضة لا تُضاف");
   assert.match(appJs, /activeItem\.addEventListener\("animationend", \(\) => activeItem\.classList\.remove\("nav-item--pulse"\), \{ once: true \}\);/, "النبضة لا تُزال بعد الحركة");
+});
+
+/* ===== v53: شاشة الموردين — زر طلب شراء بدل عداد الموردين النشطين ===== */
+
+test("شاشة الموردين: بلاطة طلب شراء بنفس آلية شاشة المشتريات بدل الموردين النشطين", () => {
+  const suppliersSummary = appJs.slice(appJs.indexOf("function suppliersMarkup"), appJs.indexOf("function supplierPaymentsMarkup"));
+  assert.ok(!suppliersSummary.includes("الموردون النشطون"), "عداد الموردين النشطين ما زال موجودًا");
+  assert.match(suppliersSummary, /data-action="new-purchase-order"[^>]*aria-label="عمل طلب شراء وإرساله للمورد"><span>\$\{icon\("truck", 15\)\} مراسلة المورد<\/span><strong>طلب شراء<\/strong>/, "بلاطة طلب الشراء مفقودة في شاشة الموردين");
+  assert.match(suppliersSummary, /data-action="new-supplier"/, "بلاطة إضافة مورد اختفت");
+  // نفس الآلية: نفس data-action المستخدم في شاشة المشتريات
+  assert.ok(appJs.split('data-action="new-purchase-order"').length >= 3, "الآلية غير مشتركة مع شاشة المشتريات");
 });
