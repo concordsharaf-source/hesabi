@@ -6,7 +6,7 @@ import { calculateDiscountAmount, calculatePackagePurchase, calculateSaleTotals,
 import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, resetCloudBackupPassword, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
 import { approveAssistantRequest, createPairingInvite, createStoreWorkspace, getCloudDeviceIdentity, redeemPairingInvite, requestAssistantDevice, revokeCloudDevice, seedWorkspaceBackup, watchAssistantRequests } from "./firebase-sync.js";
 import { installSyncCoordinator } from "./sync-coordinator.js";
-import { renderThermalInvoiceHtml } from "./invoice-print.js";
+import { DEFAULT_THERMAL_FOOTER, normalizeThermalPrintOptions, renderThermalInvoiceHtml, THERMAL_PAPER_WIDTHS } from "./invoice-print.js";
 import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { renderPurchaseInvoiceHtml } from "./purchase-invoice-print.js";
 import { getExitGuardAction, leaveAfterExitConfirmation, primeExitGuardHistory } from "./navigation-guard.js";
@@ -1607,11 +1607,42 @@ function settingsMarkup() {
     { key: "setAccounts", glyph: "users", eyebrow: "الفريق", title: "إدارة الحسابات", subtitle: "أضف الحسابات وحدد الأدوار والرواتب", body: () => stripTopbar(accountsMarkup()) },
     { key: "setActivity", glyph: "shield", eyebrow: "الأمان والرقابة", title: "سجل العمليات والتدقيق", subtitle: "مراقبة حركات الدخول والمبيعات والمخزون", body: () => stripTopbar(activityLogMarkup()) },
     { key: "setNav", glyph: "grid", eyebrow: "الهاتف", title: "ترتيب الأيقونات", subtitle: "غيّر أولوية شريط التنقل حسب متجرِك", body: () => stripTopbar(navigationSettingsMarkup()) },
+    { key: "setAppearance", glyph: "monitor", eyebrow: "العرض والأجهزة", title: "المظهر والباركود والطباعة", subtitle: "وضع النظام أو الفاتح أو الداكن، وخيارات الماسح والطابعة الحرارية", body: () => stripTopbar(appearanceSettingsMarkup()) },
     { key: "setData", glyph: "restore", eyebrow: "الحفظ", title: "إدارة البيانات", subtitle: "نسخ محلية وسحابية واستعادة آمنة", body: () => stripTopbar(dataManagementMarkup()) },
   ];
   const panels = sections.map((section) => collapsiblePanel(section.key, { eyebrow: section.eyebrow, title: section.title, subtitle: section.subtitle, glyph: section.glyph }, state.reportPanels?.[section.key] ? section.body() : "")).join("");
   return `${topbarMarkup("مركز الإعدادات", "اضغط على أي قسم لفتحه، واضغط مرة أخرى لطيه. تبقى بيانات متجرك محلية، ولا تظهر هذه الأدوات للكاشير.")}
   <div class="settings-page settings-hub"><section class="settings-hub__intro panel"><span class="eyebrow">لوحة إدارة</span><h2>ضبط المتجر من مكان واحد</h2><p>كل الأقسام مطوية افتراضيًا لتبقى الشاشة مرتبة على الهاتف وسطح المكتب.</p></section>${panels}${notificationsPanelMarkup()}${settingsContactMarkup()}</div>`;
+}
+
+/* إعدادات المظهر وقارئ الباركود والطابعة الحرارية — قسم مستقل في مركز الإعدادات. */
+function appearanceSettingsMarkup() {
+  const preference = themePreference();
+  const thermal = normalizeThermalPrintOptions(state.settings);
+  const scannerSound = state.settings?.scannerSoundEnabled === undefined ? true : Boolean(state.settings.scannerSoundEnabled);
+  const scannerVibration = state.settings?.scannerVibrationEnabled === undefined ? true : Boolean(state.settings.scannerVibrationEnabled);
+  const themeChoices = [
+    { value: "system", label: "حسب النظام", hint: `يتبع ضبط الجهاز (الآن: ${systemPrefersDark() ? "داكن" : "فاتح"})`, glyph: "monitor" },
+    { value: "light", label: "فاتح دائمًا", hint: "خلفية فاتحة في كل الأوقات", glyph: "sun" },
+    { value: "dark", label: "داكن دائمًا", hint: "خلفية داكنة مريحة ليلًا", glyph: "moon" },
+  ];
+  return `${topbarMarkup("المظهر والأجهزة", "اختر وضع العرض واضبط قارئ الباركود والطابعة الحرارية.", settingsBackAction())}
+  <div class="settings-page settings-subpage"><form id="appearance-settings-form" class="panel form-grid">
+    <div class="panel__head form-full"><div><span class="eyebrow">وضع العرض</span><h2>مظهر التطبيق</h2></div></div>
+    <div class="theme-mode-picker form-full" role="radiogroup" aria-label="وضع العرض">${themeChoices.map((choice) => `<label class="theme-mode-option ${preference === choice.value ? "is-active" : ""}"><input type="radio" name="theme" value="${choice.value}" ${preference === choice.value ? "checked" : ""} /><span class="theme-mode-option__icon">${icon(choice.glyph, 20)}</span><span class="theme-mode-option__text"><strong>${choice.label}</strong><small>${choice.hint}</small></span></label>`).join("")}</div>
+    <div class="panel__head form-full"><div><span class="eyebrow">نقطة البيع</span><h2>قارئ الباركود</h2></div></div>
+    <div class="settings-inline-checks form-full" role="group" aria-label="خيارات قارئ الباركود">
+      <label class="settings-inline-check settings-switch"><input name="scannerSoundEnabled" type="checkbox" ${scannerSound ? "checked" : ""} /><span class="switchcompat" aria-hidden="true"><span class="switchcompat__thumb"></span></span><span><strong>صافرة عند نجاح المسح</strong><small>صوت يؤكد قراءة الباركود مثل أجهزة الكاشير.</small></span></label>
+      <label class="settings-inline-check settings-switch"><input name="scannerVibrationEnabled" type="checkbox" ${scannerVibration ? "checked" : ""} /><span class="switchcompat" aria-hidden="true"><span class="switchcompat__thumb"></span></span><span><strong>اهتزاز عند نجاح المسح</strong><small>يعمل على الهواتف الداعمة للاهتزاز.</small></span></label>
+    </div>
+    <div class="panel__head form-full"><div><span class="eyebrow">الطباعة</span><h2>الطابعة الحرارية</h2></div></div>
+    <label>عرض ورق الطابعة<select name="thermalPaperWidth">${THERMAL_PAPER_WIDTHS.map((width) => `<option value="${width}" ${thermal.paperWidth === width ? "selected" : ""}>${width} مم</option>`).join("")}</select></label>
+    <label class="form-full">نص أسفل الفاتورة<input name="thermalFooterText" dir="rtl" maxlength="120" value="${escapeHtml(state.settings?.thermalFooterText || "")}" placeholder="${escapeHtml(DEFAULT_THERMAL_FOOTER)}" /><small class="field-hint">يظهر أسفل الفاتورة الحرارية. اتركه فارغًا لاستخدام النص الافتراضي.</small></label>
+    <div class="settings-inline-checks form-full" role="group" aria-label="خيارات الطباعة الحرارية">
+      <label class="settings-inline-check settings-switch"><input name="thermalShowLogo" type="checkbox" ${thermal.showLogo ? "checked" : ""} /><span class="switchcompat" aria-hidden="true"><span class="switchcompat__thumb"></span></span><span><strong>طباعة شعار المتجر</strong><small>عطّله لتسريع الطباعة أو توفير الحبر.</small></span></label>
+    </div>
+    <div class="dialog__actions form-full"><button class="button button--primary" type="submit">حفظ الإعدادات ${icon("check", 17)}</button></div>
+  </form></div>`;
 }
 
 function generalSettingsMarkup() {
@@ -2059,6 +2090,17 @@ function bindEvents() {
   root.querySelector("#periodic-inventory-filter")?.addEventListener("change", async (event) => { const form = event.currentTarget; const selectedCycle = form.querySelector("[name=cycle]").value; const cycleChanged = selectedCycle !== state.auditCycle; state.auditCycle = selectedCycle; const defaults = periodicInventoryDefaultRange(selectedCycle); state.auditFrom = cycleChanged ? defaults.from : form.querySelector("[name=from]").value; state.auditTo = cycleChanged ? defaults.to : form.querySelector("[name=to]").value; await refresh(); render(); });
   root.querySelector("#cash-filter")?.addEventListener("change", async (event) => { state.cashFrom = event.currentTarget.querySelector("[name=from]").value; state.cashTo = event.currentTarget.querySelector("[name=to]").value; await refresh(); renderKeepingScroll(); /* تغيير الفترة لا يستحق قفزة إلى أعلى الصفحة */ });
   root.querySelector("#settings-form")?.addEventListener("submit", saveSettings);
+  root.querySelector("#appearance-settings-form")?.addEventListener("submit", saveAppearanceSettings);
+  root.querySelectorAll("#appearance-settings-form [name=theme]").forEach((input) => input.addEventListener("change", async (event) => {
+    try {
+      const theme = event.currentTarget.value;
+      await db.saveSettings({ ...state.settings, theme });
+      state.settings = await db.getSettings();
+      applyTheme();
+      render();
+      showToast(theme === "system" ? `يتبع ضبط الجهاز الآن (${systemPrefersDark() ? "داكن" : "فاتح"})` : theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح");
+    } catch (error) { showToast(error.message, "error"); }
+  }));
   root.querySelector("#store-logo-file")?.addEventListener("change", handleStoreLogoFile);
   root.querySelector("#restore-file")?.addEventListener("change", restoreBackupFromFile);
   root.querySelector("#barcode-import-file")?.addEventListener("change", importBarcodeFile);
@@ -2790,6 +2832,26 @@ function openIncomingTransferDepositDialog(transferKey) {
 }
 
 async function saveSettings(event) { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); values.allowNegativeSales = Boolean(event.currentTarget.querySelector("[name=allowNegativeSales]")?.checked); values.allowSalePriceEdit = Boolean(event.currentTarget.querySelector("[name=allowSalePriceEdit]")?.checked); await db.saveSettings(values); state.settings = await db.getSettings(); await refresh(); render(); showToast("تم حفظ إعدادات المتجر"); } catch (error) { showToast(error.message, "error"); } }
+
+async function saveAppearanceSettings(event) {
+  event.preventDefault();
+  try {
+    const form = event.currentTarget;
+    const values = {
+      theme: new FormData(form).get("theme") || "system",
+      scannerSoundEnabled: Boolean(form.querySelector("[name=scannerSoundEnabled]")?.checked),
+      scannerVibrationEnabled: Boolean(form.querySelector("[name=scannerVibrationEnabled]")?.checked),
+      thermalPaperWidth: new FormData(form).get("thermalPaperWidth") || "80",
+      thermalFooterText: String(new FormData(form).get("thermalFooterText") || "").trim(),
+      thermalShowLogo: Boolean(form.querySelector("[name=thermalShowLogo]")?.checked),
+    };
+    await db.saveSettings({ ...state.settings, ...values });
+    state.settings = await db.getSettings();
+    applyTheme();
+    render();
+    showToast("تم حفظ إعدادات المظهر والأجهزة");
+  } catch (error) { showToast(error.message, "error"); }
+}
 
 async function handleStoreLogoFile(event) { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; if (!file) return; try { const dataUrl = await prepareStoreLogoDataUrl(file); await db.saveStoreLogoDataUrl(dataUrl); state.settings = await db.getSettings(); await refresh(); render(); showToast("تم حفظ شعار المتجر محليًا ويظهر في النسخة الاحتياطية وPDF."); } catch (error) { showToast(error.message || "تعذر حفظ شعار المتجر.", "error"); } }
 async function clearStoreLogo() { try { await db.saveStoreLogoDataUrl(""); state.settings = await db.getSettings(); await refresh(); render(); showToast("تمت استعادة شعار حسابي الافتراضي."); } catch (error) { showToast(error.message || "تعذر استعادة الشعار الافتراضي.", "error"); } }
@@ -3837,8 +3899,12 @@ function setBarcodeFeedback(element, message, tone = "neutral") {
   element.dataset.tone = tone;
 }
 
+/* إعدادات المستخدم لصوت واهتزاز الماسح — مفعّلة افتراضيًا حتى يعطلها بنفسه. */
+function scannerSoundAllowed() { return state.settings?.scannerSoundEnabled === undefined ? true : Boolean(state.settings.scannerSoundEnabled); }
+function scannerVibrationAllowed() { return state.settings?.scannerVibrationEnabled === undefined ? true : Boolean(state.settings.scannerVibrationEnabled); }
+
 function notifyBarcodeRead() {
-  if (navigator.vibrate) navigator.vibrate(45);
+  if (scannerVibrationAllowed() && navigator.vibrate) navigator.vibrate(45);
 }
 
 function hasBarcodeScannerSupport() {
@@ -3878,7 +3944,7 @@ function primeScannerSuccessSound() {
 }
 function playScannerSuccessSound() {
   try {
-    const context = getScannerSuccessAudioContext();
+    const context = scannerSoundAllowed() ? getScannerSuccessAudioContext() : null;
     if (context) {
       if (context.state === "suspended") {
         context.resume().catch(() => {});
@@ -3903,7 +3969,7 @@ function playScannerSuccessSound() {
     }
   } catch { /* لا يؤثر غياب الصوت في مسار المسح أو الإدخال اليدوي. */ }
   try {
-    if (navigator.vibrate) navigator.vibrate(45);
+    if (scannerVibrationAllowed() && navigator.vibrate) navigator.vibrate(45);
   } catch {}
 }
 
