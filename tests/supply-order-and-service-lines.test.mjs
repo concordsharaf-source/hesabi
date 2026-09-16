@@ -551,8 +551,9 @@ test("شريط المبيعات الثابت: زر إيقاف مؤقت في ال
   // الزر في وسط الشريط بين خانة «الإجمالي» وخانة الرقم، ويستدعي نفس آلية التعليق hold-cart
   assert.match(appJs, /sales-total-bar__label">\$\{icon\("cart", 18\)\} الإجمالي<\/span><\/button><button class="sales-total-bar__hold" type="button" data-action="hold-cart"/, "زر الإيقاف المؤقت ليس في وسط الشريط");
   assert.match(appJs, /data-action="hold-cart" \$\{state\.cart\.length \? "" : "disabled"\} aria-label="إيقاف مؤقت — تعليق عملية البيع الحالية"/, "الزر لا يتعطل مع سلة فارغة");
-  assert.match(appJs, /\$\{icon\("pause", 20\)\}<span>إيقاف مؤقت<\/span>/, "نص الزر وأيقونة الإيقاف مفقودان");
-  assert.match(css, /\.sales-total-bar__hold \{ display:inline-flex/, "أنماط زر الإيقاف المؤقت مفقودة");
+  assert.match(appJs, /title="تعليق الفاتورة الحالية">\$\{icon\("pause", 22\)\}<\/button>/, "الزر ليس أيقونة فقط بلا نص");
+  assert.doesNotMatch(appJs, /\$\{icon\("pause", \d+\)\}<span>إيقاف مؤقت<\/span>/, "نص إيقاف مؤقت ما زال داخل الزر");
+  assert.match(css, /\.sales-total-bar__hold \{ display:grid; place-items:center; width:44px; height:44px/, "الزر ليس أيقونة دائرية مدمجة");
   assert.match(css, /\.sales-total-bar__hold:disabled \{ opacity:\.45/, "حالة التعطيل بلا مظهر");
   // hold-cart يقود إلى نافذة تعليق الفاتورة الموجودة
   assert.match(appJs, /if \(action === "hold-cart"\) \{ openHoldInvoiceDialog\(\); return; \}/, "آلية التعليق غير مرتبطة");
