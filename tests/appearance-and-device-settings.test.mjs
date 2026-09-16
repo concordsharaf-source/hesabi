@@ -93,3 +93,45 @@ test("الوضع الداكن يعالج تباين شارات الحسابات 
   assert.match(css, /theme-mode-picker/);
   assert.match(css, /theme-mode-option\.is-active/);
 });
+
+test("قسم المظهر يضم وضع العرض ولون الخلفية داخل بطاقة الهوية المعاد تسميتها", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  // بطاقة «الهوية» صارت «المظهر» وتشمل الوضع واللون والشعار
+  assert.match(app, /eyebrow: "المظهر", title: "المظهر"/);
+  assert.match(app, /displaySettingsMarkup\(\)\}\$\{storeLogoSettingsMarkup\(\)/);
+  // قسم الأجهزة مستقل للباركود والطباعة
+  assert.match(app, /eyebrow: "الأجهزة", title: "الباركود والطباعة"/);
+});
+
+test("منتقي لون الخلفية: خمسة ألوان بدرجتين فاتحة وداكنة مع تذكر الاختيار", async () => {
+  const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.match(app, /const BACKGROUND_THEMES = \[/);
+  for (const id of ["ivory", "mint", "sky", "sand", "pearl"]) assert.match(app, new RegExp(`id: "${id}"`));
+  assert.match(app, /function backgroundThemeId/);
+  assert.match(app, /function backgroundPalette/);
+  assert.match(app, /name="backgroundTheme"/);
+  assert.match(app, /localStorage\.setItem\("hesabi-bg"/);
+  // كل لون يحمل درجتين
+  assert.match(app, /light: "#f4f3ec", dark: "#101d18"/);
+});
+
+test("سكربت الرأس يطبق لون الخلفية المحفوظ قبل أول رسم", async () => {
+  const html = await readFile(new URL("../client/index.html", import.meta.url), "utf8");
+  assert.match(html, /localStorage\.getItem\("hesabi-bg"\)/);
+  assert.match(html, /setProperty\("--canvas", canvas\)/);
+});
+
+test("سلة البيع على الشاشات الواسعة لاصقة والإجمالي لا يغيب مع التمرير", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  assert.match(css, /\.cart-panel:not\(\.is-sheet-mobile\) \{ position:sticky/);
+  assert.match(css, /\.cart-panel:not\(\.is-sheet-mobile\) \.cart-lines \{ flex:1 1 auto; min-height:0; overflow-y:auto/);
+  // الجوال يحتفظ بالورقة السفلية كما هي
+  assert.match(css, /\.cart-sheet\.is-sheet-mobile \{/);
+});
+
+test("أنماط منتقي لون الخلفية موجودة مع دعم الوضع الداكن", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  assert.match(css, /\.bg-theme-picker \{/);
+  assert.match(css, /\.bg-theme-option__swatch/);
+  assert.match(css, /\[data-theme="dark"\] \.bg-theme-option/);
+});

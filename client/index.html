@@ -24,10 +24,14 @@
           var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
           var theme = stored === "dark" || stored === "light" ? stored : (prefersDark ? "dark" : "light");
           document.documentElement.dataset.theme = theme;
+          /* لون الخلفية المختار (فاتح|داكن) يُطبَّق قبل أول رسم لمنع أي ومضة لونية. */
+          var bg = (localStorage.getItem("hesabi-bg") || "").split("|");
+          var canvas = theme === "dark" ? (bg[1] || "#101d18") : (bg[0] || "");
+          if (canvas) document.documentElement.style.setProperty("--canvas", canvas);
           if (theme === "dark") {
-            document.documentElement.style.background = "#101d18";
+            document.documentElement.style.background = canvas || "#101d18";
             var meta = document.querySelector('meta[name="theme-color"]');
-            if (meta) meta.setAttribute("content", "#101d18");
+            if (meta) meta.setAttribute("content", canvas || "#101d18");
           }
         } catch (error) {
           document.documentElement.dataset.theme = "light";

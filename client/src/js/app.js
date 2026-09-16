@@ -691,11 +691,17 @@ function resolvedTheme() {
 function applyTheme() {
   const preference = themePreference();
   const theme = resolvedTheme();
+  const palette = backgroundPalette();
+  const canvas = theme === "dark" ? palette.dark : palette.light;
   document.documentElement.dataset.theme = theme;
-  // نحفظ التفضيل ليطبّقه سكربت الرأس قبل أول رسم عند تحديث الصفحة.
-  try { localStorage.setItem("hesabi-theme", preference); } catch { /* التخزين المحلي غير متاح */ }
-  document.documentElement.style.background = theme === "dark" ? "#101d18" : "";
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#101d18" : "#1F6B59");
+  // نحفظ التفضيل واللون ليطبّقهما سكربت الرأس قبل أول رسم عند تحديث الصفحة.
+  try {
+    localStorage.setItem("hesabi-theme", preference);
+    localStorage.setItem("hesabi-bg", `${palette.light}|${palette.dark}`);
+  } catch { /* التخزين المحلي غير متاح */ }
+  document.documentElement.style.setProperty("--canvas", canvas);
+  document.documentElement.style.background = theme === "dark" ? canvas : "";
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? canvas : "#1F6B59");
 }
 
 // عند اتباع ضبط الجهاز، نتفاعل فورًا مع تغيّره دون الحاجة لتحديث الصفحة.
@@ -1603,11 +1609,11 @@ function stripTopbar(markup) {
 function settingsMarkup() {
   const sections = [
     { key: "setGeneral", glyph: "box", eyebrow: "المتجر", title: "إعدادات عامة", subtitle: "الاسم والنشاط والعملة ورصيد البداية", body: () => stripTopbar(generalSettingsMarkup()) },
-    { key: "setBrand", glyph: "layers", eyebrow: "الهوية", title: "شعار المتجر", subtitle: "اختر شعارًا محفوظًا محليًا وضمن PDF", body: () => stripTopbar(brandSettingsMarkup()) },
+    { key: "setBrand", glyph: "layers", eyebrow: "المظهر", title: "المظهر", subtitle: "الوضع الفاتح والداكن، لون الخلفية، وشعار المتجر", body: () => stripTopbar(brandSettingsMarkup()) },
     { key: "setAccounts", glyph: "users", eyebrow: "الفريق", title: "إدارة الحسابات", subtitle: "أضف الحسابات وحدد الأدوار والرواتب", body: () => stripTopbar(accountsMarkup()) },
     { key: "setActivity", glyph: "shield", eyebrow: "الأمان والرقابة", title: "سجل العمليات والتدقيق", subtitle: "مراقبة حركات الدخول والمبيعات والمخزون", body: () => stripTopbar(activityLogMarkup()) },
     { key: "setNav", glyph: "grid", eyebrow: "الهاتف", title: "ترتيب الأيقونات", subtitle: "غيّر أولوية شريط التنقل حسب متجرِك", body: () => stripTopbar(navigationSettingsMarkup()) },
-    { key: "setAppearance", glyph: "monitor", eyebrow: "العرض والأجهزة", title: "المظهر والباركود والطباعة", subtitle: "وضع النظام أو الفاتح أو الداكن، وخيارات الماسح والطابعة الحرارية", body: () => stripTopbar(appearanceSettingsMarkup()) },
+    { key: "setAppearance", glyph: "scan", eyebrow: "الأجهزة", title: "الباركود والطباعة", subtitle: "خيارات الماسح والطابعة الحرارية", body: () => stripTopbar(appearanceSettingsMarkup()) },
     { key: "setData", glyph: "restore", eyebrow: "الحفظ", title: "إدارة البيانات", subtitle: "نسخ محلية وسحابية واستعادة آمنة", body: () => stripTopbar(dataManagementMarkup()) },
   ];
   const panels = sections.map((section) => collapsiblePanel(section.key, { eyebrow: section.eyebrow, title: section.title, subtitle: section.subtitle, glyph: section.glyph }, state.reportPanels?.[section.key] ? section.body() : "")).join("");
@@ -1615,21 +1621,45 @@ function settingsMarkup() {
   <div class="settings-page settings-hub"><section class="settings-hub__intro panel"><span class="eyebrow">لوحة إدارة</span><h2>ضبط المتجر من مكان واحد</h2><p>كل الأقسام مطوية افتراضيًا لتبقى الشاشة مرتبة على الهاتف وسطح المكتب.</p></section>${panels}${notificationsPanelMarkup()}${settingsContactMarkup()}</div>`;
 }
 
-/* إعدادات المظهر وقارئ الباركود والطابعة الحرارية — قسم مستقل في مركز الإعدادات. */
-function appearanceSettingsMarkup() {
+/* ألوان خلفية جاهزة لكل وضع: قيم فاتحة وداكنة منسجمة مع أخضر وذهبي الهوية. */
+const BACKGROUND_THEMES = [
+  { id: "ivory", label: "عاجي دافئ", hint: "الافتراضي", light: "#f4f3ec", dark: "#101d18" },
+  { id: "mint", label: "أخضر نعناعي", hint: "قريب من لون الأزرار", light: "#ecf4ee", dark: "#0d211b" },
+  { id: "sky", label: "أزرق هادئ", hint: "مريح في الإضاءة القوية", light: "#edf3f5", dark: "#0e1d22" },
+  { id: "sand", label: "رملي ذهبي", hint: "دافئ مثل لمسات الذهبي", light: "#f7f1e2", dark: "#1e1910" },
+  { id: "pearl", label: "رمادي لؤلؤي", hint: "حيادي أنيق", light: "#f1f2f3", dark: "#171b1d" },
+];
+function backgroundThemeId() {
+  const stored = state.settings?.backgroundTheme;
+  return BACKGROUND_THEMES.some((themeOption) => themeOption.id === stored) ? stored : "ivory";
+}
+function backgroundPalette() { return BACKGROUND_THEMES.find((themeOption) => themeOption.id === backgroundThemeId()) || BACKGROUND_THEMES[0]; }
+
+/* قسم «المظهر»: وضع العرض ولون الخلفية — يظهر داخل قسم المظهر مع شعار المتجر. */
+function displaySettingsMarkup() {
   const preference = themePreference();
-  const thermal = normalizeThermalPrintOptions(state.settings);
-  const scannerSound = state.settings?.scannerSoundEnabled === undefined ? true : Boolean(state.settings.scannerSoundEnabled);
-  const scannerVibration = state.settings?.scannerVibrationEnabled === undefined ? true : Boolean(state.settings.scannerVibrationEnabled);
+  const activeBackground = backgroundThemeId();
   const themeChoices = [
     { value: "system", label: "حسب النظام", hint: `يتبع ضبط الجهاز (الآن: ${systemPrefersDark() ? "داكن" : "فاتح"})`, glyph: "monitor" },
     { value: "light", label: "فاتح دائمًا", hint: "خلفية فاتحة في كل الأوقات", glyph: "sun" },
     { value: "dark", label: "داكن دائمًا", hint: "خلفية داكنة مريحة ليلًا", glyph: "moon" },
   ];
-  return `${topbarMarkup("المظهر والأجهزة", "اختر وضع العرض واضبط قارئ الباركود والطابعة الحرارية.", settingsBackAction())}
-  <div class="settings-page settings-subpage"><form id="appearance-settings-form" class="panel form-grid">
-    <div class="panel__head form-full"><div><span class="eyebrow">وضع العرض</span><h2>مظهر التطبيق</h2></div></div>
+  return `<form id="display-settings-form" class="panel form-grid">
+    <div class="panel__head form-full"><div><span class="eyebrow">وضع العرض</span><h2>الوضع الفاتح والداكن</h2></div></div>
     <div class="theme-mode-picker form-full" role="radiogroup" aria-label="وضع العرض">${themeChoices.map((choice) => `<label class="theme-mode-option ${preference === choice.value ? "is-active" : ""}"><input type="radio" name="theme" value="${choice.value}" ${preference === choice.value ? "checked" : ""} /><span class="theme-mode-option__icon">${icon(choice.glyph, 20)}</span><span class="theme-mode-option__text"><strong>${choice.label}</strong><small>${choice.hint}</small></span></label>`).join("")}</div>
+    <div class="panel__head form-full"><div><span class="eyebrow">لون الخلفية</span><h2>خلفية التطبيق</h2></div></div>
+    <p class="form-full field-hint">يتغير اللون فورًا عند الاختيار، ولكل لون درجة فاتحة وأخرى داكنة تُطبَّق حسب الوضع الحالي.</p>
+    <div class="bg-theme-picker form-full" role="radiogroup" aria-label="لون الخلفية">${BACKGROUND_THEMES.map((themeOption) => `<label class="bg-theme-option ${activeBackground === themeOption.id ? "is-active" : ""}"><input type="radio" name="backgroundTheme" value="${themeOption.id}" ${activeBackground === themeOption.id ? "checked" : ""} /><span class="bg-theme-option__swatch" aria-hidden="true"><i style="background:${themeOption.light}"></i><i style="background:${themeOption.dark}"></i></span><span class="bg-theme-option__text"><strong>${themeOption.label}</strong><small>${themeOption.hint}</small></span></label>`).join("")}</div>
+  </form>`;
+}
+
+/* إعدادات قارئ الباركود والطابعة الحرارية — قسم «الأجهزة» في مركز الإعدادات. */
+function appearanceSettingsMarkup() {
+  const thermal = normalizeThermalPrintOptions(state.settings);
+  const scannerSound = state.settings?.scannerSoundEnabled === undefined ? true : Boolean(state.settings.scannerSoundEnabled);
+  const scannerVibration = state.settings?.scannerVibrationEnabled === undefined ? true : Boolean(state.settings.scannerVibrationEnabled);
+  return `${topbarMarkup("الباركود والطباعة", "اضبط قارئ الباركود والطابعة الحرارية.", settingsBackAction())}
+  <div class="settings-page settings-subpage"><form id="appearance-settings-form" class="panel form-grid">
     <div class="panel__head form-full"><div><span class="eyebrow">نقطة البيع</span><h2>قارئ الباركود</h2></div></div>
     <div class="settings-inline-checks form-full" role="group" aria-label="خيارات قارئ الباركود">
       <label class="settings-inline-check settings-switch"><input name="scannerSoundEnabled" type="checkbox" ${scannerSound ? "checked" : ""} /><span class="switchcompat" aria-hidden="true"><span class="switchcompat__thumb"></span></span><span><strong>صافرة عند نجاح المسح</strong><small>صوت يؤكد قراءة الباركود مثل أجهزة الكاشير.</small></span></label>
@@ -1649,7 +1679,7 @@ function generalSettingsMarkup() {
   return `${topbarMarkup("إعدادات عامة", "حدّث بيانات المتجر التي تظهر في رأس التطبيق والفواتير، ثم احفظ التغيير.", settingsBackAction())}
   <div class="settings-page settings-subpage"><form id="settings-form" class="panel form-grid"><div class="panel__head form-full"><div><span class="eyebrow">بيانات المتجر</span><h2>الإعدادات الأساسية</h2></div></div><label class="form-full">اسم المتجر<input name="storeName" required maxlength="60" dir="rtl" value="${escapeHtml(state.settings?.storeName || "")}" /></label><label>رقم الهاتف<input name="storePhone" type="tel" inputmode="tel" dir="ltr" maxlength="30" value="${escapeHtml(state.settings?.storePhone || "")}" placeholder="+967…" /></label><label>البريد الإلكتروني<input name="storeEmail" type="email" dir="ltr" maxlength="120" value="${escapeHtml(state.settings?.storeEmail || "")}" placeholder="example@domain.com" /></label><label class="form-full">العنوان<input name="storeAddress" dir="rtl" maxlength="160" value="${escapeHtml(state.settings?.storeAddress || "")}" placeholder="المدينة · الحي · الشارع" /></label><label class="form-full">الرقم الضريبي أو السجل التجاري <span class="field-optional">(اختياري)</span><input name="taxNumber" dir="ltr" maxlength="60" value="${escapeHtml(state.settings?.taxNumber || "")}" placeholder="اختياري" /></label><label>نوع النشاط<select name="businessType">${BUSINESS_TYPES.map((type) => `<option value="${type}" ${state.settings?.businessType === type ? "selected" : ""}>${type}</option>`).join("")}</select></label><label>العملة<select name="currency">${CURRENCIES.map((currency) => `<option value="${currency.code}" ${state.settings?.currency === currency.code ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><label class="form-full">رصيد افتتاحي للصندوق<input name="openingCash" type="number" min="0" step="0.01" value="${escapeHtml(state.settings?.openingCash ?? "")}" /></label><label class="form-full settings-discount-limit-field">الحد الأقصى لخصم الكاشير (%)<input name="cashierDiscountLimitPercent" type="number" min="0" max="100" step="0.01" value="${escapeHtml(state.settings?.cashierDiscountLimitPercent ?? 10)}" /><small class="field-hint">الافتراضي 10%. يطبّق على مجموع خصم السطور والخصم العام، ولا يستطيع الكاشير تجاوزه. يمكن للأدمن رفعه حتى 100% عند الحاجة.</small></label><div class="settings-inline-checks form-full" role="group" aria-label="خيارات البيع"><label class="settings-inline-check settings-switch"><input name="allowNegativeSales" type="checkbox" ${state.settings?.allowNegativeSales ? "checked" : ""} /><span class="switchcompat" aria-hidden="true"><span class="switchcompat__thumb"></span></span><span><strong>السماح بالبيع بالسالب</strong><small>تُخصم لاحقًا من فاتورة شراء.</small></span></label><label class="settings-inline-check settings-switch"><input name="allowSalePriceEdit" type="checkbox" ${state.settings?.allowSalePriceEdit ? "checked" : ""} /><span class="switchcompat" aria-hidden="true"><span class="switchcompat__thumb"></span></span><span><strong>السماح بتعديل السعر قبل البيع</strong><small>يتيح تغيير السعر داخل سلة البيع.</small></span></label></div><label class="form-full">السقف العام لمديونية العملاء<input name="customerCreditLimit" type="number" min="0" step="0.01" value="${escapeHtml(state.settings?.customerCreditLimit ?? "")}" /><small class="field-hint">اتركه فارغًا أو ضع 0 للسماح دون سقف عام. يمكن تحديد سقف مختلف لكل عميل من خيارات العملاء.</small></label><div class="dialog__actions form-full"><button class="button button--primary" type="submit">حفظ الإعدادات ${icon("check", 17)}</button></div></form><section class="panel data-management-card data-management-card--danger product-delete-settings"><span class="eyebrow">منطقة اختبار المنتجات</span><h2>حذف جميع المنتجات</h2><p>يحذف المنتجات من قوائم المنتجات والمخزون فقط، مع إبقاء الفواتير والسجلات المالية محفوظة. استخدمه قبل استيراد قائمة تجريبية جديدة.</p><button class="button button--danger" data-action="delete-all-products">حذف جميع المنتجات</button></section></div>`;
 }
-function brandSettingsMarkup() { return `${topbarMarkup("شعار المتجر", "اختر شعارًا محليًا يظهر في التطبيق وملفات PDF ويدخل في النسخة الاحتياطية.", settingsBackAction())}<div class="settings-page settings-subpage">${storeLogoSettingsMarkup()}</div>`; }
+function brandSettingsMarkup() { return `${topbarMarkup("المظهر", "اختر وضع العرض ولون الخلفية وشعار المتجر.", settingsBackAction())}<div class="settings-page settings-subpage">${displaySettingsMarkup()}${storeLogoSettingsMarkup()}</div>`; }
 function navigationSettingsMarkup() { return `${topbarMarkup("ترتيب أيقونات الهاتف", "قدّم أو أخّر الأقسام حسب أولويات متجرك. يبقى ترتيب الكاشير مقتصرًا على الأقسام المسموح بها.", settingsBackAction())}<div class="settings-page settings-subpage">${mobileNavigationSettingsMarkup()}</div>`; }
 
 function loginMarkup() {
@@ -2091,14 +2121,26 @@ function bindEvents() {
   root.querySelector("#cash-filter")?.addEventListener("change", async (event) => { state.cashFrom = event.currentTarget.querySelector("[name=from]").value; state.cashTo = event.currentTarget.querySelector("[name=to]").value; await refresh(); renderKeepingScroll(); /* تغيير الفترة لا يستحق قفزة إلى أعلى الصفحة */ });
   root.querySelector("#settings-form")?.addEventListener("submit", saveSettings);
   root.querySelector("#appearance-settings-form")?.addEventListener("submit", saveAppearanceSettings);
-  root.querySelectorAll("#appearance-settings-form [name=theme]").forEach((input) => input.addEventListener("change", async (event) => {
+  root.querySelector("#display-settings-form")?.addEventListener("submit", (event) => event.preventDefault());
+  root.querySelectorAll("#display-settings-form [name=theme]").forEach((input) => input.addEventListener("change", async (event) => {
     try {
       const theme = event.currentTarget.value;
       await db.saveSettings({ ...state.settings, theme });
       state.settings = await db.getSettings();
       applyTheme();
-      render();
+      renderKeepingScroll();
       showToast(theme === "system" ? `يتبع ضبط الجهاز الآن (${systemPrefersDark() ? "داكن" : "فاتح"})` : theme === "dark" ? "تم تفعيل الوضع الداكن" : "تم تفعيل الوضع الفاتح");
+    } catch (error) { showToast(error.message, "error"); }
+  }));
+  root.querySelectorAll("#display-settings-form [name=backgroundTheme]").forEach((input) => input.addEventListener("change", async (event) => {
+    try {
+      const backgroundTheme = event.currentTarget.value;
+      await db.saveSettings({ ...state.settings, backgroundTheme });
+      state.settings = await db.getSettings();
+      applyTheme();
+      renderKeepingScroll();
+      const palette = BACKGROUND_THEMES.find((themeOption) => themeOption.id === backgroundTheme);
+      showToast(`تم تطبيق خلفية «${palette?.label || backgroundTheme}»`);
     } catch (error) { showToast(error.message, "error"); }
   }));
   root.querySelector("#store-logo-file")?.addEventListener("change", handleStoreLogoFile);
@@ -2838,7 +2880,6 @@ async function saveAppearanceSettings(event) {
   try {
     const form = event.currentTarget;
     const values = {
-      theme: new FormData(form).get("theme") || "system",
       scannerSoundEnabled: Boolean(form.querySelector("[name=scannerSoundEnabled]")?.checked),
       scannerVibrationEnabled: Boolean(form.querySelector("[name=scannerVibrationEnabled]")?.checked),
       thermalPaperWidth: new FormData(form).get("thermalPaperWidth") || "80",
@@ -2849,7 +2890,7 @@ async function saveAppearanceSettings(event) {
     state.settings = await db.getSettings();
     applyTheme();
     render();
-    showToast("تم حفظ إعدادات المظهر والأجهزة");
+    showToast("تم حفظ إعدادات الباركود والطباعة");
   } catch (error) { showToast(error.message, "error"); }
 }
 
