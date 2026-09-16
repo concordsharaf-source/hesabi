@@ -404,9 +404,34 @@ function openAccountSessionDialog() {
   overlay.querySelector("#open-local-logout-confirm").addEventListener("click", openLogoutConfirmDialog);
 }
 
+const SCREEN_LOCK_STORAGE_KEY = "hesabi-screen-locked";
+/* قفل الشاشة السريع: طبقة مستقلة فوق كل شيء — لا تُغلق بالنقر خارجها ولا بفتح نوافذ أخرى،
+   وتصمد أمام تحديث الصفحة، ولا تُفتح إلا برمز صاحب الجلسة نفسه أو بالخروج الكامل لشاشة الدخول. */
+let screenLockGuardInstalled = false;
+function installScreenLockGuard() {
+  if (screenLockGuardInstalled) return;
+  screenLockGuardInstalled = true;
+  const guard = (event) => {
+    if (!state.isScreenLocked) return;
+    const host = document.querySelector("#screen-lock-backdrop");
+    if (!host) return;
+    if (event.target instanceof Node && host.contains(event.target)) return;
+    event.stopPropagation();
+    if (event.type !== "focusin") event.preventDefault();
+    host.querySelector("[name=pin]")?.focus();
+  };
+  ["click", "mousedown", "touchstart", "keydown", "focusin", "contextmenu"].forEach((type) => document.addEventListener(type, guard, true));
+}
 function openScreenLockDialog() {
+  if (!state.currentUser || document.querySelector("#screen-lock-backdrop")) return;
   state.isScreenLocked = true;
-  const overlay = openDialog(`
+  try { localStorage.setItem(SCREEN_LOCK_STORAGE_KEY, "1"); } catch { /* التخزين غير متاح */ }
+  installScreenLockGuard();
+  closeDialog();
+  const host = document.createElement("div");
+  host.id = "screen-lock-backdrop";
+  host.className = "screen-lock-backdrop";
+  host.innerHTML = `<section class="dialog screen-lock-sheet" role="dialog" aria-modal="true" aria-label="الشاشة مقفلة">
     <div class="dialog__head screen-lock-head">
       <div class="screen-lock-user-info">
         <div class="screen-lock-icon">${icon("lock", 26)}</div>
@@ -420,27 +445,37 @@ function openScreenLockDialog() {
     <form id="screen-lock-form" class="form-grid">
       <label class="form-full">
         رمز الدخول لفتح الشاشة
-        <input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" placeholder="••••" required autofocus maxlength="12" />
+        <input name="pin" type="password" autocomplete="current-password" placeholder="••••" required maxlength="64" />
       </label>
       <div class="dialog__actions form-full">
-        <button type="button" class="button button--secondary" id="switch-account-from-lock">تبديل الحساب</button>
+        <button type="button" class="button button--secondary" id="switch-account-from-lock">حساب آخر · خروج</button>
         <button type="submit" class="button button--primary">${icon("check", 17)} فتح الشاشة</button>
       </div>
+      <p class="form-full screen-lock-note">الشاشة مقيدة بالكامل — لا تُفتح إلا برمز ${escapeHtml(state.currentUser?.name || "صاحب الجلسة")}.</p>
     </form>
-  `);
-  const form = overlay.querySelector("#screen-lock-form");
-  overlay.querySelector("#switch-account-from-lock")?.addEventListener("click", () => {
-    state.isScreenLocked = false;
+  </section>`;
+  document.body.appendChild(host);
+  requestAnimationFrame(() => { host.classList.add("is-open"); host.querySelector("[name=pin]")?.focus(); });
+  const form = host.querySelector("#screen-lock-form");
+  host.querySelector("#switch-account-from-lock").addEventListener("click", async () => {
+    /* الخروج من القفل يكون فقط إلى شاشة الدخول الكاملة — لا وصول لأي شيء دون مصادقة. */
+    unlockScreen();
+    await db.clearPersistentSession();
+    state.currentUser = null;
+    state.activeCashierShift = null;
+    state.cart = [];
+    state.view = "sales";
+    applyTheme();
     closeDialog();
-    openAccountSessionDialog();
+    render();
+    showToast("سجّل الدخول للمتابعة.");
   });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const pin = new FormData(event.currentTarget).get("pin");
     try {
       await db.verifyAccountPin(state.currentUser.id, pin);
-      state.isScreenLocked = false;
-      closeDialog();
+      unlockScreen();
       showToast("تم فتح الشاشة بنجاح.");
     } catch {
       showToast("رمز الدخول غير صحيح. أعد المحاولة.", "error");
@@ -448,6 +483,11 @@ function openScreenLockDialog() {
       form.pin.focus();
     }
   });
+}
+function unlockScreen() {
+  state.isScreenLocked = false;
+  try { localStorage.removeItem(SCREEN_LOCK_STORAGE_KEY); } catch { /* التخزين غير متاح */ }
+  document.querySelector("#screen-lock-backdrop")?.remove();
 }
 
 function formatStatus(product) {
@@ -4445,5 +4485,5 @@ export async function bootApp(target) {
   installRuntimeGuards();
   installDesktopBarcodeReader();
   installAudioUnlockListener();
-  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } if (state.cloud.identity && state.settings?.cloudStoreId) { try { const { renewAndRegisterPushDevice } = await import("./push-alerts.js"); state.cloud.push = await renewAndRegisterPushDevice(); } catch (error) { console.warn("[Hesabi push renew]", error?.message || error); } } applyTheme(); watchSystemTheme(); installNotificationBridge(); applyDeepLinkView(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
+  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } if (state.cloud.identity?.role === "admin" && state.settings?.cloudStoreId) { try { await watchAssistantRequests(state.settings.cloudStoreId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } if (state.cloud.identity && state.settings?.cloudStoreId) { try { const { renewAndRegisterPushDevice } = await import("./push-alerts.js"); state.cloud.push = await renewAndRegisterPushDevice(); } catch (error) { console.warn("[Hesabi push renew]", error?.message || error); } } applyTheme(); watchSystemTheme(); installNotificationBridge(); applyDeepLinkView(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); try { if (state.currentUser && localStorage.getItem(SCREEN_LOCK_STORAGE_KEY) === "1") requestAnimationFrame(openScreenLockDialog); } catch { /* التخزين غير متاح */ } installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }

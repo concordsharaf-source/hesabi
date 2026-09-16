@@ -406,3 +406,37 @@ test("pdf-export: تصدير صورة PNG من نفس مسرح PDF مع مشار
   assert.match(pdfExport, /new File\(\[blob\], filename, \{ type: "image\/png" \}\)/, "ملف الصورة غير صحيح");
   assert.match(pdfExport, /export async function shareOrDownloadImage\(\{ html, filename, title, page = "a4" \}\) \{ return fileOrDownload\(await createImageFileFromHtml/, "المشاركة/التنزيل مفقودة");
 });
+
+/* ===== v49: قفل الشاشة السريع يقيد الصفحة فعلًا ولا يُفتح إلا بكلمة المرور ===== */
+
+test("قفل الشاشة: طبقة مستقلة لا تُغلق بالنقر خارجها ولا بمفتاح الهروب وتصمد أمام التحديث", () => {
+  const lock = appJs.slice(appJs.indexOf("const SCREEN_LOCK_STORAGE_KEY"), appJs.indexOf("function unlockScreen") + 400);
+  // ليست نافذة openDialog القابلة للإغلاق — بل عنصر مستقل بمعرفه الخاص
+  assert.match(lock, /host\.id = "screen-lock-backdrop"/, "القفل ما زال نافذة عادية");
+  assert.doesNotMatch(lock, /const overlay = openDialog\(/, "القفل يستخدم openDialog القابلة للإغلاق");
+  // حارس يعترض كل تفاعل خارج طبقة القفل
+  assert.match(lock, /\["click", "mousedown", "touchstart", "keydown", "focusin", "contextmenu"\]\.forEach\(\(type\) => document\.addEventListener\(type, guard, true\)\)/, "لا حارس للتفاعلات خارج القفل");
+  assert.match(lock, /event\.stopPropagation\(\)/, "الحارس لا يوقف الأحداث");
+  // يصمد أمام تحديث الصفحة عبر التخزين المحلي
+  assert.match(lock, /localStorage\.setItem\(SCREEN_LOCK_STORAGE_KEY, "1"\)/, "لا يحفظ حالة القفل");
+  assert.match(lock, /localStorage\.removeItem\(SCREEN_LOCK_STORAGE_KEY\)/, "لا يمسح حالة القفل عند الفتح");
+  assert.match(appJs, /localStorage\.getItem\(SCREEN_LOCK_STORAGE_KEY\) === "1"\) requestAnimationFrame\(openScreenLockDialog\)/, "لا يعيد القفل بعد تحديث الصفحة");
+  // زر الحساب الآخر يسجل الخروج كاملًا — لا يفتح نافذة تبديل داخل الجلسة المقفلة
+  assert.match(lock, /await db\.clearPersistentSession\(\);/, "تبديل الحساب من القفل لا يسجل الخروج");
+  assert.doesNotMatch(lock, /openAccountSessionDialog\(\)/, "القفل يفتح نافذة الجلسة دون مصادقة");
+  // الطبقة فوق كل شيء
+  assert.match(css, /\.screen-lock-backdrop \{ position:fixed; z-index:3000/, "طبقة القفل ليست فوق كل شيء");
+});
+
+test("قفل الشاشة: لا يُفتح إلا برمز صاحب الجلسة نفسه — verifyAccountPin موجودة وتتحقق فعلًا", async () => {
+  const dbJs = await readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8");
+  assert.match(dbJs, /async verifyAccountPin\(accountId, pin\)/, "الدالة مفقودة من قاعدة البيانات");
+  assert.match(dbJs, /await hashPin\(pin, account\.pinSalt\) !== account\.pinHash\) throw new Error\("رمز الدخول غير صحيح\."\)/, "لا تتحقق من الرمز فعلًا");
+  // سلوكيًا: الرمز الصحيح يفتح والخاطئ يرفض
+  await db.resetAllData();
+  const account = await db.createAccount({ username: "lock-user", name: "موظف القفل", role: "cashier", pin: "4321" });
+  await db.verifyAccountPin(account.id, "4321");
+  await assert.rejects(() => db.verifyAccountPin(account.id, "9999"), /رمز الدخول غير صحيح/);
+  await assert.rejects(() => db.verifyAccountPin("no-such-account", "4321"), /رمز الدخول غير صحيح/);
+  await db.resetAllData();
+});

@@ -1914,3 +1914,11 @@ html.is-sales-page .sales-total-bar {
 .hourly-legend__swatch--peak { background:linear-gradient(180deg,#c42a47,#84132b); }
 .hourly-legend__swatch--count { height:3px; border-radius:2px; background:#e08a2e; }
 [data-theme="dark"] .hourly-svg-label { fill:#9fb4a8; }
+
+/* v49: قفل الشاشة السريع — طبقة فوق كل شيء لا تُغلق إلا بالرمز */
+.screen-lock-backdrop { position:fixed; z-index:3000; inset:0; display:grid; place-items:center; padding:16px; background:rgba(10,22,18,.72); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); opacity:0; transition:opacity .2s var(--ease-out); }
+.screen-lock-backdrop.is-open { opacity:1; }
+.screen-lock-sheet { width:min(100%, 420px); }
+.screen-lock-user-info { display:flex; align-items:center; gap:12px; }
+.screen-lock-icon { display:grid; place-items:center; width:52px; height:52px; color:#fff; background:linear-gradient(145deg,#c42a47,#84132b); border-radius:14px; box-shadow:0 10px 22px rgba(132,19,43,.25); }
+.screen-lock-note { margin:0; color:var(--muted); font-size:10px; text-align:center; }

@@ -277,6 +277,12 @@ export const db = {
     if (!account || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("بيانات الدخول غير صحيحة.");
     return toPersistentSessionUser(account);
   },
+  /* تحقق رمز حساب محدد — يستخدمه قفل الشاشة السريع لفتحها بكلمة مرور صاحب الجلسة فقط. */
+  async verifyAccountPin(accountId, pin) {
+    const database = await this.open(); const account = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").get(String(accountId || "")));
+    if (!account || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("رمز الدخول غير صحيح.");
+    return true;
+  },
   async authenticateBackupAccount(payload, { username, pin }) {
     const normalized = normalizeUsername(username);
     const account = (payload?.stores?.accounts || []).find((item) => item.username === normalized);
