@@ -1238,7 +1238,7 @@ function suppliersMarkup() {
   const totalDue = suppliers.reduce((sum, supplier) => sum + toNumber(supplier.balance), 0);
   return `${topbarMarkup("الموردون", "تابع الأرصدة والشراء الآجل ودفعات الموردين في حساب واحد.", `<button class="button button--primary" data-action="new-supplier">${icon("plus", 18)}<span>إضافة مورد</span></button>`)}
   <section class="toolbar"><label class="search-field">${icon("search", 19)}<input id="supplier-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث باسم المورد أو رقم الهاتف..." value="${escapeHtml(state.supplierQuery)}" /></label></section>
-  <section class="inventory-summary"><div><span>مستحقات الموردين</span><strong>${money(totalDue)}</strong></div><div><span>الموردون النشطون</span><strong>${amount(suppliers.length)} مورد</strong></div></section>
+  <section class="inventory-summary inventory-summary--purchases"><div><span>مستحقات الموردين</span><strong>${money(totalDue)}</strong></div><div><span>الموردون النشطون</span><strong>${amount(suppliers.length)} مورد</strong></div><button class="po-order-tile" type="button" data-action="new-supplier" aria-label="إضافة مورد جديد"><span>${icon("plus", 15)} سجل موردًا جديدًا</span><strong>إضافة مورد</strong></button></section>
   <section class="panel entity-list">${suppliers.length ? suppliers.map((supplier) => `<article class="entity-row"><button class="entity-row__icon" data-action="open-supplier-account" data-id="${supplier.id}" aria-label="حساب ${escapeHtml(supplier.name)}">${icon("users", 20)}</button><button class="entity-row__main entity-row__main--button" data-action="open-supplier-account" data-id="${supplier.id}"><strong>${escapeHtml(supplier.name)}</strong><small>${escapeHtml(supplier.phone || supplier.address || "لا توجد بيانات اتصال")}</small></button><strong class="entity-row__amount">${money(supplier.balance)}</strong><div class="entity-row__actions">${phoneCallButton(supplier.phone, supplier.name)}<button class="icon-button" aria-label="تعديل ${escapeHtml(supplier.name)}" data-action="open-supplier" data-id="${supplier.id}">${icon("edit", 18)}</button><button class="icon-button icon-button--danger" aria-label="حذف ${escapeHtml(supplier.name)}" data-action="delete-supplier" data-id="${supplier.id}">${icon("trash", 18)}</button></div></article>`).join("") : emptyState(query ? "لا توجد نتائج مطابقة" : "لم تضف موردين بعد", query ? "جرّب اسمًا أو رقمًا آخر." : "أضف أول مورد لتبدأ تسجيل فواتير الشراء.", "new-supplier")}</section>${supplierPaymentsMarkup({ embedded: true })}`;
 }
 
@@ -1263,7 +1263,7 @@ function customersMarkup() {
   const totalDebt = customers.reduce((sum, customer) => sum + toNumber(customer.balance), 0);
   return `${topbarMarkup("العملاء", "تابع الأرصدة والبيع الآجل والدفعات في حساب واحد.", `<button class="button button--primary" data-action="new-customer">${icon("plus", 18)}<span>إضافة عميل</span></button>`)}
   <section class="toolbar"><label class="search-field">${icon("search", 19)}<input id="customer-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث باسم العميل أو رقم الهاتف..." value="${escapeHtml(state.customerQuery)}" /></label></section>
-  <section class="inventory-summary"><div><span>إجمالي الديون</span><strong>${money(totalDebt)}</strong></div><div><span>العملاء النشطون</span><strong>${amount(customers.length)} عميل</strong></div></section>
+  <section class="inventory-summary inventory-summary--purchases"><div><span>إجمالي الديون</span><strong>${money(totalDebt)}</strong></div><div><span>العملاء النشطون</span><strong>${amount(customers.length)} عميل</strong></div><button class="po-order-tile" type="button" data-action="new-customer" aria-label="إضافة عميل جديد"><span>${icon("plus", 15)} سجل عميلًا جديدًا</span><strong>إضافة عميل</strong></button></section>
   <section class="panel entity-list">${customers.length ? customers.map((customer) => `<article class="entity-row"><button class="entity-row__icon" data-action="open-customer" data-id="${customer.id}" aria-label="حساب ${escapeHtml(customer.name)}">${icon("users", 20)}</button><button class="entity-row__main entity-row__main--button" data-action="open-customer" data-id="${customer.id}"><strong>${escapeHtml(customer.name)}</strong><small>${escapeHtml(customer.phone || customer.address || "لا توجد بيانات اتصال")}</small></button><strong class="entity-row__amount">${money(customer.balance)}</strong><div class="entity-row__actions">${phoneCallButton(customer.phone, customer.name)}<button class="icon-button" aria-label="تعديل ${escapeHtml(customer.name)}" data-action="edit-customer" data-id="${customer.id}">${icon("edit", 18)}</button><button class="icon-button icon-button--danger" aria-label="حذف ${escapeHtml(customer.name)}" data-action="delete-customer" data-id="${customer.id}">${icon("trash", 18)}</button></div></article>`).join("") : emptyState(query ? "لا توجد نتائج مطابقة" : "لم تضف عملاء بعد", query ? "جرّب اسمًا أو رقمًا آخر." : "أضف أول عميل لتبدأ البيع الآجل وتسجيل الدفعات.", "new-customer")}</section>${customerPaymentsMarkup({ embedded: true })}`;
 }
 
@@ -1460,32 +1460,31 @@ function smartTopMoversMarkup(topByVolume = [], topByProfit = []) {
 }
 
 function smartHourlyPeakMarkup(hourlyDistribution = []) {
-  const maxTotal = Math.max(1, ...hourlyDistribution.map((h) => h.total));
-  const peakHour = hourlyDistribution.reduce((max, h) => h.total > max.total ? h : max, { hour: 0, count: 0, total: 0 });
-  const formatHour = (h) => {
-    const period = h >= 12 ? "م" : "ص";
-    const hr = h % 12 === 0 ? 12 : h % 12;
-    return `${hr} ${period}`;
-  };
+  /* رسم بياني SVG حقيقي: أعمدة لمبيعات كل ساعة + خط لعدد الفواتير، مع إبراز ساعة الذروة. */
+  const hours = hourlyDistribution.length === 24 ? hourlyDistribution : Array(24).fill(0).map((_, hour) => hourlyDistribution.find((h) => h.hour === hour) || { hour, count: 0, total: 0 });
+  const maxTotal = Math.max(1, ...hours.map((h) => toNumber(h.total)));
+  const maxCount = Math.max(1, ...hours.map((h) => toNumber(h.count)));
+  const peakHour = hours.reduce((max, h) => (toNumber(h.total) > toNumber(max.total) ? h : max), { hour: 0, count: 0, total: 0 });
+  const hasData = toNumber(peakHour.total) > 0;
+  const formatHour = (h) => `${h % 12 === 0 ? 12 : h % 12} ${h >= 12 ? "م" : "ص"}`;
   const open = Boolean(state.reportPanels?.hourly);
-
+  const W = 480; const H = 210; const padTop = 16; const padBottom = 30; const padX = 10;
+  const plotH = H - padTop - padBottom; const step = (W - padX * 2) / 24; const barW = Math.max(6, step - 5);
+  const bars = hours.map((h) => {
+    const height = Math.max(2, Math.round((toNumber(h.total) / maxTotal) * plotH));
+    const x = padX + h.hour * step + (step - barW) / 2;
+    const y = padTop + plotH - height;
+    const isPeak = hasData && h.hour === peakHour.hour;
+    return `<rect class="hourly-svg-bar${isPeak ? " is-peak" : ""}" x="${x.toFixed(1)}" y="${y}" width="${barW.toFixed(1)}" height="${height}" rx="3" fill="url(#${isPeak ? "hourlyPeakGrad" : "hourlyBarGrad"})"><title>الساعة ${formatHour(h.hour)}: ${amount(h.count)} فاتورة · ${money(h.total)}</title></rect>`;
+  }).join("");
+  const linePoints = hours.map((h) => `${(padX + h.hour * step + step / 2).toFixed(1)},${(padTop + plotH - (toNumber(h.count) / maxCount) * plotH).toFixed(1)}`).join(" ");
+  const labels = hours.filter((h) => h.hour % 4 === 0).map((h) => `<text class="hourly-svg-label" x="${(padX + h.hour * step + step / 2).toFixed(1)}" y="${H - 8}" text-anchor="middle">${formatHour(h.hour)}</text>`).join("");
+  const chart = `<svg class="hourly-svg-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="توزيع المبيعات على ساعات اليوم" preserveAspectRatio="xMidYMid meet"><defs><linearGradient id="hourlyBarGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f9d78"/><stop offset="1" stop-color="#155c44"/></linearGradient><linearGradient id="hourlyPeakGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#c42a47"/><stop offset="1" stop-color="#84132b"/></linearGradient></defs><line x1="${padX}" y1="${padTop + plotH}" x2="${W - padX}" y2="${padTop + plotH}" stroke="var(--line)" stroke-width="1.5"/>${bars}${hasData ? `<polyline class="hourly-svg-line" points="${linePoints}" fill="none" stroke="#e08a2e" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>` : ""}${labels}</svg>`;
   return `
     <section class="collapsible-reports">
-      ${reportPanelToggle("hourly", { eyebrow: "تحليل ساعات الذروة", title: "توزيع المبيعات على ساعات اليوم", subtitle: "اضغط لعرض المخطط الساعي", badge: peakHour.total > 0 ? `ذروة: ${formatHour(peakHour.hour)}` : "" })}
+      ${reportPanelToggle("hourly", { eyebrow: "تحليل ساعات الذروة", title: "توزيع المبيعات على ساعات اليوم", subtitle: "اضغط لعرض الرسم البياني الساعي", badge: hasData ? `ذروة: ${formatHour(peakHour.hour)}` : "" })}
       ${open ? `<article class="panel peak-hours-card report-panel-body">
-        ${peakHour.total > 0 ? `<div class="panel__head"><div><span class="eyebrow">أعلى ساعة</span></div><span class="peak-hour-badge">ذروة المبيعات: ${formatHour(peakHour.hour)} (${money(peakHour.total)})</span></div>` : ""}
-        <div class="hourly-bars-chart">
-          ${hourlyDistribution.map((h) => {
-            const heightPct = Math.max(6, Math.round((h.total / maxTotal) * 100));
-            const isPeak = peakHour.total > 0 && h.hour === peakHour.hour;
-            return `
-              <div class="hourly-bar-col ${isPeak ? "is-peak" : ""}" title="الساعة ${formatHour(h.hour)}: ${amount(h.count)} فاتورة · ${money(h.total)}">
-                <div class="hourly-bar-fill" style="height: ${heightPct}%"></div>
-                <span class="hourly-bar-label">${h.hour % 4 === 0 ? formatHour(h.hour) : "·"}</span>
-              </div>
-            `;
-          }).join("")}
-        </div>
+        ${hasData ? `<div class="panel__head"><div><span class="eyebrow">أعلى ساعة</span></div><span class="peak-hour-badge">ذروة المبيعات: ${formatHour(peakHour.hour)} (${money(peakHour.total)})</span></div>${chart}<div class="hourly-legend"><span><i class="hourly-legend__swatch hourly-legend__swatch--sales"></i>المبيعات بالمبلغ</span><span><i class="hourly-legend__swatch hourly-legend__swatch--peak"></i>ساعة الذروة</span><span><i class="hourly-legend__swatch hourly-legend__swatch--count"></i>عدد الفواتير</span></div>` : `<p class="panel__empty">لا توجد مبيعات ضمن الفترة لعرض التوزيع الساعي.</p>`}
       </article>` : ""}
     </section>
   `;

@@ -1900,3 +1900,16 @@ html.is-sales-page .sales-total-bar {
 .cash-action-tile--withdraw { background:linear-gradient(145deg,#c42a47,#84132b); border:1px solid #f28a9c; box-shadow:0 10px 22px rgba(132,19,43,.25); }
 [data-theme="dark"] .cash-action-tile--deposit { border-color:#8ef0c0; }
 [data-theme="dark"] .cash-action-tile--withdraw { border-color:#ff9eb0; }
+
+/* v46: رسم بياني SVG لساعات الذروة + وسيلة إيضاح */
+.hourly-svg-chart { display:block; width:100%; height:auto; margin-top:6px; }
+.hourly-svg-bar { opacity:.9; }
+.hourly-svg-bar.is-peak { opacity:1; }
+.hourly-svg-label { fill:var(--muted); font-size:10px; font-weight:700; }
+.hourly-legend { display:flex; flex-wrap:wrap; gap:12px; padding-top:8px; color:var(--muted); font-size:10px; font-weight:700; }
+.hourly-legend span { display:flex; align-items:center; gap:5px; }
+.hourly-legend__swatch { display:inline-block; width:12px; height:12px; border-radius:3px; }
+.hourly-legend__swatch--sales { background:linear-gradient(180deg,#2f9d78,#155c44); }
+.hourly-legend__swatch--peak { background:linear-gradient(180deg,#c42a47,#84132b); }
+.hourly-legend__swatch--count { height:3px; border-radius:2px; background:#e08a2e; }
+[data-theme="dark"] .hourly-svg-label { fill:#9fb4a8; }

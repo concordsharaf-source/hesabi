@@ -264,3 +264,53 @@ test("محاسبة v45: السلفة تخصم من راتب الموظف، وا�
   assert.equal(cashbox.withdrawals, 30, "السحب العادي يجب أن يظهر في خانة السحوبات وحدها");
   await db.resetAllData();
 });
+
+/* ===== v46: بلاطتا إضافة عميل/مورد الحمراوان + رسم SVG لساعات الذروة ===== */
+
+test("العملاء: بلاطة حمراء كبيرة (إضافة عميل) بجانب عدد العملاء بنفس تصميم بلاطة طلب الشراء", () => {
+  const markup = appJs.slice(appJs.indexOf("function customersMarkup"), appJs.indexOf("function customerPaymentsMarkup"));
+  assert.match(markup, /inventory-summary inventory-summary--purchases/, "قسم الملخص لا يستخدم شبكة البلاطات");
+  assert.match(markup, /العملاء النشطون[\s\S]*?<button class="po-order-tile" type="button" data-action="new-customer"/, "بلاطة إضافة عميل ليست بجانب عدد العملاء");
+  assert.match(markup, /<strong>إضافة عميل<\/strong>/);
+});
+
+test("الموردون: بلاطة حمراء كبيرة (إضافة مورد) بجانب عدد الموردين بنفس تصميم بلاطة طلب الشراء", () => {
+  const markup = appJs.slice(appJs.indexOf("function suppliersMarkup"), appJs.indexOf("function supplierPaymentsMarkup"));
+  assert.match(markup, /inventory-summary inventory-summary--purchases/, "قسم الملخص لا يستخدم شبكة البلاطات");
+  assert.match(markup, /الموردون النشطون[\s\S]*?<button class="po-order-tile" type="button" data-action="new-supplier"/, "بلاطة إضافة مورد ليست بجانب عدد الموردين");
+  assert.match(markup, /<strong>إضافة مورد<\/strong>/);
+});
+
+test("ساعات الذروة: رسم بياني SVG رسومي بأعمدة المبيعات وخط عدد الفواتير وإبراز الذروة", () => {
+  const fn = appJs.slice(appJs.indexOf("function smartHourlyPeakMarkup"), appJs.indexOf("function smartDeadStockMarkup"));
+  assert.match(fn, /<svg class="hourly-svg-chart" viewBox="0 0 \$\{W\} \$\{H\}" role="img"/, "لا يوجد SVG للرسم البياني");
+  assert.match(fn, /hourlyBarGrad/, "تدرج أعمدة المبيعات مفقود");
+  assert.match(fn, /hourlyPeakGrad/, "تدرج عمود الذروة مفقود");
+  assert.match(fn, /polyline class="hourly-svg-line"/, "خط عدد الفواتير مفقود");
+  assert.match(fn, /<title>الساعة \$\{formatHour\(h\.hour\)\}: \$\{amount\(h\.count\)\} فاتورة/, "تلميح تفاصيل الساعة مفقود");
+  assert.match(fn, /hourly-legend/, "وسيلة الإيضاح مفقودة");
+  assert.match(fn, /hourlyDistribution\.length === 24 \? hourlyDistribution : Array\(24\)/, "لا يضمن 24 ساعة كاملة");
+  // لا بقايا من المخطط القديم بأعمدة div
+  assert.doesNotMatch(fn, /hourly-bars-chart/, "المخطط القديم div ما زال موجودًا");
+  assert.match(css, /\.hourly-svg-chart \{ display:block; width:100%; height:auto/, "CSS الرسم مفقود");
+  assert.match(css, /\.hourly-legend__swatch--peak \{ background:linear-gradient\(180deg,#c42a47,#84132b\); \}/, "لون الذروة في وسيلة الإيضاح غير مطابق");
+});
+
+test("محاسبة التوزيع الساعي: analytics يوزع المبيعات على 24 ساعة حسب ساعة الفاتورة", async () => {
+  await db.resetAllData();
+  const product = await db.createProduct({ name: "ماء التوزيع", barcode: "hr-1", unit: "قطعة", quantity: 50, price: 100, cost: 60, minimumStock: 1 });
+  const today = new Date().toISOString().slice(0, 10);
+  const saleAt = async (hour, qty) => {
+    const sale = await db.completeSale({ items: [{ productId: product.id, quantity: qty, unitPrice: 100 }], discount: 0, paidAmount: qty * 100, paymentMethod: "نقدي" });
+    await db.updateSaleDate?.(sale.id, `${today}T${String(hour).padStart(2, "0")}:15:00`);
+    return sale;
+  };
+  await saleAt(9, 1); await saleAt(9, 2); await saleAt(17, 5);
+  const analytics = await db.getAnalytics({ from: today, to: today });
+  assert.equal(analytics.hourlyDistribution.length, 24, "التوزيع لا يغطي 24 ساعة");
+  const totalAcrossHours = analytics.hourlyDistribution.reduce((sum, h) => sum + h.total, 0);
+  assert.equal(totalAcrossHours, analytics.sales.total, "مجموع التوزيع الساعي لا يساوي إجمالي المبيعات");
+  const invoicesAcrossHours = analytics.hourlyDistribution.reduce((sum, h) => sum + h.count, 0);
+  assert.equal(invoicesAcrossHours, 3, "عدد الفواتير الموزعة غير صحيح");
+  await db.resetAllData();
+});
