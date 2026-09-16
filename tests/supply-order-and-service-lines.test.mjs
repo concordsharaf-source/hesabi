@@ -201,3 +201,66 @@ test("خدمة بمبلغ صفر تُرفض من completeSale", async () => {
   );
   await db.resetAllData();
 });
+
+/* ===== v45: بلاطتا الخزنة الكبيرتان + سحب موجّه بالبند (مصروف يومي/شهري، سلفة موظف، سحب عادي) ===== */
+
+test("الخزنة: بلاطتان كبيرتان إيداع وسحب بتصميم بلاطات المشتريات بدل أزرار الشريط الصغيرة", () => {
+  const markup = appJs.slice(appJs.indexOf("function cashboxMarkup"), appJs.indexOf("cash-action-tiles") + 3000);
+  assert.match(markup, /class="cash-action-tiles"/, "قسم البلاطتين مفقود");
+  assert.match(markup, /cash-action-tile--deposit" type="button" data-action="new-cash-deposit"/, "بلاطة الإيداع مفقودة");
+  assert.match(markup, /cash-action-tile--withdraw" type="button" data-action="new-cash-withdrawal"/, "بلاطة السحب مفقودة");
+  assert.match(markup, /<strong>إيداع<\/strong>/);
+  assert.match(markup, /<strong>سحب<\/strong>/);
+  // لا أزرار صغيرة قديمة في شريط الخزنة العلوي
+  assert.doesNotMatch(markup, /button--secondary" data-action="new-cash-withdrawal"/, "زر السحب الصغير القديم ما زال موجودًا");
+  assert.doesNotMatch(markup, /button--primary" data-action="new-cash-deposit"/, "زر الإيداع الصغير القديم ما زال موجودًا");
+  // تصميم البلاطات مطابق لروح بلاطة المشتريات: تدرج، حواف، ظل، خط كبير
+  assert.match(css, /\.cash-action-tile \{ display:grid; gap:4px; padding:16px; color:#fff; text-align:right; border-radius:14px; cursor:pointer; \}/);
+  assert.match(css, /\.cash-action-tile strong \{ font-size:20px; \}/);
+  assert.match(css, /\.cash-action-tile--deposit \{ background:linear-gradient\(145deg,#1f8a5b,#0c5537\); border:1px solid #7fd6ab; box-shadow:0 10px 22px rgba\(12,85,55,\.25\); \}/);
+  assert.match(css, /\.cash-action-tile--withdraw \{ background:linear-gradient\(145deg,#c42a47,#84132b\); border:1px solid #f28a9c; box-shadow:0 10px 22px rgba\(132,19,43,\.25\); \}/);
+  assert.match(css, /\[data-theme="dark"\] \.cash-action-tile--withdraw \{ border-color:#ff9eb0; \}/);
+});
+
+test("نافذة السحب: بنود سحب عادي/مصروف يومي/مصروف شهري/سلفة موظف وتوجيه كل بند لمكانه الصحيح", () => {
+  const dialog = appJs.slice(appJs.indexOf("function openCashMovementDialog"), appJs.indexOf("function periodicInventoryDetailsMarkup"));
+  ["withdrawal", "daily", "monthly", "advance"].forEach((kind) => assert.match(dialog, new RegExp(`name="withdrawalKind" type="radio" value="${kind}"`), `بند ${kind} مفقود`));
+  assert.match(dialog, /مصروف يومي/); assert.match(dialog, /مصروف شهري/); assert.match(dialog, /سلفة موظف/); assert.match(dialog, /سحب عادي/);
+  // السلفة تمر عبر createExpense بعلامات خصم الراتب — لا حركة صندوق مزدوجة
+  assert.match(dialog, /kind === "advance"[\s\S]*?db\.createExpense\(\{[^}]*salaryAdvance: true, cashierSalaryAdvance: true/, "السلفة لا تمر عبر مسار خصم الراتب");
+  // المصروف اليومي/الشهري يمر عبر createExpense مع periodType والفئة المختارة
+  assert.match(dialog, /kind === "daily" \|\| kind === "monthly"[\s\S]*?db\.createExpense\(\{[^}]*periodType: kind, category: values\.category/, "المصروف لا يسجل بفئته وبنوع فترته");
+  // السحب العادي وحده حركة صندوق
+  assert.match(dialog, /db\.createCashMovement\(\{ type: "WITHDRAWAL"/, "السحب العادي لا يسجل حركة خزنة");
+  // حقول السلفة: قائمة موظفين + ملاحظة المتبقي من الراتب
+  assert.match(dialog, /cw-staff-field/); assert.match(dialog, /cw-advance-note/);
+  assert.match(dialog, /MONTHLY_EXPENSE_CATEGORIES : DAILY_EXPENSE_CATEGORIES/, "فئات المصروف لا تتبدل حسب النوع");
+  // الإيداع بقي حركة خزنة بسيطة
+  assert.match(dialog, /db\.createCashMovement\(\{ type: "DEPOSIT"/);
+});
+
+test("محاسبة v45: السلفة تخصم من راتب الموظف، والمصروف والسحب كلٌّ في خانته في الخزنة بلا ازدواج", async () => {
+  await db.resetAllData();
+  const employee = await db.createAccount({ username: "v45-emp", name: "موظف الخزنة", role: "employee", pin: "9090", monthlySalary: 500 });
+  const today = new Date().toISOString().slice(0, 10);
+  // 1) سلفة موظف من نافذة السحب
+  const advance = await db.createExpense({ amount: 120, date: today, staffId: employee.id, notes: "سلفة من الخزنة", salaryAdvance: true, cashierSalaryAdvance: true, periodType: "daily" });
+  assert.equal(advance.category, "سلفة موظف");
+  assert.equal(advance.staffId, employee.id);
+  const summaries = await db.listCashierSalarySummaries({ month: today.slice(0, 7) });
+  const summary = summaries.find((item) => item.accountId === employee.id);
+  assert.ok(summary, "لا ملخص راتب للموظف");
+  assert.equal(summary.advances, 120, "السلفة لم تُسجل على راتب الموظف");
+  assert.equal(summary.remainingSalary, 380, "السلفة لم تُخصم من المتبقي من الراتب");
+  // السلفة فوق المتبقي تُرفض
+  await assert.rejects(() => db.createExpense({ amount: 400, date: today, staffId: employee.id, salaryAdvance: true, cashierSalaryAdvance: true, periodType: "daily" }), /تتجاوز المتبقي/);
+  // 2) مصروف يومي بفئته
+  const dailyExpense = await db.createExpense({ amount: 50, date: today, periodType: "daily", category: "وقود", description: "بنزين المولد" });
+  assert.equal(dailyExpense.category, "وقود");
+  // 3) سحب عادي حركة خزنة
+  await db.createCashMovement({ type: "WITHDRAWAL", amount: 30, date: today, notes: "سحب شخصي" });
+  const cashbox = await db.getCashbox({ from: today, to: today });
+  assert.equal(cashbox.expenses, 170, "المصروفات في الخزنة يجب أن تجمع السلفة والمصروف اليومي فقط");
+  assert.equal(cashbox.withdrawals, 30, "السحب العادي يجب أن يظهر في خانة السحوبات وحدها");
+  await db.resetAllData();
+});

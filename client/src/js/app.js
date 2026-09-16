@@ -1532,7 +1532,8 @@ function cashboxMarkup() {
   const outflowBody = `<article class="panel report-card"><div><span>مشتريات نقدية</span><strong>${money(cash.cashPurchases)}</strong></div><div><span>دفعات الموردين</span><strong>${money(cash.supplierPayments)}</strong></div><div><span>مصروفات</span><strong>${money(cash.expenses)}</strong></div><div><span>سحوبات يدوية</span><strong>${money(cash.withdrawals)}</strong></div></article>`;
   const movementsBody = `<article class="panel report-card">${state.cashMovements.length ? state.cashMovements.map((movement) => `<div><span>${movementLabel(movement)}<small>${movement.date}${movement.notes ? ` · ${escapeHtml(movement.notes)}` : ""}</small></span><strong class="${movement.type === "WITHDRAWAL" ? "is-negative" : ""}">${movement.type === "WITHDRAWAL" ? "−" : "+"}${money(movement.amount)}</strong></div>`).join("") : `<p>لا توجد إيداعات أو سحوبات أو تسويات ضمن الفترة.</p>`}</article>`;
 
-  return `${topbarMarkup("الخزنة والصناديق", "الخزنة تجمع التحويلات والمصروفات وحركات النقد في مكان واحد، مع فصل ما يوجد فعليًا لدى الكاشيرات.", `<div class="topbar__actions"><button class="button button--secondary" data-action="new-cash-withdrawal">سحب</button><button class="button button--primary" data-action="new-cash-deposit">${icon("plus", 18)}<span>إيداع</span></button></div>`, "topbar--cashbox")}
+  return `${topbarMarkup("الخزنة والصناديق", "الخزنة تجمع التحويلات والمصروفات وحركات النقد في مكان واحد، مع فصل ما يوجد فعليًا لدى الكاشيرات.", "", "topbar--cashbox")}
+  <section class="cash-action-tiles"><button class="cash-action-tile cash-action-tile--deposit" type="button" data-action="new-cash-deposit" aria-label="إيداع نقد في الخزنة"><span>${icon("plus", 15)} أدخل نقدًا إلى الخزنة</span><strong>إيداع</strong></button><button class="cash-action-tile cash-action-tile--withdraw" type="button" data-action="new-cash-withdrawal" aria-label="سحب من الخزنة: مصروف أو سلفة أو سحب عادي"><span>${icon("wallet", 15)} مصروف · سلفة موظف · سحب</span><strong>سحب</strong></button></section>
   <section class="toolbar toolbar--filter"><form id="cash-filter" class="date-filter"><label>من<input name="from" type="date" value="${state.cashFrom}" /></label><label>إلى<input name="to" type="date" value="${state.cashTo}" /></label></form></section>
   <section class="metric-grid metric-grid--reports">${metricCard("الخزنة الرئيسية", money(vault.vaultBalance), "wallet", vault.untransferredShiftCount ? `بانتظار ترحيل ${amount(vault.untransferredShiftCount)} وردية` : "لا توجد ورديات بانتظار الترحيل", vault.vaultBalance)}${metricCard("نقد لدى الكاشيرات", money(vault.cashierCashHeld), "users", "وردية مفتوحة أو مقفلة لم تُرحّل", vault.cashierCashHeld)}${metricCard("رأس المال في المخزون", money(state.dashboard?.inventoryValue || 0), "package", "قيمة المخزون بالتكلفة", state.dashboard?.inventoryValue || 0)}${metricCard("إجمالي النقد المسجل", money(cash.closingBalance), "chart", "الخزنة + صناديق الكاشير", cash.closingBalance)}</section>
   ${collapsiblePanel("cashIn", { eyebrow: "مصادر الداخل", title: "الوارد إلى الصندوق", subtitle: "المبيعات النقدية ودفعات العملاء والإيداعات", badge: money(inflowTotal), glyph: "wallet" }, inflowBody)}
@@ -2822,8 +2823,68 @@ async function openCashierShortageDeductionDialog(accountId) {
 }
 
 function openCashMovementDialog(type) {
-  const label = type === "DEPOSIT" ? "إيداع في الصندوق" : "سحب من الصندوق";
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حركة صندوق</span><h2>${label}</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="cash-movement-form" class="form-grid"><label>المبلغ${quantityControlMarkup({ value: "", min: 0.01, step: "0.01", inputAttrs: "name=\"amount\" required autofocus" })}</label><label>التاريخ<input name="date" required type="date" value="${dateKey()}" /></label><label class="form-full">السبب أو الملاحظة<textarea name="notes" required maxlength="180" placeholder="مثال: إيداع بداية اليوم"></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ الحركة ${icon("check", 17)}</button></div></form>`); overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog)); bindQuantityControl(overlay.querySelector(".quantity-control"), { min: 0.01, step: 0.01, onChange: () => {} }); overlay.querySelector("#cash-movement-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); await db.createCashMovement({ type, ...values }); await refresh(); closeDialog(); render(); showToast(`تم حفظ ${label}`); } catch (error) { showToast(error.message, "error"); } });
+  /* الإيداع حركة خزنة بسيطة. السحب موجّه بالبند: كل مبلغ يدخل مكانه الصحيح في الحسابات —
+     سحب عادي ⇒ حركة خزنة، مصروف يومي/شهري ⇒ سجل المصروفات بفئته (يخصم من الصندوق تلقائيًا)،
+     سلفة موظف ⇒ مصروف سلفة يُخصم من راتب الموظف المتبقي. لا ازدواج خصم أبدًا. */
+  if (type === "DEPOSIT") {
+    const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حركة صندوق</span><h2>إيداع في الخزنة</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="cash-movement-form" class="form-grid"><label>المبلغ${quantityControlMarkup({ value: "", min: 0.01, step: "0.01", inputAttrs: "name=\"amount\" required autofocus" })}</label><label>التاريخ<input name="date" required type="date" value="${dateKey()}" /></label><label class="form-full">السبب أو الملاحظة<textarea name="notes" required maxlength="180" placeholder="مثال: إيداع بداية اليوم"></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ الإيداع ${icon("check", 17)}</button></div></form>`);
+    overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+    bindQuantityControl(overlay.querySelector(".quantity-control"), { min: 0.01, step: 0.01, onChange: () => {} });
+    overlay.querySelector("#cash-movement-form").addEventListener("submit", async (event) => { event.preventDefault(); try { const values = Object.fromEntries(new FormData(event.currentTarget)); await db.createCashMovement({ type: "DEPOSIT", ...values }); await refresh(); closeDialog(); render(); showToast("تم حفظ الإيداع في الخزنة"); } catch (error) { showToast(error.message, "error"); } });
+    return;
+  }
+  const staff = state.accounts.filter((account) => ["admin", "cashier", "employee"].includes(account.role) && account.isActive);
+  const staffOptions = staff.map((account) => `<option value="${account.id}">${escapeHtml(account.name)} · ${roleLabel(account.role)}${account.jobTitle ? ` · ${escapeHtml(account.jobTitle)}` : ""}</option>`).join("");
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حركة صندوق</span><h2>سحب من الخزنة</h2><p class="dialog__subtext">اختر بند السحب ليدخل المبلغ مكانه الصحيح في الحسابات والتقارير.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="cash-withdrawal-form" class="form-grid"><fieldset class="payment-type form-full"><legend>بند السحب</legend><label><input name="withdrawalKind" type="radio" value="withdrawal" checked /> سحب عادي</label><label><input name="withdrawalKind" type="radio" value="daily" /> مصروف يومي</label><label><input name="withdrawalKind" type="radio" value="monthly" /> مصروف شهري</label><label><input name="withdrawalKind" type="radio" value="advance" /> سلفة موظف</label></fieldset><label>المبلغ${quantityControlMarkup({ value: "", min: 0.01, step: "0.01", inputAttrs: "name=\"amount\" required autofocus" })}</label><label id="cw-date-label">التاريخ<input name="date" required type="date" value="${dateKey()}" /></label><label id="cw-category-field" class="form-full" hidden>فئة المصروف<select name="category"></select></label><label id="cw-staff-field" class="form-full" hidden>الموظف<select name="staffId">${staffOptions}</select></label><p id="cw-advance-note" class="form-full scanner-session-note" hidden></p><label class="form-full">السبب أو الوصف<textarea name="notes" maxlength="180" placeholder="مثال: سحب شخصي، فاتورة كهرباء، سلفة من راتب الشهر..."></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">حفظ السحب ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  bindQuantityControl(overlay.querySelector(".quantity-control"), { min: 0.01, step: 0.01, onChange: () => {} });
+  const form = overlay.querySelector("#cash-withdrawal-form");
+  const categoryField = overlay.querySelector("#cw-category-field");
+  const staffField = overlay.querySelector("#cw-staff-field");
+  const advanceNote = overlay.querySelector("#cw-advance-note");
+  const dateLabel = overlay.querySelector("#cw-date-label");
+  const syncAdvanceNote = () => {
+    if (form.withdrawalKind.value !== "advance") return;
+    const month = String(form.date.value || dateKey()).slice(0, 7);
+    const summary = (state.cashierSalarySummaries || []).find((item) => item.accountId === form.staffId?.value && item.month === month);
+    const account = staff.find((item) => item.id === form.staffId?.value);
+    const salary = toNumber(summary?.monthlySalary ?? account?.monthlySalary);
+    const remaining = summary ? toNumber(summary.remainingSalary) : salary;
+    advanceNote.textContent = salary > 0 ? `راتب ${account?.name || "الموظف"}: ${money(salary)} · المتبقي القابل للسلفة: ${money(remaining)} — تُخصم السلفة من راتبه تلقائيًا.` : "لم يُسجل راتب شهري لهذا الموظف؛ عدّل بيانات حسابه أولًا.";
+  };
+  const syncKind = () => {
+    const kind = form.withdrawalKind.value;
+    const isExpense = kind === "daily" || kind === "monthly";
+    categoryField.hidden = !isExpense;
+    staffField.hidden = kind !== "advance";
+    advanceNote.hidden = kind !== "advance";
+    dateLabel.firstChild.textContent = kind === "monthly" ? "شهر الاستحقاق" : "التاريخ";
+    if (isExpense) { const categories = kind === "monthly" ? MONTHLY_EXPENSE_CATEGORIES : DAILY_EXPENSE_CATEGORIES; form.category.innerHTML = categories.map((category) => `<option value="${category}">${category}</option>`).join(""); }
+    if (kind === "advance") { if (!staff.length) { showToast("أضف حسابًا نشطًا قبل تسجيل السلفة.", "error"); form.withdrawalKind.value = "withdrawal"; syncKind(); return; } syncAdvanceNote(); }
+  };
+  form.querySelectorAll("[name=withdrawalKind]").forEach((input) => input.addEventListener("change", syncKind));
+  form.staffId?.addEventListener("change", syncAdvanceNote);
+  form.date.addEventListener("change", syncAdvanceNote);
+  syncKind();
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(form));
+    const kind = values.withdrawalKind;
+    try {
+      if (kind === "advance") {
+        await db.createExpense({ amount: values.amount, date: values.date, staffId: values.staffId, description: values.notes || "", notes: values.notes, salaryAdvance: true, cashierSalaryAdvance: true, periodType: "daily" });
+        showToast("سُجلت سلفة الموظف وخُصمت من راتبه ومن الصندوق.");
+      } else if (kind === "daily" || kind === "monthly") {
+        await db.createExpense({ amount: values.amount, date: values.date, periodType: kind, category: values.category, description: values.notes || values.category, notes: values.notes });
+        showToast(kind === "monthly" ? "سُجل المصروف الشهري وسيُوزع على أيام شهره." : "سُجل المصروف اليومي وخُصم من الصندوق.");
+      } else {
+        if (!String(values.notes || "").trim()) { showToast("اكتب سبب السحب.", "error"); return; }
+        await db.createCashMovement({ type: "WITHDRAWAL", amount: values.amount, date: values.date, notes: values.notes });
+        showToast("تم حفظ السحب من الخزنة");
+      }
+      await refresh(); closeDialog(); render();
+    } catch (error) { showToast(error.message, "error"); }
+  });
 }
 
 function periodicInventoryDetailsMarkup(audit) {

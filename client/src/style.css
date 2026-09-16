@@ -1890,3 +1890,13 @@ html.is-sales-page .sales-total-bar {
 .icon-button--restock:hover { color:#fff; background:#c42a47; }
 [data-theme="dark"] .icon-button--restock { color:#ff9eb0; background:#3d1a23; border-color:#84132b; }
 [data-theme="dark"] .icon-button--restock:hover { color:#fff; background:#c42a47; }
+
+/* v45: cashbox big action tiles (إيداع/سحب) matching purchases tile design */
+.cash-action-tiles { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.cash-action-tile { display:grid; gap:4px; padding:16px; color:#fff; text-align:right; border-radius:14px; cursor:pointer; }
+.cash-action-tile span { display:flex; align-items:center; gap:6px; font-size:10px; font-weight:700; opacity:.92; }
+.cash-action-tile strong { font-size:20px; }
+.cash-action-tile--deposit { background:linear-gradient(145deg,#1f8a5b,#0c5537); border:1px solid #7fd6ab; box-shadow:0 10px 22px rgba(12,85,55,.25); }
+.cash-action-tile--withdraw { background:linear-gradient(145deg,#c42a47,#84132b); border:1px solid #f28a9c; box-shadow:0 10px 22px rgba(132,19,43,.25); }
+[data-theme="dark"] .cash-action-tile--deposit { border-color:#8ef0c0; }
+[data-theme="dark"] .cash-action-tile--withdraw { border-color:#ff9eb0; }
