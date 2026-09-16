@@ -355,3 +355,54 @@ test("الوضع الداكن: لون اللوحات والحدود يتبع ا�
   const darkRules = css.split("\n").filter((line) => line.includes('[data-theme="dark"]') && !line.includes(':root[data-theme="dark"]')).join("\n");
   assert.doesNotMatch(darkRules, /#1a2d26|#557267|#58756a|#16211c|#122019|#3f5c51/, "قواعد الداكن ما زالت بألوان خضراء ثابتة");
 });
+
+/* ===== v48: النظام خارج التطبيق + بلاطة إضافة موظف + طباعة ومشاركة صورة لطلب الشراء ===== */
+
+test("الوضع خارج التطبيق يتبع النظام: التفضيل المحفوظ يُطبق فقط بعد تسجيل الدخول", () => {
+  const resolved = appJs.slice(appJs.indexOf("function resolvedTheme"), appJs.indexOf("function applyTheme"));
+  assert.match(resolved, /if \(!state\.currentUser\) return systemPrefersDark\(\) \? "dark" : "light";/, "شاشات البداية لا تتبع النظام");
+  // بعد الدخول/الخروج يعاد تطبيق السمة فورًا
+  const login = appJs.slice(appJs.indexOf("async function handleLogin"), appJs.indexOf("async function handleLogin") + 900);
+  assert.match(login, /installAutomaticBackups\(\);\s*applyTheme\(\);/, "لا يطبق تفضيل المستخدم بعد الدخول");
+  const logout = appJs.slice(appJs.indexOf("async function completeLocalLogout"), appJs.indexOf("async function leaveAfterCashierShift"));
+  const applyCount = (logout.match(/applyTheme\(\);/g) || []).length;
+  assert.equal(applyCount, 2, "الخروج وتبديل المستخدم لا يعيدان اتباع النظام");
+  // مراقب تغير سمة النظام يتفاعل أيضًا خارج الجلسة
+  assert.match(appJs, /if \(themePreference\(\) === "system" \|\| !state\.currentUser\) \{ applyTheme\(\); render\(\); \}/, "مراقب النظام لا يعمل خارج الجلسة");
+});
+
+test("سكربت الرأس: لا يفرض الوضع المحفوظ قبل أول رسم إلا بوجود جلسة دخول", async () => {
+  const html = await readFile(new URL("../client/index.html", import.meta.url), "utf8");
+  assert.match(html, /hesabi-active-account-session/, "لا يفحص وجود الجلسة");
+  assert.match(html, /var theme = hasSession && \(stored === "dark" \|\| stored === "light"\) \? stored : \(prefersDark \? "dark" : "light"\);/, "يفرض الوضع المحفوظ حتى بلا جلسة");
+});
+
+test("الحسابات: بلاطة حمراء كبيرة (إضافة موظف) تفتح نافذة الحساب بنوعه وصلاحياته", () => {
+  const markup = appJs.slice(appJs.indexOf("function accountsMarkup"), appJs.indexOf("function activityLogMarkup"));
+  assert.match(markup, /inventory-summary inventory-summary--purchases/, "شبكة البلاطات مفقودة");
+  assert.match(markup, /<button class="po-order-tile" type="button" data-action="new-account"/, "بلاطة إضافة موظف مفقودة");
+  assert.match(markup, /<strong>إضافة موظف<\/strong>/);
+  assert.match(markup, /أدمن · كاشير · موظف وصلاحياته/, "وصف النوع والصلاحيات مفقود");
+  // نافذة الحساب نفسها تحتوي الدور والصلاحيات والراتب
+  const dialogMarkup = appJs.slice(appJs.indexOf("function accountFormMarkup"), appJs.indexOf("function openAccountDialog"));
+  assert.match(dialogMarkup, /ACCOUNT_ROLES\.map/, "قائمة الأدوار مفقودة من نافذة الحساب");
+  assert.match(dialogMarkup, /cashierPermissionsFieldsMarkup\(account\)/, "قسم الصلاحيات مفقود من نافذة الحساب");
+});
+
+test("طلب الشراء: زرا طباعة ومشاركة كصورة قبل الطباعة", () => {
+  const dialog = appJs.slice(appJs.indexOf("function openPurchaseOrderDialog"), appJs.indexOf("function currentMonthDateRange"));
+  assert.match(dialog, /<button id="po-print" class="button button--secondary" type="button">\$\{icon\("receipt", 17\)\}<span>طباعة<\/span>/, "زر الطباعة مفقود");
+  assert.match(dialog, /<button id="po-share-image"[^>]*>\$\{icon\("share", 17\)\}<span>مشاركة صورة<\/span>/, "زر مشاركة الصورة مفقود");
+  assert.match(dialog, /printHtmlDocument\(\{ html: orderHtml\(order\), target: "hesabi-purchase-order" \}\)/, "الطباعة لا تستخدم فاتورة الطلب");
+  assert.match(dialog, /shareOrDownloadImage\(\{ html: orderHtml\(order\), filename: `طلب-شراء-\$\{dateKey\(\)\}\.png`/, "مشاركة الصورة لا تستخدم فاتورة الطلب");
+  // مُصدر الصورة موجود في وحدة PDF ويُنتج PNG عبر نفس مسرح العرض
+  assert.match(appJs, /shareOrDownloadImage, shareOrDownloadInvoicePdf/, "الاستيراد مفقود");
+});
+
+test("pdf-export: تصدير صورة PNG من نفس مسرح PDF مع مشاركة أو تنزيل", async () => {
+  const pdfExport = await readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8");
+  assert.match(pdfExport, /export async function createImageFileFromHtml\(\{ html, filename, page = "a4" \}\)/, "الدالة مفقودة");
+  assert.match(pdfExport, /canvas\.toBlob\(resolve, "image\/png"\)/, "لا يصدر PNG");
+  assert.match(pdfExport, /new File\(\[blob\], filename, \{ type: "image\/png" \}\)/, "ملف الصورة غير صحيح");
+  assert.match(pdfExport, /export async function shareOrDownloadImage\(\{ html, filename, title, page = "a4" \}\) \{ return fileOrDownload\(await createImageFileFromHtml/, "المشاركة/التنزيل مفقودة");
+});

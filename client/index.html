@@ -22,7 +22,10 @@
         try {
           var stored = localStorage.getItem("hesabi-theme");
           var prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-          var theme = stored === "dark" || stored === "light" ? stored : (prefersDark ? "dark" : "light");
+          /* التفضيل المحفوظ يُطبق فقط عند وجود جلسة دخول؛ شاشات البداية وتسجيل الدخول تتبع النظام. */
+          var hasSession = false;
+          try { hasSession = !!(JSON.parse(localStorage.getItem("hesabi-active-account-session") || "{}").accountId); } catch (sessionError) { hasSession = false; }
+          var theme = hasSession && (stored === "dark" || stored === "light") ? stored : (prefersDark ? "dark" : "light");
           document.documentElement.dataset.theme = theme;
           /* لون الخلفية المختار (فاتح|داكن) يُطبَّق قبل أول رسم لمنع أي ومضة لونية. */
           var bg = (localStorage.getItem("hesabi-bg") || "").split("|");

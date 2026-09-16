@@ -997,6 +997,20 @@ export async function createReportPdfFile({ rows, storeName, storeInfo, logoData
   return createPdfFileFromHtml({ html: generatedHtml, filename, page: "a4" });
 }
 
+/* تصدير المحتوى كصورة PNG للمشاركة قبل الطباعة (نفس مسرح PDF لكن بلا تقسيم صفحات). */
+export async function createImageFileFromHtml({ html, filename, page = "a4" }) {
+  await loadCanvasArabicFont();
+  const stage = createPdfStage(html, page);
+  try {
+    await waitForPdfStage(stage);
+    const canvas = await html2canvas(stage, { scale: Math.max(2, window.devicePixelRatio || 1), useCORS: true, backgroundColor: "#ffffff", logging: false, windowWidth: stage.scrollWidth, windowHeight: stage.scrollHeight });
+    if (canvas.width < 2 || canvas.height < 2) throw new Error("تعذر رسم محتوى الطلب كصورة.");
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob || blob.size < 800) throw new Error("تعذر إنشاء ملف الصورة.");
+    return new File([blob], filename, { type: "image/png" });
+  } finally { stage.remove(); }
+}
+export async function shareOrDownloadImage({ html, filename, title, page = "a4" }) { return fileOrDownload(await createImageFileFromHtml({ html, filename, page }), title); }
 export async function shareOrDownloadPdf({ html, filename, title, page = "a4" }) { return fileOrDownload(await createPdfFileFromHtml({ html, filename, page }), title); }
 export async function shareOrDownloadReportPdf(options) { return fileOrDownload(await createReportPdfFile(options), options.title); }
 export async function shareOrDownloadInvoicePdf(options) { return fileOrDownload(await createThermalInvoicePdfFile(options), options.title); }

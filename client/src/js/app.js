@@ -11,7 +11,7 @@ import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { renderPurchaseInvoiceHtml } from "./purchase-invoice-print.js";
 import { getExitGuardAction, leaveAfterExitConfirmation, primeExitGuardHistory } from "./navigation-guard.js";
 import { randomId } from "./ids.js";
-import { createPdfFileFromHtml, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadInvoicePdf, shareOrDownloadPdf, shareOrDownloadPurchaseInvoicePdf } from "./pdf-export.js";
+import { createPdfFileFromHtml, printHtmlDocument, shareOrDownloadCustomerAccountPdf, shareOrDownloadImage, shareOrDownloadInvoicePdf, shareOrDownloadPdf, shareOrDownloadPurchaseInvoicePdf } from "./pdf-export.js";
 import { CASHIER_CONFIGURABLE_PERMISSIONS, DEFAULT_CASHIER_ALLOWED_VIEWS, canAccessView, canUseAction, isAdmin } from "./permissions.js";
 import { shortRandomId } from "./ids.js";
 import { createBarcodeWorkbook, createPurchaseWorkbook, parseBarcodeFile } from "./barcode-file.js";
@@ -347,6 +347,7 @@ async function completeLocalLogout() {
   state.activeCashierShift = null;
   state.cart = [];
   state.view = "sales";
+  applyTheme();
   closeDialog();
   render();
   showToast("تم تسجيل الخروج.");
@@ -359,6 +360,7 @@ async function switchLocalUser() {
   state.activeCashierShift = null;
   state.cart = [];
   state.view = "sales";
+  applyTheme();
   closeDialog();
   render();
   showToast("اختر المستخدم التالي لتسجيل الدخول.");
@@ -707,6 +709,8 @@ function themePreference() {
 }
 function resolvedTheme() {
   const preference = themePreference();
+  /* شاشة البداية وتسجيل الدخول تتبعان ضبط الجهاز دائمًا؛ التفضيل المحفوظ يُطبق داخل التطبيق فقط. */
+  if (!state.currentUser) return systemPrefersDark() ? "dark" : "light";
   return preference === "system" ? (systemPrefersDark() ? "dark" : "light") : preference;
 }
 
@@ -740,7 +744,7 @@ function watchSystemTheme() {
   if (systemThemeWatcherBound || typeof window === "undefined" || !window.matchMedia) return;
   systemThemeWatcherBound = true;
   const query = window.matchMedia("(prefers-color-scheme: dark)");
-  const onChange = () => { if (themePreference() === "system") { applyTheme(); render(); } };
+  const onChange = () => { if (themePreference() === "system" || !state.currentUser) { applyTheme(); render(); } };
   if (query.addEventListener) query.addEventListener("change", onChange);
   else if (query.addListener) query.addListener(onChange);
 }
@@ -1296,7 +1300,7 @@ function purchasesMarkup() {
 function openPurchaseOrderDialog() {
   if (!state.suppliers.length) { showToast("أضف موردًا واحدًا على الأقل لعمل طلب شراء.", "error"); openSupplierDialog(); return; }
   const itemRow = () => `<div class="po-line"><div class="po-line__name-wrap"><input class="po-line__name" dir="rtl" placeholder="اسم الصنف المطلوب" aria-label="اسم الصنف" autocomplete="off" /><div class="po-suggest" hidden></div></div><input class="po-line__qty" type="number" inputmode="decimal" min="0" step="1" placeholder="الكمية" aria-label="الكمية" /><select class="po-line__unit" aria-label="بالحبة أو بالعبوة">${PACKAGE_UNITS.map((unit) => `<option value="${unit}">${unit}</option>`).join("")}</select><button class="icon-button icon-button--danger po-line__remove" type="button" aria-label="حذف السطر">${icon("close", 16)}</button></div>`;
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">مراسلة المورد</span><h2>طلب شراء</h2><p class="dialog__subtext">اختر المورد واكتب الأصناف والكميات، ثم أرسل الطلب واتساب على رقمه المسجل أو كملف PDF.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="purchase-order-form" class="form-grid"><label class="form-full">المورد<select id="po-supplier" required><option value="">اختر المورد</option>${state.suppliers.map((supplier) => `<option value="${supplier.id}">${escapeHtml(supplier.name)}${supplier.phone ? ` — ${escapeHtml(supplier.phone)}` : " — بلا رقم مسجل"}</option>`).join("")}</select></label><div class="form-full"><div class="section-caption"><span class="eyebrow">البضاعة المطلوبة</span><strong>الأصناف والكميات</strong></div><div id="po-lines">${itemRow()}${itemRow()}</div><button id="po-add-line" class="button button--secondary" type="button">${icon("plus", 16)}<span>إضافة صنف</span></button></div><label class="form-full">ملاحظات للمورد<textarea id="po-notes" dir="rtl" placeholder="اختياري: موعد التوصيل، طريقة الدفع..."></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button id="po-send-whatsapp" class="button button--primary" type="button">${icon("whatsapp", 17)}<span>واتساب</span></button><button id="po-send-sms" class="button button--secondary" type="button">${icon("phone", 17)}<span>رسالة نصية</span></button><button id="po-send-pdf" class="button button--secondary" type="button">${icon("share", 17)}<span>إرسال PDF</span></button></div></form>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">مراسلة المورد</span><h2>طلب شراء</h2><p class="dialog__subtext">اختر المورد واكتب الأصناف والكميات، ثم أرسل الطلب واتساب على رقمه المسجل أو كملف PDF.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="purchase-order-form" class="form-grid"><label class="form-full">المورد<select id="po-supplier" required><option value="">اختر المورد</option>${state.suppliers.map((supplier) => `<option value="${supplier.id}">${escapeHtml(supplier.name)}${supplier.phone ? ` — ${escapeHtml(supplier.phone)}` : " — بلا رقم مسجل"}</option>`).join("")}</select></label><div class="form-full"><div class="section-caption"><span class="eyebrow">البضاعة المطلوبة</span><strong>الأصناف والكميات</strong></div><div id="po-lines">${itemRow()}${itemRow()}</div><button id="po-add-line" class="button button--secondary" type="button">${icon("plus", 16)}<span>إضافة صنف</span></button></div><label class="form-full">ملاحظات للمورد<textarea id="po-notes" dir="rtl" placeholder="اختياري: موعد التوصيل، طريقة الدفع..."></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button id="po-send-whatsapp" class="button button--primary" type="button">${icon("whatsapp", 17)}<span>واتساب</span></button><button id="po-send-sms" class="button button--secondary" type="button">${icon("phone", 17)}<span>رسالة نصية</span></button><button id="po-send-pdf" class="button button--secondary" type="button">${icon("share", 17)}<span>إرسال PDF</span></button><button id="po-print" class="button button--secondary" type="button">${icon("receipt", 17)}<span>طباعة</span></button><button id="po-share-image" class="button button--secondary" type="button">${icon("share", 17)}<span>مشاركة صورة</span></button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   const linesHost = overlay.querySelector("#po-lines");
   const bindRemove = (row) => row.querySelector(".po-line__remove").addEventListener("click", () => { if (linesHost.children.length > 1) row.remove(); else { row.querySelector(".po-line__name").value = ""; row.querySelector(".po-line__qty").value = ""; } });
@@ -1365,6 +1369,20 @@ function openPurchaseOrderDialog() {
       if (order.supplier.phone) sendWhatsAppExact(order.supplier.phone, "");
     } catch (error) { if (error?.name !== "AbortError") showToast("تعذر تجهيز ملف PDF لطلب الشراء.", "error"); }
     button.disabled = false;
+  });
+  overlay.querySelector("#po-print").addEventListener("click", () => {
+    const order = validate(); if (!order) return;
+    printHtmlDocument({ html: orderHtml(order), target: "hesabi-purchase-order" });
+    showToast("أُرسل طلب الشراء للطباعة.");
+  });
+  overlay.querySelector("#po-share-image").addEventListener("click", async (event) => {
+    const order = validate(); if (!order) return;
+    const button = event.currentTarget; button.disabled = true;
+    try {
+      const result = await shareOrDownloadImage({ html: orderHtml(order), filename: `طلب-شراء-${dateKey()}.png`, title: `طلب شراء — ${order.supplier.name}` });
+      if (result === "downloaded") showToast("نُزّلت صورة الطلب — شاركها أو اطبعها.");
+    } catch (error) { if (error?.name !== "AbortError") showToast(error.message || "تعذر إنشاء صورة الطلب.", "error"); }
+    finally { button.disabled = false; }
   });
 }
 
@@ -1752,6 +1770,7 @@ function accountsMarkup() {
   const accounts = state.accounts;
   const salaryByStaff = new Map((state.cashierSalarySummaries || []).map((summary) => [summary.accountId, summary]));
   return `${topbarMarkup("الحسابات والصلاحيات", "أدر حسابات فريقك وحدد من يرى البيانات المالية ومن يقتصر على البيع.", `<button class="button button--primary" data-action="new-account">${icon("plus", 18)}<span>إضافة حساب</span></button>`)}
+  <section class="inventory-summary inventory-summary--purchases"><div><span>حسابات الفريق</span><strong>${amount(accounts.length)} حساب</strong></div><div><span>النشطون</span><strong>${amount(accounts.filter((account) => account.isActive).length)} نشط</strong></div><button class="po-order-tile" type="button" data-action="new-account" aria-label="إضافة موظف جديد وتحديد نوعه وصلاحياته"><span>${icon("plus", 15)} أدمن · كاشير · موظف وصلاحياته</span><strong>إضافة موظف</strong></button></section>
   <section class="panel account-list"><div class="panel__head"><div><span class="eyebrow">فريق المتجر</span><h2>الحسابات المحلية</h2></div><small>الأدمن: كامل الصلاحيات · الكاشير: صلاحيات مخصصة (الافتراضي مبيعات وفواتيرها فقط) · لكل حساب راتب شهري اختياري</small></div>${accounts.map((account) => { const salary = salaryByStaff.get(account.id); const isPayrollAccount = ["admin", "cashier", "employee"].includes(account.role); const salaryAction = isPayrollAccount && account.isActive && toNumber(salary?.monthlySalary) > 0 ? (salary?.salaryDelivered ? `<small class="status status--available">تم تسليم الراتب</small>` : `<button class="button button--secondary button--compact" data-action="settle-staff-salary" data-id="${account.id}">تسليم الراتب</button>`) : ""; return `<article class="account-row"><div class="account-row__icon">${icon("users", 20)}</div><div class="account-row__main"><strong>${escapeHtml(account.name)}</strong><small dir="ltr">${escapeHtml(account.username)}</small>${account.jobTitle ? `<small class="account-job-title">${escapeHtml(account.jobTitle)}</small>` : ""}${isPayrollAccount ? `<small class="account-salary-note">راتب الشهر ${money(salary?.monthlySalary ?? account.monthlySalary ?? 0)} · السلف ${money(salary?.advances || 0)} · خصم العجز ${money(salary?.shortageDeductions || 0)} · المتبقي ${money(salary?.remainingSalary || 0)}</small>` : ""}${cashierPermissionsSummaryMarkup(account)}</div><span class="account-badge account-badge--${account.role}">${roleLabel(account.role)}</span><span class="status status--${account.isActive ? "available" : "empty"}">${account.isActive ? "نشط" : "موقوف"}</span><div class="entity-row__actions">${salaryAction}<button class="icon-button" data-action="reset-account-pin" data-id="${account.id}" aria-label="إعادة تعيين رمز دخول ${escapeHtml(account.name)}">${icon("key", 18)}</button><button class="icon-button" data-action="open-account" data-id="${account.id}" aria-label="تعديل ${escapeHtml(account.name)}">${icon("dots", 18)}</button>${account.role === "cashier" && account.isActive ? `<button class="icon-button icon-button--danger" data-action="delete-cashier-account" data-id="${account.id}" aria-label="حذف الكاشير ${escapeHtml(account.name)}">${icon("trash", 18)}</button>` : ""}</div></article>`; }).join("")}</section>`;
 }
 
@@ -2244,6 +2263,7 @@ async function handleLogin(event) {
     state.currentUser = await db.authenticateAccount(values);
     await db.savePersistentSession(state.currentUser.id);
     installAutomaticBackups();
+    applyTheme();
     await refresh();
     state.view = state.currentUser.role === "admin" ? "dashboard" : "sales";
     render();
