@@ -42,6 +42,32 @@ test("نافذة توصيل النواقص: كمية قابلة للتعديل �
   assert.match(reorder, /data-reorder-share="\$\{key\}"/, "لا بديل مشاركة عند غياب رقم المورد");
 });
 
+test("صفحة المشتريات: زر «طلب شراء» مماثل بجوار زر فاتورة الشراء ونافذته كاملة", () => {
+  // الزر التوأم بنفس فئة الشكل button--primary في نفس شريط الصفحة
+  assert.match(appJs, /data-action="new-purchase">\$\{icon\("plus", 18\)\}<span>فاتورة شراء<\/span><\/button><button class="button button--primary" data-action="new-purchase-order">\$\{icon\("truck", 18\)\}<span>طلب شراء<\/span><\/button>/, "زر طلب الشراء ليس بجوار زر فاتورة الشراء أو يختلف شكله");
+  assert.match(appJs, /if \(action === "new-purchase-order"\) \{ openPurchaseOrderDialog\(\); return; \}/, "إجراء فتح النافذة مفقود");
+  const dialog = appJs.slice(appJs.indexOf("function openPurchaseOrderDialog()"), appJs.indexOf("function currentMonthDateRange()"));
+  assert.ok(dialog.length > 800, "تعذر استخراج نافذة طلب الشراء");
+  // خانات النافذة: مورد، أصناف بكمية، إرسال واتساب وPDF
+  assert.match(dialog, /id="po-supplier"/, "لا خانة اختيار المورد");
+  assert.match(dialog, /po-line__name/, "لا خانة اسم الصنف");
+  assert.match(dialog, /po-line__qty/, "لا خانة الكمية");
+  assert.match(dialog, /id="po-add-line"/, "لا زر إضافة صنف");
+  assert.match(dialog, /id="po-send-whatsapp"/, "لا زر إرسال واتساب");
+  assert.match(dialog, /id="po-send-pdf"/, "لا زر إرسال PDF");
+  // الإرسال بالرقم كما هو مسجل تمامًا وليس عبر الدالة المطبعة
+  assert.match(dialog, /sendWhatsAppExact\(order\.supplier\.phone, orderText\(order\)\)/, "الواتساب لا يستخدم الرقم كما هو");
+  assert.doesNotMatch(dialog, /whatsAppHref\(|sendWhatsAppMessage\(/, "نافذة طلب الشراء تستخدم الدالة المطبعة للرقم");
+  // PDF عبر مسار المشاركة الموجود وجدول بالكمية
+  assert.match(dialog, /shareOrDownloadPdf\(\{ html: orderHtml\(order\)/, "لا مسار PDF");
+  assert.match(dialog, /<th>الكمية<\/th>/, "جدول PDF بلا عمود الكمية");
+  // لا مساس بالمخزون أو القاعدة: النافذة مراسلة فقط
+  assert.doesNotMatch(dialog, /db\.(completeSale|createPurchase|adjust|createProduct)/, "نافذة الطلب تكتب في القاعدة");
+  // أنماط الأسطر موجودة مع دعم الوضع الداكن
+  assert.match(css, /\.po-line \{ display:grid; grid-template-columns:minmax\(0,1fr\) 88px auto/, "أنماط سطر الطلب مفقودة");
+  assert.match(css, /\[data-theme="dark"\] \.po-line__name/, "لا دعم للوضع الداكن في النافذة");
+});
+
 test("خانتا الخدمات الثابتتان أعلى قائمة البيع مع أنماطهما", () => {
   assert.match(appJs, /class="sales-service-tiles"/, "حاوية الخانتين مفقودة من قالب المبيعات");
   assert.match(appJs, /data-action="add-service-line" data-service="instant-topup"/, "خانة الشحن الفوري مفقودة");

@@ -1227,9 +1227,61 @@ function customerPaymentsMarkup({ embedded = false } = {}) {
 }
 
 function purchasesMarkup() {
-  return `${topbarMarkup("المشتريات", "أنشئ فاتورة شراء لزيادة المخزون وتثبيت تكلفة المنتجات، مع إمكانية ربط المورد عند توفره.", `<button class="button button--primary" data-action="new-purchase">${icon("plus", 18)}<span>فاتورة شراء</span></button>`)}
+  return `${topbarMarkup("المشتريات", "أنشئ فاتورة شراء لزيادة المخزون وتثبيت تكلفة المنتجات، مع إمكانية ربط المورد عند توفره.", `<button class="button button--primary" data-action="new-purchase">${icon("plus", 18)}<span>فاتورة شراء</span></button><button class="button button--primary" data-action="new-purchase-order">${icon("truck", 18)}<span>طلب شراء</span></button>`)}
   <section class="inventory-summary"><div><span>إجمالي المشتريات</span><strong>${money(state.analytics?.purchases.total || 0)}</strong></div><div><span>فواتير الشراء</span><strong>${amount(state.purchases.length)} فاتورة</strong></div></section>
   <section class="panel invoice-list">${state.purchases.length ? state.purchases.map((purchase) => `<button class="invoice-row" data-action="open-purchase" data-id="${purchase.id}"><div class="invoice-row__mark invoice-row__mark--purchase">${icon("truck", 20)}</div><div class="invoice-row__main"><strong>${purchase.invoiceNumber}</strong><small>${escapeHtml(purchase.supplierName)} · ${dateTime(purchase.date)}</small></div><strong>${money(purchase.total)}</strong>${icon("arrow", 18)}</button>`).join("") : emptyState("لا توجد فواتير شراء", "سجّل أول فاتورة شراء لزيادة المخزون، مع المورد أو بدونه.", "new-purchase")}</section>`;
+}
+
+/* طلب شراء: اختيار المورد وكتابة الأصناف والكميات ثم الإرسال واتساب (بالرقم كما هو مسجل) أو PDF.
+   لا يمس المخزون ولا الحسابات — مجرد مراسلة منسقة للمورد. */
+function openPurchaseOrderDialog() {
+  if (!state.suppliers.length) { showToast("أضف موردًا واحدًا على الأقل لعمل طلب شراء.", "error"); openSupplierDialog(); return; }
+  const productOptions = state.products.map((product) => `<option value="${escapeHtml(product.name)}"></option>`).join("");
+  const itemRow = () => `<div class="po-line"><input class="po-line__name" list="po-products" dir="rtl" placeholder="اسم الصنف المطلوب" aria-label="اسم الصنف" /><input class="po-line__qty" type="number" inputmode="decimal" min="0" step="1" placeholder="الكمية" aria-label="الكمية" /><button class="icon-button icon-button--danger po-line__remove" type="button" aria-label="حذف السطر">${icon("close", 16)}</button></div>`;
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">مراسلة المورد</span><h2>طلب شراء</h2><p class="dialog__subtext">اختر المورد واكتب الأصناف والكميات، ثم أرسل الطلب واتساب على رقمه المسجل أو كملف PDF.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="purchase-order-form" class="form-grid"><label class="form-full">المورد<select id="po-supplier" required><option value="">اختر المورد</option>${state.suppliers.map((supplier) => `<option value="${supplier.id}">${escapeHtml(supplier.name)}${supplier.phone ? ` — ${escapeHtml(supplier.phone)}` : " — بلا رقم مسجل"}</option>`).join("")}</select></label><datalist id="po-products">${productOptions}</datalist><div class="form-full"><div class="section-caption"><span class="eyebrow">البضاعة المطلوبة</span><strong>الأصناف والكميات</strong></div><div id="po-lines">${itemRow()}${itemRow()}</div><button id="po-add-line" class="button button--secondary" type="button">${icon("plus", 16)}<span>إضافة صنف</span></button></div><label class="form-full">ملاحظات للمورد<textarea id="po-notes" dir="rtl" placeholder="اختياري: موعد التوصيل، طريقة الدفع..."></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button id="po-send-whatsapp" class="button button--primary" type="button">${icon("whatsapp", 17)}<span>إرسال واتساب</span></button><button id="po-send-pdf" class="button button--secondary" type="button">${icon("share", 17)}<span>إرسال PDF</span></button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  const linesHost = overlay.querySelector("#po-lines");
+  const bindRemove = (row) => row.querySelector(".po-line__remove").addEventListener("click", () => { if (linesHost.children.length > 1) row.remove(); else { row.querySelector(".po-line__name").value = ""; row.querySelector(".po-line__qty").value = ""; } });
+  linesHost.querySelectorAll(".po-line").forEach(bindRemove);
+  overlay.querySelector("#po-add-line").addEventListener("click", () => { linesHost.insertAdjacentHTML("beforeend", itemRow()); const row = linesHost.lastElementChild; bindRemove(row); row.querySelector(".po-line__name").focus(); });
+  const selectedSupplier = () => state.suppliers.find((supplier) => supplier.id === overlay.querySelector("#po-supplier").value) || null;
+  const collectLines = () => [...linesHost.querySelectorAll(".po-line")].map((row) => ({ name: row.querySelector(".po-line__name").value.trim(), quantity: Math.max(0, toNumber(row.querySelector(".po-line__qty").value)) })).filter((line) => line.name && line.quantity > 0);
+  const unitOf = (name) => state.products.find((product) => product.name === name)?.unit || "";
+  const validate = () => {
+    const supplier = selectedSupplier();
+    if (!supplier) { showToast("اختر المورد أولًا.", "error"); overlay.querySelector("#po-supplier").focus(); return null; }
+    const lines = collectLines();
+    if (!lines.length) { showToast("اكتب صنفًا واحدًا على الأقل مع كميته.", "error"); linesHost.querySelector(".po-line__name")?.focus(); return null; }
+    return { supplier, lines, notes: overlay.querySelector("#po-notes").value.trim() };
+  };
+  const orderText = ({ supplier, lines, notes }) => [
+    `طلب شراء من ${storeDisplayName()}`,
+    `إلى المورد: ${supplier.name}`,
+    `التاريخ: ${dateKey()}`,
+    "",
+    "البضاعة المطلوبة:",
+    ...lines.map((line, index) => `${index + 1}. ${line.name} — الكمية: ${amount(line.quantity)}${unitOf(line.name) ? ` ${unitOf(line.name)}` : ""}`),
+    "",
+    `إجمالي الأصناف: ${lines.length}`,
+    ...(notes ? [`ملاحظات: ${notes}`] : []),
+    "نرجو التجهيز والتوصيل، وشكرًا.",
+  ].join("\n");
+  const orderHtml = ({ supplier, lines, notes }) => `<!doctype html><html dir="rtl" lang="ar"><head><meta charset="utf-8" /><style>body{font-family:Arial,sans-serif;margin:24px;color:#17342d;}h1{font-size:20px;margin:0 0 2px;}h2{font-size:15px;margin:0 0 14px;color:#1f6b59;}table{width:100%;border-collapse:collapse;margin-top:12px;}th,td{border:1px solid #b9cdbf;padding:8px 10px;font-size:13px;text-align:right;}th{background:#e7f1eb;}tfoot td{font-weight:bold;background:#f8f0df;}p.note{margin-top:16px;font-size:12px;color:#555;}</style></head><body><h1>طلب شراء — ${escapeHtml(storeDisplayName())}</h1><h2>إلى المورد: ${escapeHtml(supplier.name)}${supplier.phone ? ` · <span dir="ltr">${escapeHtml(supplier.phone)}</span>` : ""} · التاريخ: ${dateKey()}</h2><table><thead><tr><th>#</th><th>الصنف</th><th>الكمية</th><th>الوحدة</th></tr></thead><tbody>${lines.map((line, index) => `<tr><td>${index + 1}</td><td>${escapeHtml(line.name)}</td><td>${amount(line.quantity)}</td><td>${escapeHtml(unitOf(line.name) || "—")}</td></tr>`).join("")}</tbody><tfoot><tr><td colspan="4">إجمالي الأصناف: ${lines.length}</td></tr></tfoot></table>${notes ? `<p class="note">ملاحظات: ${escapeHtml(notes)}</p>` : ""}<p class="note">نرجو التجهيز والتوصيل، وشكرًا.</p></body></html>`;
+  overlay.querySelector("#po-send-whatsapp").addEventListener("click", () => {
+    const order = validate(); if (!order) return;
+    if (!order.supplier.phone) { showToast("لا يوجد رقم مسجل لهذا المورد — أضف رقمه أولًا.", "error"); return; }
+    sendWhatsAppExact(order.supplier.phone, orderText(order));
+  });
+  overlay.querySelector("#po-send-pdf").addEventListener("click", async (event) => {
+    const order = validate(); if (!order) return;
+    const button = event.currentTarget; button.disabled = true;
+    try {
+      const result = await shareOrDownloadPdf({ html: orderHtml(order), filename: `طلب-شراء-${dateKey()}.pdf`, title: `طلب شراء — ${order.supplier.name}` });
+      if (result === "downloaded") showToast("نُزّل ملف PDF — أرسله للمورد عبر واتساب.");
+      if (order.supplier.phone) sendWhatsAppExact(order.supplier.phone, "");
+    } catch (error) { if (error?.name !== "AbortError") showToast("تعذر تجهيز ملف PDF لطلب الشراء.", "error"); }
+    button.disabled = false;
+  });
 }
 
 function currentMonthDateRange() { const now = new Date(); const year = now.getFullYear(); const month = now.getMonth(); const pad = (value) => String(value).padStart(2, "0"); return { from: `${year}-${pad(month + 1)}-01`, to: `${year}-${pad(new Date(year, month + 1, 0).getDate())}` }; }
@@ -2199,6 +2251,7 @@ async function handleActionUnsafe(event) {
   if (action === "delete-supplier") { deleteSupplier(id); return; }
   if (action === "new-supplier-payment") { openSupplierPaymentDialog(); return; }
   if (action === "record-supplier-payment") { openSupplierPaymentDialog(id); return; }
+  if (action === "new-purchase-order") { openPurchaseOrderDialog(); return; }
   if (action === "new-purchase") { openPurchaseEntryDialog(); return; }
   if (action === "open-purchase") { openPurchaseDialog(id); return; }
   if (action === "purchase-return") { openPurchaseReturnDialog(id); return; }

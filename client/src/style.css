@@ -1851,3 +1851,12 @@ html.is-sales-page .sales-total-bar {
 [data-theme="dark"] .reorder-line { background:#1a2d26; border-color:#3f5c51; }
 [data-theme="dark"] .reorder-line__info small, [data-theme="dark"] .reorder-line__qty span, [data-theme="dark"] .reorder-line__qty small { color:#9db8ad; }
 [data-theme="dark"] .reorder-line__qty input { color:#e6f4ea; background:#122019; border-color:#3f5c51; }
+
+/* ═══ نافذة طلب الشراء: أسطر صنف/كمية مع حذف وإضافة ═══ */
+#po-lines { display:grid; gap:8px; margin-bottom:8px; }
+.po-line { display:grid; grid-template-columns:minmax(0,1fr) 88px auto; align-items:center; gap:8px; }
+.po-line__name, .po-line__qty { height:44px; padding:0 10px; border:1px solid rgba(31,107,89,.25); border-radius:11px; background:#fffefa; font:inherit; }
+.po-line__qty { direction:ltr; text-align:center; font-weight:800; }
+.po-line__remove { flex:0 0 auto; }
+#po-add-line { min-height:40px; }
+[data-theme="dark"] .po-line__name, [data-theme="dark"] .po-line__qty { color:#e6f4ea; background:#122019; border-color:#3f5c51; }
