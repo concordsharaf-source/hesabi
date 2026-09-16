@@ -1884,3 +1884,9 @@ html.is-sales-page .sales-total-bar {
 [data-theme="dark"] .po-suggest__item { border-bottom-color:#2b3d35; }
 [data-theme="dark"] .po-suggest__item:hover { background:#1f322a; }
 [data-theme="dark"] .po-suggest__item strong { color:#e6f4ea; }
+
+/* ═══ زر طلب التوريد بجانب المنتج الناقص/النافد ═══ */
+.icon-button--restock { color:#84132b; background:#fbe3e8; border:1px solid #f28a9c; }
+.icon-button--restock:hover { color:#fff; background:#c42a47; }
+[data-theme="dark"] .icon-button--restock { color:#ff9eb0; background:#3d1a23; border-color:#84132b; }
+[data-theme="dark"] .icon-button--restock:hover { color:#fff; background:#c42a47; }

@@ -93,6 +93,45 @@ test("اقتراح الأصناف في طلب الشراء: كل المنتجا�
   assert.match(css, /\[data-theme="dark"\] \.po-suggest \{/, "لا دعم للوضع الداكن في الاقتراحات");
 });
 
+test("زر طلب توريد بجانب المنتج الناقص/النافد يفتح نافذة موجهة لمورده المرتبط", () => {
+  // الزر يظهر فقط عند النقص أو النفاد
+  assert.match(appJs, /function supplyRequestButton\(product\) \{\n  if \(toNumber\(product\.quantity\) > toNumber\(product\.minimumStock\)\) return "";/, "الزر لا يقتصر على الناقص والنافد");
+  assert.match(appJs, /data-action="product-supply-request" data-id="\$\{product\.id\}"/, "زر الطلب بلا إجراء أو معرف");
+  // موجود في صف المخزون وبطاقة المنتج
+  assert.match(appJs, /\$\{productSupplierActions\(product\)\}\$\{supplyRequestButton\(product\)\}<button class="button button--secondary" data-action="count-stock"/, "الزر مفقود من صف المخزون");
+  assert.match(appJs, /\$\{productSupplierActions\(product\)\}\$\{supplyRequestButton\(product\)\}<\/div><\/article>/, "الزر مفقود من بطاقة المنتج");
+  assert.match(appJs, /if \(action === "product-supply-request"\) \{ openProductSupplyRequestDialog\(id\); return; \}/, "إجراء فتح النافذة مفقود");
+  const dialog = appJs.slice(appJs.indexOf("function openProductSupplyRequestDialog("), appJs.indexOf("function openReorderDialog()"));
+  assert.ok(dialog.length > 500, "تعذر استخراج نافذة توريد المنتج");
+  // المورد المرتبط محدد مسبقًا، ومع غيابه تظهر القائمة الكاملة مع تلميح
+  assert.match(dialog, /state\.productSuppliers\?\.\[product\.id\]/, "النافذة لا تقرأ المورد المرتبط");
+  assert.match(dialog, /\$\{linked\?\.id === supplier\.id \? "selected" : ""\}/, "المورد المرتبط غير محدد مسبقًا في القائمة");
+  assert.match(dialog, /غير مرتبط بمورد بعد/, "لا تلميح عند غياب المورد المرتبط");
+  // كمية مقترحة وواتساب وSMS بالرقم كما هو
+  assert.match(dialog, /id="psr-qty"[^>]*value="\$\{suggested\}"/, "لا كمية مقترحة");
+  assert.match(dialog, /sendWhatsAppExact\(order\.supplier\.phone, requestText\(order\)\)/, "واتساب لا يستخدم الرقم كما هو");
+  assert.match(dialog, /sendSmsExact\(order\.supplier\.phone, requestText\(order\)\)/, "لا زر رسالة نصية");
+  assert.doesNotMatch(dialog, /db\.(completeSale|createPurchase|adjust)/, "النافذة تكتب في القاعدة");
+  assert.match(css, /\.icon-button--restock \{/, "أنماط زر التوريد مفقودة");
+  assert.match(css, /\[data-theme="dark"\] \.icon-button--restock \{/, "لا دعم للوضع الداكن للزر");
+});
+
+test("رسالة SMS بالرقم كما هو مسجل في كل مسارات الطلبات بجانب واتساب", () => {
+  // الدالة: أرقام فقط بلا + عبر بروتوكول sms:
+  assert.match(appJs, /const smsExactHref = \(phone, text = ""\) => \{/, "دالة SMS مفقودة");
+  const fn = appJs.slice(appJs.indexOf("const smsExactHref"), appJs.indexOf("const whatsAppHref"));
+  assert.match(fn, /replace\(\/\\D\/g, ""\)/, "رقم SMS لا يُنظف إلى أرقام فقط");
+  assert.match(fn, /`sms:\$\{digits\}\$\{text \? `\?body=\$\{encodeURIComponent\(text\)\}` : ""\}`/, "رابط SMS لا يستخدم الأرقام الخام مع نص الرسالة");
+  assert.doesNotMatch(fn, /replace\(\/\^00\/, "\+"\)/, "دالة SMS تطبع الرقم — المطلوب كما هو");
+  // زر SMS في نافذة النواقص المجمعة ونافذة طلب الشراء
+  const reorder = appJs.slice(appJs.indexOf("function openReorderDialog()"), appJs.indexOf("function inventoryMarkup()"));
+  assert.match(reorder, /data-reorder-send-sms="\$\{key\}"/, "زر SMS مفقود من نافذة النواقص");
+  assert.match(reorder, /sendSmsExact\(group\.supplier\?\.phone, orderText\(group, lines\)\)/, "SMS النواقص لا يرسل نص الطلب");
+  const po = appJs.slice(appJs.indexOf("function openPurchaseOrderDialog()"), appJs.indexOf("function currentMonthDateRange()"));
+  assert.match(po, /id="po-send-sms"/, "زر SMS مفقود من نافذة طلب الشراء");
+  assert.match(po, /sendSmsExact\(order\.supplier\.phone, orderText\(order\)\)/, "SMS طلب الشراء لا يرسل نص الطلب");
+});
+
 test("خانتا الخدمات الثابتتان أعلى قائمة البيع مع أنماطهما", () => {
   assert.match(appJs, /class="sales-service-tiles"/, "حاوية الخانتين مفقودة من قالب المبيعات");
   assert.match(appJs, /data-action="add-service-line" data-service="instant-topup"/, "خانة الشحن الفوري مفقودة");

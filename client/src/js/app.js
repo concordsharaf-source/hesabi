@@ -183,6 +183,17 @@ function sendWhatsAppExact(phone, text) {
   if (href) window.open(href, "_blank", "noopener,noreferrer");
   else showToast("لا يوجد رقم هاتف مسجل لهذا المورد.", "error");
 }
+/* رسالة SMS بالرقم كما هو مسجل تمامًا: أرقام فقط بلا + — نفس مبدأ واتساب المورد. */
+const smsExactHref = (phone, text = "") => {
+  const digits = String(phone || "").trim().replace(/\D/g, "");
+  if (!digits) return "";
+  return `sms:${digits}${text ? `?body=${encodeURIComponent(text)}` : ""}`;
+};
+function sendSmsExact(phone, text) {
+  const href = smsExactHref(phone, text);
+  if (href) window.location.href = href;
+  else showToast("لا يوجد رقم هاتف مسجل لهذا المورد.", "error");
+}
 const whatsAppHref = (phone, text = "") => {
   const raw = String(phone || "").trim();
   const digits = raw.replace(/[^0-9+]/g, "");
@@ -1014,13 +1025,48 @@ function productRow(product) {
 }
 
 function productCard(product) {
-  return `<article class="product-card"><button class="product-card__main" data-action="open-product" data-id="${product.id}"><div><strong dir="rtl">${escapeHtml(product.name)}</strong><small dir="auto">${product.internalCode || product.barcode || "دون رمز"}</small>${expiryMeterMarkup(product)}</div>${formatStatus(product)}</button><div class="product-card__meta"><span>${money(product.salePrice)}</span><span>${amount(product.quantity)} ${escapeHtml(product.unit)}</span>${productSupplierActions(product)}</div></article>`;
+  return `<article class="product-card"><button class="product-card__main" data-action="open-product" data-id="${product.id}"><div><strong dir="rtl">${escapeHtml(product.name)}</strong><small dir="auto">${product.internalCode || product.barcode || "دون رمز"}</small>${expiryMeterMarkup(product)}</div>${formatStatus(product)}</button><div class="product-card__meta"><span>${money(product.salePrice)}</span><span>${amount(product.quantity)} ${escapeHtml(product.unit)}</span>${productSupplierActions(product)}${supplyRequestButton(product)}</div></article>`;
 }
 
 function productSupplierActions(product) {
   const supplier = state.productSuppliers?.[product.id];
   if (!supplier) return "";
   return `<div class="product-supplier-actions"><button class="icon-button icon-button--supplier" data-action="open-supplier-account" data-id="${supplier.id}" aria-label="حساب المورد ${escapeHtml(supplier.name)}" title="حساب المورد: ${escapeHtml(supplier.name)}">${icon("truck", 18)}</button>${phoneCallButton(supplier.phone, supplier.name)}</div>`;
+}
+
+/* زر طلب التوريد بجانب المنتج الناقص أو النافد: يفتح نافذة موجهة لمورده المرتبط إن وُجد. */
+function supplyRequestButton(product) {
+  if (toNumber(product.quantity) > toNumber(product.minimumStock)) return "";
+  return `<button class="icon-button icon-button--restock" data-action="product-supply-request" data-id="${product.id}" aria-label="إرسال طلب توريد ${escapeHtml(product.name)}" title="إرسال طلب توريد للمورد">${icon("truck", 18)}</button>`;
+}
+function openProductSupplyRequestDialog(productId) {
+  const product = state.products.find((item) => item.id === productId);
+  if (!product) return;
+  if (!state.suppliers.length) { showToast("أضف موردًا واحدًا على الأقل لإرسال طلب التوريد.", "error"); openSupplierDialog(); return; }
+  const linked = state.productSuppliers?.[product.id] || null;
+  const suggested = Math.max(1, Math.ceil(Math.max(toNumber(product.minimumStock) * 2, 1) - toNumber(product.quantity)));
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">توريد ناقص</span><h2>طلب توريد: ${escapeHtml(product.name)}</h2><p class="dialog__subtext">المتاح ${amount(product.quantity)} ${escapeHtml(product.unit)} · الحد الأدنى ${amount(product.minimumStock)} ${escapeHtml(product.unit)}${linked ? ` · آخر مورد ورّده: ${escapeHtml(linked.name)}` : ""}</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="product-supply-form" class="form-grid"><label class="form-full">المورد${linked ? "" : `<small class="field-hint">هذا المنتج غير مرتبط بمورد بعد — اختر من تراسله.</small>`}<select id="psr-supplier">${state.suppliers.map((supplier) => `<option value="${supplier.id}" ${linked?.id === supplier.id ? "selected" : ""}>${escapeHtml(supplier.name)}${supplier.phone ? ` — ${escapeHtml(supplier.phone)}` : " — بلا رقم مسجل"}</option>`).join("")}</select></label><label>الكمية المطلوبة<input id="psr-qty" type="number" inputmode="numeric" min="1" step="1" value="${suggested}" /></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button id="psr-send-whatsapp" class="button button--primary" type="button">${icon("whatsapp", 17)}<span>واتساب</span></button><button id="psr-send-sms" class="button button--secondary" type="button">${icon("phone", 17)}<span>رسالة نصية</span></button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  const validate = () => {
+    const supplier = state.suppliers.find((item) => item.id === overlay.querySelector("#psr-supplier").value) || null;
+    if (!supplier) { showToast("اختر المورد أولًا.", "error"); return null; }
+    if (!supplier.phone) { showToast("لا يوجد رقم مسجل لهذا المورد — أضف رقمه أولًا.", "error"); return null; }
+    const quantity = Math.max(0, Math.floor(toNumber(overlay.querySelector("#psr-qty").value)));
+    if (quantity <= 0) { showToast("أدخل كمية أكبر من صفر.", "error"); overlay.querySelector("#psr-qty").focus(); return null; }
+    return { supplier, quantity };
+  };
+  const requestText = ({ supplier, quantity }) => [
+    `طلب توريد من ${storeDisplayName()}`,
+    `إلى المورد: ${supplier.name}`,
+    `التاريخ: ${dateKey()}`,
+    "",
+    "الصنف المطلوب:",
+    `- ${product.name} — الكمية: ${amount(quantity)} ${product.unit}`,
+    "",
+    "نرجو التجهيز والتوصيل، وشكرًا.",
+  ].join("\n");
+  overlay.querySelector("#psr-send-whatsapp").addEventListener("click", () => { const order = validate(); if (order) sendWhatsAppExact(order.supplier.phone, requestText(order)); });
+  overlay.querySelector("#psr-send-sms").addEventListener("click", () => { const order = validate(); if (order) sendSmsExact(order.supplier.phone, requestText(order)); });
 }
 
 function openReorderDialog() {
@@ -1033,7 +1079,7 @@ function openReorderDialog() {
   }, new Map());
   /* الكمية المقترحة: ما يرفع المخزون إلى ضعف الحد الأدنى على الأقل (وحدة واحدة كحد أدنى). */
   const suggestedQuantity = (product) => Math.max(1, Math.ceil(Math.max(toNumber(product.minimumStock) * 2, 1) - toNumber(product.quantity)));
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">توصيل النواقص من الموردين</span><h2>المنتجات المنخفضة أو النافدة</h2><p class="dialog__subtext">حدّد الكمية المطلوبة من كل صنف ثم أرسل طلب التوريد للمورد نصًا أو PDF على رقمه المسجل.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div>${groups.size ? `<section class="account-transactions">${[...groups.entries()].map(([key, group]) => `<article class="reorder-group" data-reorder-group="${key}"><div class="reorder-group__head"><div><strong>${escapeHtml(group.supplier?.name || "منتجات بلا مورد مرتبط")}</strong><small>${group.products.length} أصناف تحتاج إعادة طلب${group.supplier?.phone ? ` · <span dir="ltr">${escapeHtml(group.supplier.phone)}</span>` : ""}</small></div><div class="product-supplier-actions">${group.supplier ? `<button class="icon-button icon-button--supplier" data-reorder-supplier="${group.supplier.id}" aria-label="حساب المورد">${icon("truck", 18)}</button>${phoneCallButton(group.supplier.phone, group.supplier.name)}` : ""}</div></div><div class="reorder-lines">${group.products.map((product) => `<div class="reorder-line"><div class="reorder-line__info"><strong dir="rtl">${escapeHtml(product.name)}</strong><small>المتاح ${amount(product.quantity)} ${escapeHtml(product.unit)} · الحد ${amount(product.minimumStock)} ${escapeHtml(product.unit)}</small></div><label class="reorder-line__qty"><span>المطلوب</span><input type="number" inputmode="numeric" min="0" step="1" value="${suggestedQuantity(product)}" data-reorder-qty="${product.id}" aria-label="الكمية المطلوبة من ${escapeHtml(product.name)}" /><small>${escapeHtml(product.unit)}</small></label></div>`).join("")}</div><div class="reorder-group__send">${group.supplier?.phone ? `<button class="button button--primary" data-reorder-send-text="${key}">${icon("whatsapp", 17)}<span>إرسال نصي للمورد</span></button><button class="button button--secondary" data-reorder-send-pdf="${key}">${icon("share", 17)}<span>إرسال PDF</span></button>` : `<button class="button button--secondary" data-reorder-share="${key}">${icon("share", 17)}<span>مشاركة القائمة</span></button><small class="reorder-no-phone">${group.supplier ? "لا يوجد رقم مسجل لهذا المورد — أضف رقمه ليظهر زر الإرسال المباشر." : "اربط المنتجات بمورد ليظهر زر الإرسال المباشر."}</small>`}</div></article>`).join("")}</section>` : `<div class="inline-empty">لا توجد منتجات منخفضة أو نافدة حاليًا.</div>`}<div class="dialog__actions"><button class="button button--primary" data-dialog-close>إغلاق</button></div>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">توصيل النواقص من الموردين</span><h2>المنتجات المنخفضة أو النافدة</h2><p class="dialog__subtext">حدّد الكمية المطلوبة من كل صنف ثم أرسل طلب التوريد للمورد نصًا أو PDF على رقمه المسجل.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div>${groups.size ? `<section class="account-transactions">${[...groups.entries()].map(([key, group]) => `<article class="reorder-group" data-reorder-group="${key}"><div class="reorder-group__head"><div><strong>${escapeHtml(group.supplier?.name || "منتجات بلا مورد مرتبط")}</strong><small>${group.products.length} أصناف تحتاج إعادة طلب${group.supplier?.phone ? ` · <span dir="ltr">${escapeHtml(group.supplier.phone)}</span>` : ""}</small></div><div class="product-supplier-actions">${group.supplier ? `<button class="icon-button icon-button--supplier" data-reorder-supplier="${group.supplier.id}" aria-label="حساب المورد">${icon("truck", 18)}</button>${phoneCallButton(group.supplier.phone, group.supplier.name)}` : ""}</div></div><div class="reorder-lines">${group.products.map((product) => `<div class="reorder-line"><div class="reorder-line__info"><strong dir="rtl">${escapeHtml(product.name)}</strong><small>المتاح ${amount(product.quantity)} ${escapeHtml(product.unit)} · الحد ${amount(product.minimumStock)} ${escapeHtml(product.unit)}</small></div><label class="reorder-line__qty"><span>المطلوب</span><input type="number" inputmode="numeric" min="0" step="1" value="${suggestedQuantity(product)}" data-reorder-qty="${product.id}" aria-label="الكمية المطلوبة من ${escapeHtml(product.name)}" /><small>${escapeHtml(product.unit)}</small></label></div>`).join("")}</div><div class="reorder-group__send">${group.supplier?.phone ? `<button class="button button--primary" data-reorder-send-text="${key}">${icon("whatsapp", 17)}<span>واتساب</span></button><button class="button button--secondary" data-reorder-send-sms="${key}">${icon("phone", 17)}<span>رسالة نصية</span></button><button class="button button--secondary" data-reorder-send-pdf="${key}">${icon("share", 17)}<span>إرسال PDF</span></button>` : `<button class="button button--secondary" data-reorder-share="${key}">${icon("share", 17)}<span>مشاركة القائمة</span></button><small class="reorder-no-phone">${group.supplier ? "لا يوجد رقم مسجل لهذا المورد — أضف رقمه ليظهر زر الإرسال المباشر." : "اربط المنتجات بمورد ليظهر زر الإرسال المباشر."}</small>`}</div></article>`).join("")}</section>` : `<div class="inline-empty">لا توجد منتجات منخفضة أو نافدة حاليًا.</div>`}<div class="dialog__actions"><button class="button button--primary" data-dialog-close>إغلاق</button></div>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   overlay.querySelectorAll("[data-reorder-supplier]").forEach((button) => button.addEventListener("click", () => { closeDialog(); openSupplierAccountDialog(button.dataset.reorderSupplier); }));
   /* الأصناف المطلوبة فعلًا: كمية أكبر من صفر فقط — يستطيع البائع تصفير ما لا يريده. */
@@ -1057,6 +1103,11 @@ function openReorderDialog() {
     const key = button.dataset.reorderSendText; const group = groups.get(key); const lines = requestedLines(key);
     if (!lines.length) { showToast("حدّد كمية لصنف واحد على الأقل.", "error"); return; }
     sendWhatsAppExact(group.supplier?.phone, orderText(group, lines));
+  }));
+  overlay.querySelectorAll("[data-reorder-send-sms]").forEach((button) => button.addEventListener("click", () => {
+    const key = button.dataset.reorderSendSms; const group = groups.get(key); const lines = requestedLines(key);
+    if (!lines.length) { showToast("حدّد كمية لصنف واحد على الأقل.", "error"); return; }
+    sendSmsExact(group.supplier?.phone, orderText(group, lines));
   }));
   overlay.querySelectorAll("[data-reorder-send-pdf]").forEach((button) => button.addEventListener("click", async () => {
     const key = button.dataset.reorderSendPdf; const group = groups.get(key); const lines = requestedLines(key);
@@ -1087,7 +1138,7 @@ function inventoryMarkup() {
   return `${topbarMarkup("المخزون", "عدّل الكميات من حركة موثقة، وليس من بطاقة المنتج.")}
   <section class="inventory-summary"><div><span>إجمالي قيمة المخزون</span><strong>${money(state.dashboard.inventoryValue)}</strong></div><div><span>عدد المنتجات</span><strong>${amount(state.products.length)} منتج</strong></div><div><span>منخفض أو نافد</span><strong>${amount(state.dashboard.lowStock.length)} منتج</strong></div></section>${crossLinkMarkup("products", { eyebrow: "تنقّل سريع", title: "المنتجات والأسعار", subtitle: "إضافة منتج، تعديل الأسعار، والباركود", label: "فتح المنتجات", glyph: "package" })}<section class="reports-bottom-action inventory-audit-entry"><div><span class="eyebrow">الجرد والمراجعة</span><strong>الجرد المحاسبي الدوري</strong><small>راجع قيمة المخزون والأرصدة واعتمد لقطة شهرية أو سنوية للمقارنة.</small></div><button class="button button--primary" data-action="navigate" data-view="periodic-inventory">فتح الجرد المحاسبي ${icon("chart", 18)}</button></section><div class="category-toolbar"><strong>أصناف المخزون (${amount(products.length)})</strong><div class="category-chips">${categoryButtons(state.inventoryCategory, "inventory-category")}</div></div>
   ${expiringProducts.length ? `<section class="expiry-inventory-alert ${urgentExpiryCount ? "expiry-inventory-alert--danger" : "expiry-inventory-alert--warning"}"><div><strong>تنبيه انتهاء الصلاحية</strong><span>${amount(expiringProducts.length)} منتج وصل إلى 85% من مدة صلاحيته أو اقترب انتهاؤه</span></div><small>${urgentExpiryCount ? `${amount(urgentExpiryCount)} منتج ينتهي خلال شهر أو أقل.` : "افتح المنتجات المعلَّمة لمراجعة التاريخ والكمية."}</small></section>` : ""}
-  <section class="panel inventory-list">${products.length ? products.map((product) => `<article class="inventory-row"><div class="inventory-row__main"><div class="inventory-icon">${icon("package", 20)}</div><div><strong dir="rtl">${escapeHtml(product.name)}</strong><small dir="auto">${escapeHtml(product.barcode || "دون باركود")} · ${escapeHtml(product.category || product.unit)} · شراء: ${money(product.purchasePrice)} · بيع: ${money(product.salePrice)}</small><small>قيمة المخزون: ${money(product.purchasePrice * product.quantity)}</small>${expiryMeterMarkup(product)}${expiryStatusMarkup(product)}</div></div><div class="inventory-row__stock"><div>${formatStatus(product)}<strong>${amount(product.quantity)} <small>${escapeHtml(product.unit)}</small></strong></div>${productSupplierActions(product)}<button class="button button--secondary" data-action="count-stock" data-id="${product.id}">جرد</button><button class="button button--secondary" data-action="adjust-stock" data-id="${product.id}">تعديل</button><button class="icon-button" data-action="open-stock-history" data-id="${product.id}" aria-label="سجل الحركة">${icon("history", 18)}</button></div></article>`).join("") : emptyState("المخزون بانتظار أول منتج", "أضف منتجًا مع كمية افتتاحية ليظهر هنا.")}</section><div class="dialog__actions"><button class="button button--secondary button--wide" data-action="open-stock-history">${icon("history", 17)} سجل حركة المخزون</button></div>`;
+  <section class="panel inventory-list">${products.length ? products.map((product) => `<article class="inventory-row"><div class="inventory-row__main"><div class="inventory-icon">${icon("package", 20)}</div><div><strong dir="rtl">${escapeHtml(product.name)}</strong><small dir="auto">${escapeHtml(product.barcode || "دون باركود")} · ${escapeHtml(product.category || product.unit)} · شراء: ${money(product.purchasePrice)} · بيع: ${money(product.salePrice)}</small><small>قيمة المخزون: ${money(product.purchasePrice * product.quantity)}</small>${expiryMeterMarkup(product)}${expiryStatusMarkup(product)}</div></div><div class="inventory-row__stock"><div>${formatStatus(product)}<strong>${amount(product.quantity)} <small>${escapeHtml(product.unit)}</small></strong></div>${productSupplierActions(product)}${supplyRequestButton(product)}<button class="button button--secondary" data-action="count-stock" data-id="${product.id}">جرد</button><button class="button button--secondary" data-action="adjust-stock" data-id="${product.id}">تعديل</button><button class="icon-button" data-action="open-stock-history" data-id="${product.id}" aria-label="سجل الحركة">${icon("history", 18)}</button></div></article>`).join("") : emptyState("المخزون بانتظار أول منتج", "أضف منتجًا مع كمية افتتاحية ليظهر هنا.")}</section><div class="dialog__actions"><button class="button button--secondary button--wide" data-action="open-stock-history">${icon("history", 17)} سجل حركة المخزون</button></div>`;
 }
 
 const SALES_CATALOG_LIMIT = 40;
@@ -1237,7 +1288,7 @@ function purchasesMarkup() {
 function openPurchaseOrderDialog() {
   if (!state.suppliers.length) { showToast("أضف موردًا واحدًا على الأقل لعمل طلب شراء.", "error"); openSupplierDialog(); return; }
   const itemRow = () => `<div class="po-line"><div class="po-line__name-wrap"><input class="po-line__name" dir="rtl" placeholder="اسم الصنف المطلوب" aria-label="اسم الصنف" autocomplete="off" /><div class="po-suggest" hidden></div></div><input class="po-line__qty" type="number" inputmode="decimal" min="0" step="1" placeholder="الكمية" aria-label="الكمية" /><button class="icon-button icon-button--danger po-line__remove" type="button" aria-label="حذف السطر">${icon("close", 16)}</button></div>`;
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">مراسلة المورد</span><h2>طلب شراء</h2><p class="dialog__subtext">اختر المورد واكتب الأصناف والكميات، ثم أرسل الطلب واتساب على رقمه المسجل أو كملف PDF.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="purchase-order-form" class="form-grid"><label class="form-full">المورد<select id="po-supplier" required><option value="">اختر المورد</option>${state.suppliers.map((supplier) => `<option value="${supplier.id}">${escapeHtml(supplier.name)}${supplier.phone ? ` — ${escapeHtml(supplier.phone)}` : " — بلا رقم مسجل"}</option>`).join("")}</select></label><div class="form-full"><div class="section-caption"><span class="eyebrow">البضاعة المطلوبة</span><strong>الأصناف والكميات</strong></div><div id="po-lines">${itemRow()}${itemRow()}</div><button id="po-add-line" class="button button--secondary" type="button">${icon("plus", 16)}<span>إضافة صنف</span></button></div><label class="form-full">ملاحظات للمورد<textarea id="po-notes" dir="rtl" placeholder="اختياري: موعد التوصيل، طريقة الدفع..."></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button id="po-send-whatsapp" class="button button--primary" type="button">${icon("whatsapp", 17)}<span>إرسال واتساب</span></button><button id="po-send-pdf" class="button button--secondary" type="button">${icon("share", 17)}<span>إرسال PDF</span></button></div></form>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">مراسلة المورد</span><h2>طلب شراء</h2><p class="dialog__subtext">اختر المورد واكتب الأصناف والكميات، ثم أرسل الطلب واتساب على رقمه المسجل أو كملف PDF.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="purchase-order-form" class="form-grid"><label class="form-full">المورد<select id="po-supplier" required><option value="">اختر المورد</option>${state.suppliers.map((supplier) => `<option value="${supplier.id}">${escapeHtml(supplier.name)}${supplier.phone ? ` — ${escapeHtml(supplier.phone)}` : " — بلا رقم مسجل"}</option>`).join("")}</select></label><div class="form-full"><div class="section-caption"><span class="eyebrow">البضاعة المطلوبة</span><strong>الأصناف والكميات</strong></div><div id="po-lines">${itemRow()}${itemRow()}</div><button id="po-add-line" class="button button--secondary" type="button">${icon("plus", 16)}<span>إضافة صنف</span></button></div><label class="form-full">ملاحظات للمورد<textarea id="po-notes" dir="rtl" placeholder="اختياري: موعد التوصيل، طريقة الدفع..."></textarea></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button id="po-send-whatsapp" class="button button--primary" type="button">${icon("whatsapp", 17)}<span>واتساب</span></button><button id="po-send-sms" class="button button--secondary" type="button">${icon("phone", 17)}<span>رسالة نصية</span></button><button id="po-send-pdf" class="button button--secondary" type="button">${icon("share", 17)}<span>إرسال PDF</span></button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
   const linesHost = overlay.querySelector("#po-lines");
   const bindRemove = (row) => row.querySelector(".po-line__remove").addEventListener("click", () => { if (linesHost.children.length > 1) row.remove(); else { row.querySelector(".po-line__name").value = ""; row.querySelector(".po-line__qty").value = ""; } });
@@ -1291,6 +1342,11 @@ function openPurchaseOrderDialog() {
     const order = validate(); if (!order) return;
     if (!order.supplier.phone) { showToast("لا يوجد رقم مسجل لهذا المورد — أضف رقمه أولًا.", "error"); return; }
     sendWhatsAppExact(order.supplier.phone, orderText(order));
+  });
+  overlay.querySelector("#po-send-sms").addEventListener("click", () => {
+    const order = validate(); if (!order) return;
+    if (!order.supplier.phone) { showToast("لا يوجد رقم مسجل لهذا المورد — أضف رقمه أولًا.", "error"); return; }
+    sendSmsExact(order.supplier.phone, orderText(order));
   });
   overlay.querySelector("#po-send-pdf").addEventListener("click", async (event) => {
     const order = validate(); if (!order) return;
@@ -2272,6 +2328,7 @@ async function handleActionUnsafe(event) {
   if (action === "new-supplier-payment") { openSupplierPaymentDialog(); return; }
   if (action === "record-supplier-payment") { openSupplierPaymentDialog(id); return; }
   if (action === "new-purchase-order") { openPurchaseOrderDialog(); return; }
+  if (action === "product-supply-request") { openProductSupplyRequestDialog(id); return; }
   if (action === "new-purchase") { openPurchaseEntryDialog(); return; }
   if (action === "open-purchase") { openPurchaseDialog(id); return; }
   if (action === "purchase-return") { openPurchaseReturnDialog(id); return; }
