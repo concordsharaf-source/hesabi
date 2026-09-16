@@ -29,6 +29,8 @@
           var canvas = theme === "dark" ? (bg[1] || "#101d18") : (bg[0] || "");
           if (canvas) document.documentElement.style.setProperty("--canvas", canvas);
           if (theme === "dark") {
+            if (bg[2]) document.documentElement.style.setProperty("--paper", bg[2]);
+            if (bg[3]) document.documentElement.style.setProperty("--line", bg[3]);
             document.documentElement.style.background = canvas || "#101d18";
             var meta = document.querySelector('meta[name="theme-color"]');
             if (meta) meta.setAttribute("content", canvas || "#101d18");

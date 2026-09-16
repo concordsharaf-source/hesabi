@@ -69,7 +69,7 @@ test("صفحة المشتريات: بلاطة «طلب شراء» الكبيرة
   // لا مساس بالمخزون أو القاعدة: النافذة مراسلة فقط
   assert.doesNotMatch(dialog, /db\.(completeSale|createPurchase|adjust|createProduct)/, "نافذة الطلب تكتب في القاعدة");
   // أنماط الأسطر موجودة مع دعم الوضع الداكن
-  assert.match(css, /\.po-line \{ display:grid; grid-template-columns:minmax\(0,1fr\) 88px auto/, "أنماط سطر الطلب مفقودة");
+  assert.match(css, /\.po-line \{ display:grid; grid-template-columns:minmax\(0,1fr\) 64px 84px auto/, "أنماط سطر الطلب مفقودة");
   assert.match(css, /\[data-theme="dark"\] \.po-line__name/, "لا دعم للوضع الداكن في النافذة");
 });
 
@@ -313,4 +313,45 @@ test("محاسبة التوزيع الساعي: analytics يوزع المبيع�
   const invoicesAcrossHours = analytics.hourlyDistribution.reduce((sum, h) => sum + h.count, 0);
   assert.equal(invoicesAcrossHours, 3, "عدد الفواتير الموزعة غير صحيح");
   await db.resetAllData();
+});
+
+/* ===== v47: وحدة الكمية (حبة/عبوة) في طلبات الشراء + تاريخ يوم/شهر/سنة + لوحات الداكن تتبع الخلفية المختارة ===== */
+
+test("طلب الشراء: خانة بالحبة أو بالعبوة (كرتون كيس صندوق...) لكل سطر وتدخل في نص الطلب وPDF", () => {
+  const dialog = appJs.slice(appJs.indexOf("function openPurchaseOrderDialog"), appJs.indexOf("function currentMonthDateRange"));
+  assert.match(dialog, /<select class="po-line__unit"[^>]*>\$\{PACKAGE_UNITS\.map/, "قائمة العبوات مفقودة من سطر الطلب");
+  assert.match(dialog, /unit: row\.querySelector\("\.po-line__unit"\)\?\.value \|\| "حبة"/, "collectLines لا يجمع الوحدة");
+  assert.match(dialog, /line\.unit === "حبة" \? \(unitOf\(line\.name\) \|\| "حبة"\) : line\.unit/, "نص الطلب لا يستخدم الوحدة المختارة");
+  assert.match(css, /\.po-line__unit \{ height:44px/, "CSS خانة الوحدة مفقود");
+});
+
+test("طلب توريد المنتج الناقص: خانة بالحبة أو بالعبوة وتدخل في نص الرسالة", () => {
+  const dialog = appJs.slice(appJs.indexOf("function openProductSupplyRequestDialog"), appJs.indexOf("function openReorderDialog"));
+  assert.match(dialog, /<select id="psr-unit">/, "قائمة العبوات مفقودة");
+  assert.match(dialog, /\[product\.unit, \.\.\.PACKAGE_UNITS\.filter/, "وحدة المنتج ليست الخيار الأول");
+  assert.match(dialog, /unit: overlay\.querySelector\("#psr-unit"\)\?\.value \|\| product\.unit/, "الوحدة لا تُجمع عند الإرسال");
+  assert.match(dialog, /\$\{amount\(quantity\)\} \$\{unit \|\| product\.unit\}/, "نص الطلب لا يستخدم الوحدة المختارة");
+});
+
+test("تواريخ نوافذ الطلبات: تُعرض يوم/شهر/سنة مثل بقية التطبيق وليس بصيغة ISO", () => {
+  const zone = appJs.slice(appJs.indexOf("function supplyRequestButton"), appJs.indexOf("function purchasesMarkup"));
+  assert.doesNotMatch(zone, /التاريخ: \$\{dateKey\(\)\}/, "ما زالت التواريخ بصيغة ISO في نصوص الطلبات");
+  assert.match(zone, /التاريخ: \$\{formatDate\(dateKey\(\)\)\}/, "التاريخ لا يمر عبر منسق يوم/شهر/سنة");
+  const poZone = appJs.slice(appJs.indexOf("function openPurchaseOrderDialog"), appJs.indexOf("function customersMarkup"));
+  assert.doesNotMatch(poZone, /التاريخ: \$\{dateKey\(\)\}/, "نافذة طلب الشراء ما زالت ISO");
+});
+
+test("الوضع الداكن: لون اللوحات والحدود يتبع الخلفية المختارة ولا يبقى أخضر دائمًا", () => {
+  // كل خيار خلفية داكنة يحمل لون لوحة وحدود مشتقين
+  const themes = appJs.slice(appJs.indexOf("const BACKGROUND_DARK_THEMES"), appJs.indexOf("const LEGACY_BACKGROUND_MAP"));
+  ["forest", "night-sky", "plum", "amber-night", "charcoal"].forEach((id) => assert.match(themes, new RegExp(`id: "${id}"[^}]*paper: "#[0-9a-f]{6}"[^}]*line: "#[0-9a-f]{6}"`), `خيار ${id} بلا ألوان لوحة`));
+  // applyTheme يضبط --paper و--line في الداكن ويزيلهما في الفاتح
+  const apply = appJs.slice(appJs.indexOf("function applyTheme"), appJs.indexOf("let systemThemeWatcherBound"));
+  assert.match(apply, /setProperty\("--paper", palette\.darkPaper\)/, "لا يضبط لون اللوحات");
+  assert.match(apply, /setProperty\("--line", palette\.darkLine\)/, "لا يضبط لون الحدود");
+  assert.match(apply, /removeProperty\("--paper"\)/, "لا يعيد الفاتح لأصله");
+  assert.match(apply, /\$\{palette\.light\}\|\$\{palette\.dark\}\|\$\{palette\.darkPaper\}\|\$\{palette\.darkLine\}/, "التخزين المحلي لا يحفظ ألوان اللوحة لما قبل أول رسم");
+  // CSS: قواعد الداكن لم تعد تستخدم الأخضر الثابت بل المتغيرات
+  const darkRules = css.split("\n").filter((line) => line.includes('[data-theme="dark"]') && !line.includes(':root[data-theme="dark"]')).join("\n");
+  assert.doesNotMatch(darkRules, /#1a2d26|#557267|#58756a|#16211c|#122019|#3f5c51/, "قواعد الداكن ما زالت بألوان خضراء ثابتة");
 });
