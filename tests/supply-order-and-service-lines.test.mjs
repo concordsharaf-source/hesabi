@@ -543,3 +543,25 @@ test("شاشة الموردين: بلاطة طلب شراء بنفس آلية ش
   // نفس الآلية: نفس data-action المستخدم في شاشة المشتريات
   assert.ok(appJs.split('data-action="new-purchase-order"').length >= 3, "الآلية غير مشتركة مع شاشة المشتريات");
 });
+
+/* ===== v54: زر إيقاف مؤقت وسط شريط المبيعات + اقتراحات طلب الشراء بالاسم الكامل ===== */
+
+test("شريط المبيعات الثابت: زر إيقاف مؤقت في الوسط يعلّق عملية البيع الحالية", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  // الزر في وسط الشريط بين خانة «الإجمالي» وخانة الرقم، ويستدعي نفس آلية التعليق hold-cart
+  assert.match(appJs, /sales-total-bar__label">\$\{icon\("cart", 18\)\} الإجمالي<\/span><\/button><button class="sales-total-bar__hold" type="button" data-action="hold-cart"/, "زر الإيقاف المؤقت ليس في وسط الشريط");
+  assert.match(appJs, /data-action="hold-cart" \$\{state\.cart\.length \? "" : "disabled"\} aria-label="إيقاف مؤقت — تعليق عملية البيع الحالية"/, "الزر لا يتعطل مع سلة فارغة");
+  assert.match(appJs, /\$\{icon\("pause", 20\)\}<span>إيقاف مؤقت<\/span>/, "نص الزر وأيقونة الإيقاف مفقودان");
+  assert.match(css, /\.sales-total-bar__hold \{ display:inline-flex/, "أنماط زر الإيقاف المؤقت مفقودة");
+  assert.match(css, /\.sales-total-bar__hold:disabled \{ opacity:\.45/, "حالة التعطيل بلا مظهر");
+  // hold-cart يقود إلى نافذة تعليق الفاتورة الموجودة
+  assert.match(appJs, /if \(action === "hold-cart"\) \{ openHoldInvoiceDialog\(\); return; \}/, "آلية التعليق غير مرتبطة");
+});
+
+test("اقتراحات طلب الشراء: الاسم الكامل يظهر دون قصّ على عرض الحقل", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  assert.match(css, /\.po-suggest \{ position:absolute;[^}]*width:max-content;[^}]*max-width:min\(440px, calc\(100vw - 48px\)\)/, "القائمة ما زالت مقيدة بعرض الحقل");
+  assert.match(css, /\.po-suggest \{[^}]*z-index:40/, "القائمة قد تُحجب تحت عناصر النافذة");
+  assert.match(css, /\.po-suggest__item strong \{[^}]*overflow-wrap:anywhere/, "اسم الصنف ما زال يُقصّ بثلاث نقاط");
+  assert.doesNotMatch(/\.po-suggest__item strong \{[^}]*\}/.exec(css)?.[0] || "", /text-overflow:ellipsis|white-space:nowrap/, "قصّ الاسم ما زال مفعلًا");
+});

@@ -24,7 +24,8 @@ test("لا بقايا من الورقة السفلية القديمة: السل�
 });
 
 test("شريط الإجمالي الثابت: يظهر في صفحة المبيعات فقط ويعرض الإجمالي بالخط الرقمي", () => {
-  assert.match(salesMarkup, /class="sales-total-bar" type="button" data-action="scroll-to-cart"/, "لا زر شريط إجمالي في قالب المبيعات");
+  assert.match(salesMarkup, /class="sales-total-bar" role="group"/, "لا شريط إجمالي في قالب المبيعات");
+  assert.match(salesMarkup, /sales-total-bar__jump" type="button" data-action="scroll-to-cart"/, "زر الانتقال إلى السلة مفقود من الشريط");
   assert.match(salesMarkup, /data-sales-total-bar dir="ltr">\$\{money\(totals\.subtotal\)\}/, "الشريط لا يعرض إجمالي السلة");
   // مخفي افتراضيًا ويُفعّل فقط حين تكون صفحة المبيعات هي المعروضة
   assert.match(css, /\.sales-total-bar \{ display: none; \}/, "الشريط ليس مخفيًا افتراضيًا خارج صفحة المبيعات");

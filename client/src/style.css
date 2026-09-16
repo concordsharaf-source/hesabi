@@ -1522,10 +1522,13 @@ html.is-sales-page .sales-total-bar {
   border-top: 2px solid #d6ad50;
   border-radius: 0;
   box-shadow: 0 -8px 24px rgba(9, 29, 22, .35);
-  cursor: pointer;
   text-align: right;
   -webkit-tap-highlight-color: transparent;
 }
+.sales-total-bar__jump { display:inline-flex; align-items:center; gap:8px; padding:6px 2px; background:transparent; border:0; cursor:pointer; color:inherit; }
+.sales-total-bar__hold { display:inline-flex; align-items:center; gap:7px; padding:9px 14px; color:#10241e; background:linear-gradient(145deg,#f3cf70,#d6ad50); border:1px solid #f8e3a8; border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,.28); font-size:12px; font-weight:800; cursor:pointer; }
+.sales-total-bar__hold:active { transform:scale(.95); }
+.sales-total-bar__hold:disabled { opacity:.45; cursor:default; }
 .sales-total-bar__label { display: inline-flex; align-items: center; gap: 8px; color: #d7f5ed; font-size: 12px; font-weight: 800; }
 .sales-total-bar__value { color: #fff4bd; font-family: "DS-Digital", "Courier New", monospace; font-size: clamp(32px, 9vw, 46px); font-weight: 400; letter-spacing: 1px; line-height: 1; text-shadow: 0 0 9px rgba(243, 207, 112, .3); font-variant-numeric: tabular-nums; }
 .sales-total-bar:active .sales-total-bar__value { text-shadow: 0 0 14px rgba(243, 207, 112, .55); }
@@ -1875,11 +1878,11 @@ html.is-sales-page .sales-total-bar {
 /* قائمة اقتراح الأصناف داخل نافذة طلب الشراء: كل المنتجات المسجلة فور الكتابة */
 .po-line__name-wrap { position:relative; min-width:0; }
 .po-line__name-wrap .po-line__name { width:100%; }
-.po-suggest { position:absolute; top:calc(100% + 4px); right:0; left:0; z-index:5; display:grid; max-height:220px; overflow-y:auto; background:#fffefa; border:1px solid rgba(31,107,89,.3); border-radius:11px; box-shadow:0 12px 26px rgba(23,52,45,.18); }
+.po-suggest { position:absolute; top:calc(100% + 4px); right:0; left:auto; z-index:40; display:grid; min-width:100%; width:max-content; max-width:min(440px, calc(100vw - 48px)); max-height:260px; overflow-y:auto; background:#fffefa; border:1px solid rgba(31,107,89,.3); border-radius:11px; box-shadow:0 12px 26px rgba(23,52,45,.18); }
 .po-suggest__item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:10px 12px; text-align:right; background:transparent; border:0; border-bottom:1px solid rgba(31,107,89,.1); font:inherit; cursor:pointer; }
 .po-suggest__item:last-child { border-bottom:0; }
 .po-suggest__item:hover { background:var(--green-pale); }
-.po-suggest__item strong { font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.po-suggest__item strong { font-size:12px; overflow:visible; text-overflow:clip; overflow-wrap:anywhere; text-align:right; }
 .po-suggest__item small { flex:0 0 auto; color:var(--muted); font-size:10px; }
 [data-theme="dark"] .po-suggest { background:var(--paper); border-color:var(--line); box-shadow:0 12px 26px rgba(0,0,0,.4); }
 [data-theme="dark"] .po-suggest__item { border-bottom-color:var(--line); }
