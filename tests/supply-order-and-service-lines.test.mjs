@@ -394,17 +394,17 @@ test("طلب الشراء: زرا طباعة ومشاركة كصورة قبل ا
   assert.match(dialog, /<button id="po-print" class="button button--secondary" type="button">\$\{icon\("receipt", 17\)\}<span>طباعة<\/span>/, "زر الطباعة مفقود");
   assert.match(dialog, /<button id="po-share-image"[^>]*>\$\{icon\("share", 17\)\}<span>مشاركة صورة<\/span>/, "زر مشاركة الصورة مفقود");
   assert.match(dialog, /printHtmlDocument\(\{ html: orderHtml\(order\), target: "hesabi-purchase-order" \}\)/, "الطباعة لا تستخدم فاتورة الطلب");
-  assert.match(dialog, /shareOrDownloadImage\(\{ html: orderHtml\(order\), filename: `طلب-شراء-\$\{dateKey\(\)\}\.png`/, "مشاركة الصورة لا تستخدم فاتورة الطلب");
+  assert.match(dialog, /shareDocumentImage\(\{ html: orderHtml\(order\), filename: `طلب-شراء-\$\{dateKey\(\)\}\.png`/, "مشاركة الصورة لا تستخدم فاتورة الطلب");
   // مُصدر الصورة موجود في وحدة PDF ويُنتج PNG عبر نفس مسرح العرض
   assert.match(appJs, /shareOrDownloadImage, shareOrDownloadInvoicePdf/, "الاستيراد مفقود");
 });
 
 test("pdf-export: تصدير صورة PNG من نفس مسرح PDF مع مشاركة أو تنزيل", async () => {
   const pdfExport = await readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8");
-  assert.match(pdfExport, /export async function createImageFileFromHtml\(\{ html, filename, page = "a4" \}\)/, "الدالة مفقودة");
-  assert.match(pdfExport, /canvas\.toBlob\(resolve, "image\/png"\)/, "لا يصدر PNG");
+  assert.match(pdfExport, /export async function createImageFileFromHtml\(\{ html, filename, page = "a4", monochrome = true \}\)/, "الدالة مفقودة");
+  assert.match(pdfExport, /finalCanvas\.toBlob\(resolve, "image\/png"\)/, "لا يصدر PNG");
   assert.match(pdfExport, /new File\(\[blob\], filename, \{ type: "image\/png" \}\)/, "ملف الصورة غير صحيح");
-  assert.match(pdfExport, /export async function shareOrDownloadImage\(\{ html, filename, title, page = "a4" \}\) \{ return fileOrDownload\(await createImageFileFromHtml/, "المشاركة/التنزيل مفقودة");
+  assert.match(pdfExport, /export async function shareOrDownloadImage\(\{ html, filename, title, page = "a4", monochrome = true \}\) \{ return fileOrDownload\(await createImageFileFromHtml/, "المشاركة/التنزيل مفقودة");
 });
 
 /* ===== v49: قفل الشاشة السريع يقيد الصفحة فعلًا ولا يُفتح إلا بكلمة المرور ===== */
@@ -477,4 +477,41 @@ test("محاسبة تسديد المورد من الخزنة: يسوي الفو�
   // تجاوز المستحق يُرفض
   await assert.rejects(() => db.registerSupplierPayment({ supplierId: supplier.id, amount: 900, date: today, paymentMethod: "نقدي" }), /أكبر من المستحق/);
   await db.resetAllData();
+});
+
+/* ===== v51: مشاركة الصورة بنمط الطابعة (أبيض/أسود) في كل أقسام الفواتير والتقارير ===== */
+
+test("صورة المشاركة بنمط الطابعة: تحويل رمادي إجباري افتراضيًا في مُصدر الصور", async () => {
+  const pdfExport = await readFile(new URL("../client/src/js/pdf-export.js", import.meta.url), "utf8");
+  assert.match(pdfExport, /function toGrayscaleCanvas\(canvas\)/, "دالة التدرج الرمادي مفقودة");
+  assert.match(pdfExport, /0\.299 \* pixels\[index\] \+ 0\.587 \* pixels\[index \+ 1\] \+ 0\.114 \* pixels\[index \+ 2\]/, "معادلة الإضاءة غير صحيحة");
+  assert.match(pdfExport, /createImageFileFromHtml\(\{ html, filename, page = "a4", monochrome = true \}\)/, "monochrome ليس افتراضيًا");
+  assert.match(pdfExport, /const finalCanvas = monochrome \? toGrayscaleCanvas\(canvas\) : canvas;/, "التحويل الرمادي لا يطبق");
+  assert.match(pdfExport, /shareOrDownloadImage\(\{ html, filename, title, page = "a4", monochrome = true \}\)/, "التمرير للمشاركة مفقود");
+});
+
+test("مشاركة صورة في كل الأقسام: فاتورة البيع والشراء وكشف العميل والتقارير والجرد والنواقص وطلب الشراء", () => {
+  // مساعد موحد يمرر عبر المصدر الرمادي
+  assert.match(appJs, /async function shareDocumentImage\(\{ html, filename, title, page = "a4", button = null \}\)/, "المساعد الموحد مفقود");
+  assert.match(appJs, /await shareOrDownloadImage\(\{ html, filename, title, page \}\)/, "المساعد لا يمرر للمصدر الرمادي");
+  // فاتورة البيع (حرارية)
+  assert.match(appJs, /id="share-invoice-image"/, "زر صورة فاتورة البيع مفقود");
+  assert.match(appJs, /shareDocumentImage\(\{ html: await thermalInvoiceHtml\(invoiceWithCustomer\), filename: `\$\{invoice\.invoiceNumber\}\.png`, title: `فاتورة \$\{invoice\.invoiceNumber\}`, page: "thermal"/, "فاتورة البيع لا تشارك كصورة حرارية");
+  // فاتورة الشراء
+  assert.match(appJs, /id="share-purchase-image"/, "زر صورة فاتورة الشراء مفقود");
+  assert.match(appJs, /shareDocumentImage\(\{ html, filename: `\$\{purchase\.invoiceNumber\}\.png`/, "فاتورة الشراء لا تشارك كصورة");
+  // كشف حساب العميل
+  assert.match(appJs, /id="share-customer-account-image"/, "زر صورة كشف الحساب مفقود");
+  assert.match(appJs, /shareDocumentImage\(\{ html: accountHtml\(\), filename: `كشف-حساب-\$\{account\.customer\.name\}\.png`/, "كشف الحساب لا يشارك كصورة");
+  // معاينة التقارير المالية
+  assert.match(appJs, /data-preview-share-image/, "زر صورة التقارير مفقود");
+  assert.match(appJs, /shareDocumentImage\(\{ html, filename: `hesabi-\$\{type\}-report-\$\{dateKey\(\)\}\.png`, title: reportTitle\(type\)/, "التقرير لا يشارك كصورة");
+  // الجرد الدوري
+  assert.match(appJs, /id="share-periodic-inventory-image"/, "زر صورة الجرد مفقود");
+  assert.match(appJs, /shareDocumentImage\(\{ html: periodicInventoryReportHtml\(audit\), filename: `جرد-\$\{audit\.cycle\}-\$\{audit\.periodTo\}\.png`/, "الجرد لا يشارك كصورة");
+  // طلب توريد النواقص
+  assert.match(appJs, /data-reorder-send-image="\$\{key\}"/, "زر صورة النواقص مفقود");
+  assert.match(appJs, /shareDocumentImage\(\{ html: orderHtml\(group, lines\), filename: `طلب-توريد-\$\{dateKey\(\)\}\.png`/, "طلب النواقص لا يشارك كصورة");
+  // طلب الشراء يمر عبر المساعد الموحد أيضًا (رمادي)
+  assert.match(appJs, /shareDocumentImage\(\{ html: orderHtml\(order\), filename: `طلب-شراء-\$\{dateKey\(\)\}\.png`/, "طلب الشراء لا يمر عبر المسار الرمادي");
 });
