@@ -92,8 +92,8 @@ try {
   let purchaseDialogOpened = false;
   for (let attempt = 0; attempt < 2 && !purchaseDialogOpened; attempt += 1) {
     await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]')?.click()`);
-    await waitFor('.topbar [data-action="new-purchase"]');
-    await evaluate(`document.querySelector('.topbar [data-action="new-purchase"]').click()`);
+    await waitFor('.po-order-tile[data-action="new-purchase"]');
+    await evaluate(`document.querySelector('.po-order-tile[data-action="new-purchase"]').click()`);
     for (let check = 0; check < 20; check += 1) {
       if (await evaluate(`Boolean(document.querySelector('#purchase-product-search'))`)) { purchaseDialogOpened = true; break; }
       await sleep(150);
@@ -104,8 +104,8 @@ try {
   for (let attempt = 0; attempt < 3 && !purchaseSearchEntered; attempt += 1) {
     if (!await evaluate(`Boolean(document.querySelector('#purchase-product-search'))`)) {
       await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]')?.click()`);
-      await waitFor('.topbar [data-action="new-purchase"]');
-      await evaluate(`document.querySelector('.topbar [data-action="new-purchase"]').click()`);
+      await waitFor('.po-order-tile[data-action="new-purchase"]');
+      await evaluate(`document.querySelector('.po-order-tile[data-action="new-purchase"]').click()`);
       await sleep(180);
     }
     purchaseSearchEntered = await evaluate(`(() => { const search = document.querySelector('#purchase-product-search'); if (!search) return false; search.value = '628100000001'; search.dispatchEvent(new Event('input', { bubbles: true })); return true; })()`);
@@ -122,8 +122,8 @@ try {
     if (!purchaseProductSelected) {
       if (!await evaluate(`Boolean(document.querySelector('#purchase-product-search'))`)) {
         await evaluate(`document.querySelector('[data-bottom-nav] [data-view="purchases"]')?.click()`);
-        await waitFor('.topbar [data-action="new-purchase"]');
-        await evaluate(`document.querySelector('.topbar [data-action="new-purchase"]').click()`);
+        await waitFor('.po-order-tile[data-action="new-purchase"]');
+        await evaluate(`document.querySelector('.po-order-tile[data-action="new-purchase"]').click()`);
         await waitFor('#purchase-product-search');
       }
       await sleep(180);

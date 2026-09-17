@@ -674,3 +674,15 @@ test("المشتريات: بلاطة إضافة فاتورة حمراء كبير
   const section = appJs.slice(start, appJs.indexOf("</section>", start));
   assert.ok(!section.includes("<span>فواتير الشراء</span>"), "عداد فواتير الشراء القديم ما زال موجودًا");
 });
+
+/* ===== v62: حذف زر + من أعلى صفحات العملاء والموردين والمشتريات ===== */
+
+test("لا زر + في الشريط العلوي لصفحات العملاء والموردين والمشتريات، والبلاطات البديلة موجودة", () => {
+  assert.match(appJs, /topbarMarkup\("الموردون", "تابع الأرصدة والشراء الآجل ودفعات الموردين في حساب واحد\."\)/, "زر + ما زال في شريط الموردين");
+  assert.match(appJs, /topbarMarkup\("العملاء", "تابع الأرصدة والبيع الآجل والدفعات في حساب واحد\."\)/, "زر + ما زال في شريط العملاء");
+  assert.match(appJs, /topbarMarkup\("المشتريات", "أنشئ فاتورة شراء لزيادة المخزون وتثبيت تكلفة المنتجات، مع إمكانية ربط المورد عند توفره\."\)/, "زر + ما زال في شريط المشتريات");
+  // الوظائف باقية في البلاطات الحمراء أسفل الصفحة
+  assert.match(appJs, /po-order-tile" type="button" data-action="new-supplier"/, "بلاطة إضافة مورد مفقودة");
+  assert.match(appJs, /po-order-tile" type="button" data-action="new-customer"/, "بلاطة إضافة عميل مفقودة");
+  assert.match(appJs, /po-order-tile" type="button" data-action="new-purchase"/, "بلاطة إضافة فاتورة مفقودة");
+});
