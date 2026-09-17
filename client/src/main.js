@@ -1,6 +1,7 @@
 /* اتجاه التصميم: دفتر التاجر الهادئ — تشغيل يومي عربي واضح، دافئ، وموجّه للأرقام. */
 import "./style.css";
 import { bootApp } from "./js/app.js";
+import { shouldBlockBrowserAccess, mountInstallGate } from "./js/install-gate.js";
 
 if ("serviceWorker" in navigator) {
   if (import.meta.env.DEV) {
@@ -17,4 +18,9 @@ if ("serviceWorker" in navigator) {
   }
 }
 
-bootApp(document.querySelector("#app"));
+/* بوابة التثبيت: المتصفح العادي يرى شاشة التثبيت فقط؛ التطبيق المثبت (PWA/أندرويد/سطح المكتب) يعمل مباشرة. */
+if (shouldBlockBrowserAccess()) {
+  mountInstallGate();
+} else {
+  bootApp(document.querySelector("#app"));
+}

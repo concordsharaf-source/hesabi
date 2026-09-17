@@ -1937,3 +1937,20 @@ html.is-sales-page .sales-total-bar {
 .bottom-nav .nav-item--pulse { animation:bottom-nav-pulse .38s var(--ease-out); }
 [data-theme="dark"] .bottom-nav .nav-item.is-active { color:#fff; background:linear-gradient(145deg,#2a9a77,#175a46); box-shadow:0 4px 12px rgba(0,0,0,.4); }
 @media (max-width:599px) { .bottom-nav .nav-item { min-width:64px; font-size:11px; } .bottom-nav .nav-item.is-active { font-size:11.5px; } }
+
+
+/* ===== بوابة التثبيت: شاشة إرشاد تظهر في المتصفح فقط حتى يُثبَّت التطبيق ===== */
+html.is-install-gated, html.is-install-gated body { height:100%; overflow:hidden; }
+#install-screen { position:fixed; inset:0; z-index:4000; display:grid; place-items:center; padding:22px; background:linear-gradient(160deg,#0d302a,#1f6b59); }
+.install-card { display:grid; gap:14px; justify-items:center; width:min(100%,420px); padding:30px 24px; text-align:center; color:#eafaf3; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.16); border-radius:22px; box-shadow:0 24px 70px rgba(0,0,0,.35); backdrop-filter:blur(8px); }
+.install-card__logo { width:84px; height:84px; border-radius:20px; box-shadow:0 10px 26px rgba(0,0,0,.3); }
+.install-card h1 { margin:0; font-size:24px; color:#fff; }
+.install-card__lead { margin:0; font-size:13.5px; line-height:1.9; color:#d7f5ed; }
+.install-card__btn { display:inline-flex; align-items:center; gap:8px; padding:14px 30px; color:#10241e; background:linear-gradient(145deg,#f3cf70,#d6ad50); border:1px solid #f8e3a8; border-radius:14px; box-shadow:0 6px 16px rgba(0,0,0,.3); font-size:16px; font-weight:800; cursor:pointer; }
+.install-card__btn:active { transform:scale(.97); }
+.install-card__btn:disabled { opacity:.55; cursor:default; }
+.install-steps { display:grid; gap:6px; width:100%; padding:14px 16px; text-align:right; background:rgba(0,0,0,.22); border:1px solid rgba(255,255,255,.14); border-radius:14px; font-size:13px; line-height:1.9; }
+.install-steps ol { margin:0; padding-right:18px; display:grid; gap:6px; }
+.install-steps__icon { display:inline-grid; place-items:center; min-width:22px; height:22px; padding:0 4px; background:rgba(255,255,255,.14); border-radius:6px; font-size:13px; }
+.install-card__note { margin:0; font-size:11.5px; line-height:1.8; color:#bfe8da; }
+.install-card__note--done { color:#9df3c4; font-weight:800; }

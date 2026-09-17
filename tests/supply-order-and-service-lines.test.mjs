@@ -580,3 +580,41 @@ test("قائمة المبيعات: الأصناف بلا باركود (كود د
   // فرز مستقر: الكود الداخلي وحده لا يُعد باركودًا — يعتمد على حقل barcode فقط
   assert.doesNotMatch(fn, /internalCode/, "الكود الداخلي يجب ألا يؤثر على التصدر");
 });
+
+/* ===== v57: بوابة التثبيت — المتصفح يرى شاشة التثبيت والتطبيق المثبت يعمل مباشرة ===== */
+
+test("بوابة التثبيت: كشف standalone وأغلفة أندرويد/سطح المكتب وiOS سفاري", async () => {
+  const gate = await readFile(new URL("../client/src/js/install-gate.js", import.meta.url), "utf8");
+  // كشف وضع التثبيت بكل صيغ display-mode + navigator.standalone على iOS
+  assert.match(gate, /"\(display-mode: standalone\)", "\(display-mode: fullscreen\)", "\(display-mode: minimal-ui\)"/, "استعلامات display-mode ناقصة");
+  assert.match(gate, /window\.navigator\.standalone === true/, "كشف iOS standalone مفقود");
+  // الأغلفة الأصلية لا تُحجب أبدًا
+  assert.match(gate, /Boolean\(window\.Capacitor \|\| window\.__TAURI__ \|\| window\.__TAURI_INTERNALS__\)/, "أغلفة Capacitor/Tauri ستُحجب بالخطأ");
+  assert.match(gate, /if \(isNativeShell\(\)\) return false;/, "الغلاف الأصلي لا يمر");
+  // iOS: iPad الحديث يعرف نفسه MacIntel بلمس
+  assert.match(gate, /navigator\.platform === "MacIntel" && navigator\.maxTouchPoints > 1/, "iPadOS الحديث لن يُكشف");
+  // بيئة التطوير لا تُحجب
+  assert.match(gate, /if \(import\.meta\.env\.DEV\) return false;/, "بيئة التطوير ستُحجب");
+});
+
+test("بوابة التثبيت: beforeinstallprompt للزر وخطوات iOS والواجهة في index.html", async () => {
+  const gate = await readFile(new URL("../client/src/js/install-gate.js", import.meta.url), "utf8");
+  const html = await readFile(new URL("../client/index.html", import.meta.url), "utf8");
+  const mainJs = await readFile(new URL("../client/src/main.js", import.meta.url), "utf8");
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  // أندرويد/كروم: التقاط الحدث وتأجيله وربطه بالزر ثم prompt عند الضغط
+  assert.match(gate, /window\.addEventListener\("beforeinstallprompt", \(event\) => \{\s*event\.preventDefault\(\);\s*deferredPrompt = event;/, "التقاط beforeinstallprompt مفقود");
+  assert.match(gate, /deferredPrompt\.prompt\(\);/, "الزر لا يستدعي prompt");
+  assert.match(gate, /window\.addEventListener\("appinstalled"/, "لا استجابة لحدث appinstalled");
+  // iOS: إخفاء الزر وإظهار الخطوات
+  assert.match(gate, /if \(isIosSafari\(\)\) \{[\s\S]{0,220}installButton\.hidden = true;[\s\S]{0,120}iosSteps\.hidden = false;/, "مسار iOS لا يخفي الزر ويظهر الخطوات");
+  // الواجهة: الشاشة والزر والخطوات الثلاث في index.html والتطبيق داخل #app-content
+  assert.match(html, /<div id="app-content">[\s\S]{0,80}<div id="app"/, "التطبيق ليس داخل #app-content");
+  assert.match(html, /<section id="install-screen" hidden/, "شاشة التثبيت مفقودة");
+  assert.match(html, /id="install-app-btn"[^>]*hidden/, "زر التثبيت يجب أن يبدأ مخفيًا حتى يصل الحدث");
+  assert.match(html, /id="ios-install-steps"[\s\S]*?المشاركة[\s\S]*?إضافة إلى الشاشة الرئيسية[\s\S]*?«إضافة»/, "خطوات iOS الثلاث ناقصة");
+  // main.js: الحجب قبل الإقلاع — المتصفح لا يشغل التطبيق إطلاقًا
+  assert.match(mainJs, /if \(shouldBlockBrowserAccess\(\)\) \{\s*mountInstallGate\(\);\s*\} else \{\s*bootApp\(document\.querySelector\("#app"\)\);\s*\}/, "البوابة لا تسبق إقلاع التطبيق");
+  // CSS: الشاشة فوق كل شيء
+  assert.match(css, /#install-screen \{ position:fixed; inset:0; z-index:4000/, "شاشة التثبيت ليست طبقة عليا مثبتة");
+});

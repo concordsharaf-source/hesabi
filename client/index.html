@@ -45,7 +45,27 @@
     </script>
   </head>
   <body>
-    <div id="app" aria-live="polite"></div>
+    <div id="app-content">
+      <div id="app" aria-live="polite"></div>
+    </div>
+    <section id="install-screen" hidden aria-label="تثبيت التطبيق">
+      <div class="install-card">
+        <img src="./hesabi-icon-192.png" alt="شعار حسابي" class="install-card__logo" />
+        <h1>ثبّت تطبيق حسابي</h1>
+        <p class="install-card__lead">للاستخدام الكامل بسرعة وأمان ودون اتصال، يعمل حسابي كتطبيق مثبت على جهازك — وليس من داخل المتصفح.</p>
+        <button id="install-app-btn" class="install-card__btn" type="button" hidden>📲 تثبيت التطبيق</button>
+        <div id="ios-install-steps" class="install-steps" hidden>
+          <strong>لتثبيت التطبيق على iPhone / iPad:</strong>
+          <ol>
+            <li>اضغط زر <strong>المشاركة</strong> <span class="install-steps__icon" aria-hidden="true">⎋</span> في شريط سفاري.</li>
+            <li>اختر <strong>«إضافة إلى الشاشة الرئيسية»</strong> <span class="install-steps__icon" aria-hidden="true">➕</span>.</li>
+            <li>اضغط <strong>«إضافة»</strong> ثم افتح التطبيق من الشاشة الرئيسية.</li>
+          </ol>
+        </div>
+        <p id="manual-install-note" class="install-card__note" hidden>إن لم يظهر زر التثبيت: افتح قائمة المتصفح ⋮ واختر «تثبيت التطبيق» أو «إضافة إلى الشاشة الرئيسية».<br />وإذا كان التطبيق مثبتًا مسبقًا فافتحه من أيقونته على جهازك.</p>
+        <p id="install-done-note" class="install-card__note install-card__note--done" hidden>✅ تم التثبيت! افتح التطبيق الآن من أيقونة «حسابي» على جهازك.</p>
+      </div>
+    </section>
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
