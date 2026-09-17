@@ -650,3 +650,16 @@ test("الصيدلية: بلاطة خدمات ثابتة بلون مميز أع�
   assert.match(css, /\[data-theme="dark"\] \.sales-service-tile--pharmacy/, "لا دعم للوضع الداكن");
   assert.match(appJs, /medical: '<path d="M12 3v18"/, "أيقونة الخدمات الطبية مفقودة");
 });
+
+/* ===== v60: إخفاء سعر البيع من شاشة تفاصيل فاتورة الشراء المحفوظة ===== */
+
+test("تفاصيل فاتورة الشراء المحفوظة لا تعرض سعر البيع مع بقائه في البيانات", () => {
+  const start = appJs.indexOf("فاتورة شراء محفوظة");
+  assert.ok(start > -1, "شاشة تفاصيل فاتورة الشراء غير موجودة");
+  const dialog = appJs.slice(start, start + 3200);
+  assert.ok(!dialog.includes("سعر البيع"), "سعر البيع ما زال يظهر في تفاصيل فاتورة الشراء");
+  assert.ok(dialog.includes("سعر الحبة ${money(item.unitCost)}"), "سعر الحبة اختفى من التفاصيل");
+  // البيانات تبقى: التعبئة التلقائية والحفظ في سطر الشراء لم يتغيرا
+  assert.match(appJs, /const salePrice = values\.salePrice === undefined \|\| values\.salePrice === "" \? product\.salePrice \?\? product\.defaultSalePrice \?\? product\.price \?\? 0 : values\.salePrice;/, "التعبئة التلقائية لسعر البيع حُذفت");
+  assert.match(appJs, /salePrice: toNumber\(salePrice\)/, "سعر البيع لم يعد يُحفظ في بيانات السطر");
+});
