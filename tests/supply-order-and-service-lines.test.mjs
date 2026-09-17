@@ -686,3 +686,13 @@ test("لا زر + في الشريط العلوي لصفحات العملاء و�
   assert.match(appJs, /po-order-tile" type="button" data-action="new-customer"/, "بلاطة إضافة عميل مفقودة");
   assert.match(appJs, /po-order-tile" type="button" data-action="new-purchase"/, "بلاطة إضافة فاتورة مفقودة");
 });
+
+/* ===== v63: حذف زر «ربط هذا الجهاز» (رمز الاقتران) من الإعدادات > البيانات ===== */
+
+test("لا زر ربط هذا الجهاز ولا نافذة إدخال رمز الاقتران في بطاقة النسخ السحابي", () => {
+  assert.ok(!appJs.includes('data-action="pairing-redeem"'), "زر ربط هذا الجهاز ما زال موجودًا");
+  assert.ok(!appJs.includes("openPairingRedeemDialog"), "نافذة إدخال رمز الاقتران ما زالت في الكود");
+  // زر ربط النسخ السحابية باقٍ، وتدفق «دخول جهاز مساعد» لم يُمس
+  assert.match(appJs, /data-action="open-cloud-auth">ربط النسخ السحابية<\/button><\/div><\/section>/, "زر ربط النسخ السحابية اختفى أو بقي بجواره زر الاقتران");
+  assert.match(appJs, /redeemPairingInvite/, "تدفق دخول الجهاز المساعد حُذف بالخطأ");
+});
