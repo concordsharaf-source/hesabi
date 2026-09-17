@@ -56,6 +56,7 @@ const icon = (name, size = 20) => {
     pause: '<rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>',
     clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
     calculator: '<rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="16" y1="14" x2="16" y2="18"/><path d="M8 10h.01M12 10h.01M16 10h.01M8 14h.01M12 14h.01M8 18h.01M12 18h.01"/>',
+    medical: '<path d="M12 3v18"/><path d="M3 12h18"/><circle cx="12" cy="12" r="9"/>',
     phone: '<path d="M22 16.9v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.37 1.9.72 2.8a2 2 0 0 1-.45 2.11L8.11 9.89a16 16 0 0 0 6 6l1.26-1.26a2 2 0 0 1 2.11-.45c.9.35 1.84.59 2.8.72A2 2 0 0 1 22 16.9Z"/>',
     moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
@@ -1244,7 +1245,7 @@ function salesMarkup() {
   const topbarActions = `<div class="sales-topbar-actions">${heldCount ? `<button class="button button--secondary button--compact held-topbar-btn" data-action="open-held-invoices" title="الفواتير المعلقة">${icon("clock", 16)}<span>معلقة (${heldCount})</span></button>` : ""}<button class="button button--secondary" data-action="navigate" data-view="invoices">${icon("receipt", 17)}<span>الفواتير</span></button></div>`;
   return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.", topbarActions)}
   <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div><p class="desktop-barcode-reader-note">${icon("scan", 15)} قارئ الباركود المتصل بالكمبيوتر يعمل مباشرةً في صفحة المبيعات؛ امسح الرمز ثم Enter أو Tab.</p>
-  <div class="sales-service-tiles"><button class="sales-service-tile sales-service-tile--topup" type="button" data-action="add-service-line" data-service="instant-topup">${icon("phone", 20)}<span>شحن فوري</span><small>رصيد اتصالات للزبون</small></button><button class="sales-service-tile sales-service-tile--exchange" type="button" data-action="add-service-line" data-service="cash-transfer">${icon("transfer", 20)}<span>نقد مقابل تحويل</span><small>الزبون يحوّل وتسلمه نقدًا</small></button></div><div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => {
+  <div class="sales-service-tiles">${isPharmacy() ? `<button class="sales-service-tile sales-service-tile--pharmacy" type="button" data-action="open-pharmacy-service">${icon("medical", 20)}<span>خدمات</span><small>مجارحة · ضرب إبر · قياسات وغيرها</small></button>` : ""}<button class="sales-service-tile sales-service-tile--topup" type="button" data-action="add-service-line" data-service="instant-topup">${icon("phone", 20)}<span>شحن فوري</span><small>رصيد اتصالات للزبون</small></button><button class="sales-service-tile sales-service-tile--exchange" type="button" data-action="add-service-line" data-service="cash-transfer">${icon("transfer", 20)}<span>نقد مقابل تحويل</span><small>الزبون يحوّل وتسلمه نقدًا</small></button></div><div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => {
     const isFlash = state.lastAddedProductId === product.id;
     const inCart = cartProductIds.has(product.id);
     const cartQty = inCart ? state.cart.reduce((sum, line) => (line.productId === product.id ? sum + toNumber(line.quantity) : sum), 0) : 0;
@@ -1259,6 +1260,24 @@ const SALE_SERVICE_TYPES = {
   "instant-topup": { label: "شحن فوري", hint: "رصيد اتصالات للزبون", prefix: "svc-topup" },
   "cash-transfer": { label: "نقد مقابل تحويل", hint: "الزبون يحوّل حوالة وتسلمه المبلغ نقدًا", prefix: "svc-exchange" },
 };
+const PHARMACY_SERVICE_OPTIONS = ["مجارحة", "ضرب إبر", "قياس ضغط", "قياس سكر", "تضميد جرح", "استشارة"];
+function openPharmacyServiceDialog() {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">خدمات الصيدلية</span><h2>إضافة خدمة للفاتورة</h2><p class="dialog__subtext">اختر نوع الخدمة وحدد سعرها لتُضاف سطرًا في سلة البيع.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="pharmacy-service-form" class="form-grid"><label>نوع الخدمة<select name="serviceKind">${PHARMACY_SERVICE_OPTIONS.map((option) => `<option value="${option}">${option}</option>`).join("")}<option value="__custom__">خدمة أخرى...</option></select></label><label id="pharmacy-service-custom" hidden>اسم الخدمة<input name="customKind" dir="rtl" maxlength="60" placeholder="اكتب اسم الخدمة" /></label><label>السعر<input name="servicePrice" type="number" inputmode="decimal" min="0" step="1" required placeholder="أدخل سعر الخدمة" /></label><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button type="submit" class="button button--primary">إضافة للسلة ${icon("check", 17)}</button></div></form>`);
+  overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
+  const form = overlay.querySelector("#pharmacy-service-form");
+  const customField = overlay.querySelector("#pharmacy-service-custom");
+  form.serviceKind.addEventListener("change", () => { const isCustom = form.serviceKind.value === "__custom__"; customField.hidden = !isCustom; form.customKind.required = isCustom; if (isCustom) form.customKind.focus(); });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const kind = form.serviceKind.value === "__custom__" ? String(form.customKind.value || "").trim() : form.serviceKind.value;
+    const price = toNumber(form.servicePrice.value);
+    if (!kind) { showToast("اكتب اسم الخدمة.", "error"); return; }
+    if (price <= 0) { showToast("أدخل سعر الخدمة.", "error"); return; }
+    state.cart.push({ productId: `svc-pharmacy-${Date.now()}`, isService: true, serviceType: "pharmacy-service", name: kind, unitPrice: price, quantity: 1, discount: "" });
+    closeDialog(); renderKeepingScroll(); showToast(`أُضيفت خدمة «${kind}» إلى السلة.`);
+  });
+  requestAnimationFrame(() => form.servicePrice.focus());
+}
 function addServiceLine(serviceType) {
   const service = SALE_SERVICE_TYPES[serviceType];
   if (!service) return;
@@ -1267,9 +1286,9 @@ function addServiceLine(serviceType) {
   requestAnimationFrame(() => { const input = root.querySelector(`[data-service-amount]:last-of-type`) || [...root.querySelectorAll("[data-service-amount]")].pop(); input?.focus(); });
 }
 function serviceCartLine(line) {
-  const service = SALE_SERVICE_TYPES[line.serviceType] || { label: line.name || "خدمة", hint: "" };
+  const service = SALE_SERVICE_TYPES[line.serviceType] || { label: line.name || "خدمة", hint: line.serviceType === "pharmacy-service" ? "خدمة صيدلية" : "" };
   const lineAmount = Math.max(0, toNumber(line.unitPrice));
-  return `<article class="cart-line cart-line--service"><div class="cart-line__detail"><strong dir="rtl">${icon(line.serviceType === "cash-transfer" ? "transfer" : "phone", 15)} ${escapeHtml(service.label)}</strong><small>${escapeHtml(service.hint)}</small></div><strong data-cart-line-total="${line.productId}">${money(lineAmount)}</strong><label class="cart-line__service-amount"><span>المبلغ</span><input data-service-amount="${line.productId}" type="number" inputmode="decimal" min="0" step="1" value="${escapeHtml(line.unitPrice)}" placeholder="أدخل المبلغ" aria-label="مبلغ ${escapeHtml(service.label)}" /></label><button class="remove-line" aria-label="حذف من السلة" data-action="cart-remove" data-id="${line.productId}">${icon("close", 16)}</button></article>`;
+  return `<article class="cart-line cart-line--service"><div class="cart-line__detail"><strong dir="rtl">${icon(line.serviceType === "cash-transfer" ? "transfer" : line.serviceType === "pharmacy-service" ? "medical" : "phone", 15)} ${escapeHtml(service.label)}</strong><small>${escapeHtml(service.hint)}</small></div><strong data-cart-line-total="${line.productId}">${money(lineAmount)}</strong><label class="cart-line__service-amount"><span>المبلغ</span><input data-service-amount="${line.productId}" type="number" inputmode="decimal" min="0" step="1" value="${escapeHtml(line.unitPrice)}" placeholder="أدخل المبلغ" aria-label="مبلغ ${escapeHtml(service.label)}" /></label><button class="remove-line" aria-label="حذف من السلة" data-action="cart-remove" data-id="${line.productId}">${icon("close", 16)}</button></article>`;
 }
 function cartLine(line) {
   if (line.isService) return serviceCartLine(line);
@@ -2346,6 +2365,7 @@ async function handleActionUnsafe(event) {
   const id = event.currentTarget.dataset.id;
   if (action === "fill-login") { const input = root.querySelector("#login-form [name=username]"); if (input) { input.value = event.currentTarget.dataset.username; root.querySelector("#login-form [name=pin]")?.focus(); } return; }
   if (action === "add-service-line") { addServiceLine(event.currentTarget.dataset.service); return; }
+  if (action === "open-pharmacy-service") { openPharmacyServiceDialog(); return; }
   if (action === "scroll-to-cart") { root.querySelector("#sales-cart")?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (action === "open-phone-recovery") { openPhoneRecoveryDialog(); return; }
   if (action === "cloud-password-reset") { openCloudAuthDialog(); return; }

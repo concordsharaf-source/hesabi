@@ -1824,6 +1824,8 @@ html.is-sales-page .sales-total-bar {
 .sales-service-tile:active { transform:scale(.97); }
 .sales-service-tile span { font-size:14px; font-weight:800; }
 .sales-service-tile small { font-size:10px; opacity:.85; }
+.sales-service-tile--pharmacy { grid-column:1 / -1; background:linear-gradient(135deg,#6d3ba8,#4a2478); border-color:#b58ae6; box-shadow:0 8px 18px rgba(74,36,120,.3); }
+[data-theme="dark"] .sales-service-tile--pharmacy { background:linear-gradient(135deg,#5c3390,#3a1d61); border-color:#8d5fc4; }
 .sales-service-tile--topup { background:linear-gradient(135deg,#1f6b59,#174c3f); border-color:rgba(255,255,255,.25); }
 .sales-service-tile--exchange { background:linear-gradient(135deg,#8a5a1f,#6b4415); border-color:rgba(255,255,255,.25); }
 [data-theme="dark"] .sales-service-tile--topup { background:linear-gradient(135deg,#1c5b4c,#123c32); border-color:#3a6d5f; }

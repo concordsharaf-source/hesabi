@@ -629,3 +629,24 @@ test("فاتورة الشراء: لا خانة سعر بيع في السطر و�
   assert.match(dialog, /const salePrice = values\.salePrice === undefined \|\| values\.salePrice === "" \? product\.salePrice \?\? product\.defaultSalePrice \?\? product\.price \?\? 0 : values\.salePrice;/, "تعبئة سعر البيع التلقائية من المنتج مفقودة");
   assert.match(dialog, /salePrice: toNumber\(salePrice\)/, "سعر البيع لم يعد يُحفظ في سطر الفاتورة");
 });
+
+/* ===== v59: بلاطة «خدمات» الصيدلية أعلى أصناف المبيعات ===== */
+
+test("الصيدلية: بلاطة خدمات ثابتة بلون مميز أعلى الأصناف تفتح نافذة نوع الخدمة والسعر", async () => {
+  const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
+  // البلاطة تظهر للصيدلية فقط وفوق بلاطتي الشحن والتحويل
+  assert.match(appJs, /\$\{isPharmacy\(\) \? `<button class="sales-service-tile sales-service-tile--pharmacy" type="button" data-action="open-pharmacy-service">\$\{icon\("medical", 20\)\}<span>خدمات<\/span>/, "بلاطة الخدمات ليست مشروطة بالصيدلية أو ليست قبل البلاطتين");
+  assert.match(appJs, /مجارحة · ضرب إبر · قياسات وغيرها/, "وصف البلاطة مفقود");
+  // النافذة: نوع الخدمة (مجارحة، ضرب إبر...) + خيار مخصص + السعر
+  assert.match(appJs, /const PHARMACY_SERVICE_OPTIONS = \["مجارحة", "ضرب إبر", "قياس ضغط", "قياس سكر", "تضميد جرح", "استشارة"\];/, "قائمة أنواع الخدمة ناقصة");
+  assert.match(appJs, /<option value="__custom__">خدمة أخرى\.\.\.<\/option>/, "خيار الخدمة المخصصة مفقود");
+  assert.match(appJs, /<label>السعر<input name="servicePrice" type="number" inputmode="decimal" min="0" step="1" required/, "خانة السعر مفقودة");
+  // الإضافة كسطر خدمة في السلة بسعر إلزامي واسم النوع
+  assert.match(appJs, /state\.cart\.push\(\{ productId: `svc-pharmacy-\$\{Date\.now\(\)\}`, isService: true, serviceType: "pharmacy-service", name: kind, unitPrice: price, quantity: 1, discount: "" \}\);/, "الخدمة لا تُضاف للسلة");
+  assert.match(appJs, /if \(price <= 0\) \{ showToast\("أدخل سعر الخدمة\.", "error"\); return; \}/, "السعر الصفري يمر");
+  assert.match(appJs, /if \(action === "open-pharmacy-service"\) \{ openPharmacyServiceDialog\(\); return; \}/, "الزر غير مربوط بالنافذة");
+  // لون مميز بعرض كامل فوق البلاطتين + دعم داكن + أيقونة طبية
+  assert.match(css, /\.sales-service-tile--pharmacy \{ grid-column:1 \/ -1; background:linear-gradient\(135deg,#6d3ba8,#4a2478\)/, "البلاطة بلا لون مميز بعرض كامل");
+  assert.match(css, /\[data-theme="dark"\] \.sales-service-tile--pharmacy/, "لا دعم للوضع الداكن");
+  assert.match(appJs, /medical: '<path d="M12 3v18"/, "أيقونة الخدمات الطبية مفقودة");
+});
