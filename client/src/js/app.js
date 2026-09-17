@@ -2082,13 +2082,27 @@ async function repairCloudWorkspace() {
   try { state.cloud.busy = "repair"; render(); await ensureAdminCloudWorkspace(); await seedWorkspaceBackup(await db.exportBackup()); state.cloud.error = ""; showToast("تم إصلاح ربط المتجر بالبريد السحابي. جرّب إنشاء رمز الاقتران الآن."); } catch (error) { state.cloud.error = error.message || "تعذر إصلاح ربط المتجر."; showToast(state.cloud.error, "error"); } finally { state.cloud.busy = false; render(); }
 }
 
-async function ensureAdminCloudWorkspace() {
+async function linkAdminCloudWorkspaceAfterAuth() {
   if (!isAdmin(state.currentUser) || !state.cloud.user) return;
-  const storeId = state.settings?.cloudStoreId || `store_${randomId()}`;
+  const isPermissionError = (error) => error?.code === "permission-denied" || /insufficient permissions/i.test(error?.message || "");
+  const attempt = async (storeId) => {
+    const identity = await createStoreWorkspace({ storeId, storeName: storeDisplayName(), ownerAccount: state.currentUser });
+    try { await watchAssistantRequests(storeId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); }
+    return identity;
+  };
+  let storeId = state.settings?.cloudStoreId || `store_${randomId()}`;
   if (!state.settings?.cloudStoreId) { await db.saveSettings({ cloudStoreId: storeId }); state.settings = await db.getSettings(); }
-  state.cloud.identity = await createStoreWorkspace({ storeId, storeName: storeDisplayName(), ownerAccount: state.currentUser });
-  try { await watchAssistantRequests(storeId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); }
+  try { state.cloud.identity = await attempt(storeId); }
+  catch (error) {
+    if (!isPermissionError(error)) throw error;
+    /* مساحة المتجر المحفوظة تخص بريدًا سحابيًا آخر — ننشئ مساحة جديدة لهذا البريد بدل رسالة Missing or insufficient permissions */
+    storeId = `store_${randomId()}`;
+    await db.saveSettings({ cloudStoreId: storeId }); state.settings = await db.getSettings();
+    state.cloud.identity = await attempt(storeId);
+  }
 }
+
+async function ensureAdminCloudWorkspace() { await linkAdminCloudWorkspaceAfterAuth(); }
 
 function openAssistantWaitingDialog(request) {
   const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">طلب الجهاز المساعد</span><h2>بانتظار موافقة الأدمن</h2><p class="dialog__subtext">أرسلنا الطلب. بعد موافقة الأدمن سيعطيك رمزًا مؤقتًا؛ أدخله هنا لإكمال الدخول وتحميل بيانات المتجر.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="assistant-code-form" class="form-grid"><label class="form-full">رمز الدخول المؤقت<input name="token" dir="ltr" inputmode="text" autocomplete="one-time-code" placeholder="معرّف المتجر:123456" required autofocus /></label><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>لاحقًا</button><button class="button button--primary" type="submit">إكمال الدخول</button></div></form>`);
@@ -3229,14 +3243,14 @@ function openCloudAuthDialog(initialMode = "signin") {
     const controls = [...form.querySelectorAll("button")]; controls.forEach((button) => { button.disabled = true; });
     try {
       state.cloud.user = mode === "register" ? await registerCloudBackupUser(values.email, values.password) : await signInCloudBackupUser(values.email, values.password);
-      if (isAdmin(state.currentUser)) { const storeId = state.settings?.cloudStoreId || `store_${randomId()}`; if (!state.settings?.cloudStoreId) { await db.saveSettings({ cloudStoreId: storeId }); state.settings = await db.getSettings(); } state.cloud.identity = await createStoreWorkspace({ storeId, storeName: storeDisplayName(), ownerAccount: state.currentUser }); try { await watchAssistantRequests(storeId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } }
+      await linkAdminCloudWorkspaceAfterAuth();
       state.cloud.backups = []; state.cloud.error = ""; closeDialog(); render(); await refreshCloudBackups({ quiet: true }); showToast("تم ربط حساب النسخ السحابية.");
     } catch (error) {
       controls.forEach((button) => { button.disabled = false; });
       if (mode === "register" && error.code === "auth/email-already-in-use") {
         try {
           state.cloud.user = await signInCloudBackupUser(values.email, values.password);
-          if (isAdmin(state.currentUser)) { const storeId = state.settings?.cloudStoreId || `store_${randomId()}`; if (!state.settings?.cloudStoreId) { await db.saveSettings({ cloudStoreId: storeId }); state.settings = await db.getSettings(); } state.cloud.identity = await createStoreWorkspace({ storeId, storeName: storeDisplayName(), ownerAccount: state.currentUser }); try { await watchAssistantRequests(storeId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (watchError) { console.warn("[Hesabi pairing requests unavailable]", watchError); } }
+          await linkAdminCloudWorkspaceAfterAuth();
           state.cloud.backups = []; state.cloud.error = ""; closeDialog(); render(); await refreshCloudBackups({ quiet: true }); showToast("هذا البريد مسجل من قبل، فتم تسجيل دخولك وربط الحساب.");
           return;
         } catch (signinError) {
@@ -3248,7 +3262,8 @@ function openCloudAuthDialog(initialMode = "signin") {
         }
       }
       if (mode === "signin" && (error.code === "auth/user-not-found")) { mode = "register"; applyMode(); form.email.value = values.email; showError("لا يوجد حساب بهذا البريد. أنشئه الآن من تبويب «إنشاء جديد»."); return; }
-      showError(error.message || "تعذر ربط حساب النسخ السحابية.");
+      const permissionIssue = error.code === "permission-denied" || /insufficient permissions/i.test(error.message || "");
+      showError(permissionIssue ? "تم إنشاء الحساب لكن تعذر تجهيز مساحة المتجر في السحابة. أعد المحاولة، وإن تكررت المشكلة استخدم زر إصلاح ربط المتجر بعد الدخول." : error.message || "تعذر ربط حساب النسخ السحابية.");
     }
   });
 }

@@ -59,8 +59,11 @@ export async function createStoreWorkspace({ storeId, storeName, ownerAccount })
   const { firestore } = await services();
   const user = await ensureOwnerUser();
   const deviceId = readDeviceId();
-  const existingStore = await getDoc(storeRef(firestore, storeId));
-  const existingOwnerDeviceId = existingStore.exists() ? existingStore.data().ownerDeviceId : "";
+  /* المستخدم الجديد ليس عضوًا بعد، فقواعد الأمان ترفض قراءة مستند المتجر قبل إنشائه.
+     نعامل رفض القراءة كمتجر غير موجود بدل إفشال الربط برسالة Missing or insufficient permissions. */
+  let existingOwnerDeviceId = "";
+  try { const existingStore = await getDoc(storeRef(firestore, storeId)); existingOwnerDeviceId = existingStore.exists() ? existingStore.data().ownerDeviceId : ""; }
+  catch (error) { if (error?.code !== "permission-denied") throw error; }
   const isOwnerDevice = !existingOwnerDeviceId || existingOwnerDeviceId === deviceId;
   const identity = { ...createDeviceIdentity({ deviceId, accountId: ownerAccount.id, accountName: ownerAccount.name, role: "admin", storeId }), isOwnerDevice };
   await setDoc(storeRef(firestore, storeId), { id: storeId, ownerUid: user.uid, ownerEmail: user.email || "", name: String(storeName || "حسابي").slice(0, 80), ownerDeviceId: existingOwnerDeviceId || deviceId, updatedAt: serverTimestamp() }, { merge: true });

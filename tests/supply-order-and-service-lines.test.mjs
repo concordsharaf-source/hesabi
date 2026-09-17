@@ -735,3 +735,22 @@ test("نافذة الربط السحابي: تبويبان وتأكيد كلمة
   assert.match(backupJs, /استخدم تبويب «تسجيل دخول» بدلًا من إنشاء حساب جديد/, "رسالة البريد المستخدم لم تُحدث");
   assert.match(css, /\.cloud-auth-tab\.is-active \{ color:#fff; background:var\(--green\)/, "تمييز التبويب النشط مفقود");
 });
+
+/* ===== v66: إصلاح Missing or insufficient permissions عند تسجيل بريد جديد ===== */
+
+test("الربط السحابي لبريد جديد لا يسقط في خطأ الصلاحيات: قراءة المتجر متسامحة ومساحة جديدة عند التعارض", async () => {
+  const syncJs = await readFile(new URL("../client/src/js/firebase-sync.js", import.meta.url), "utf8");
+  // قراءة مستند المتجر قبل العضوية لا تفشل التهيئة
+  assert.match(syncJs, /catch \(error\) \{ if \(error\?\.code !== "permission-denied"\) throw error; \}/, "رفض قراءة المتجر ما زال يفشل الربط");
+  // دالة موحدة تعيد المحاولة بمساحة متجر جديدة عند تعارض الملكية
+  const start = appJs.indexOf("async function linkAdminCloudWorkspaceAfterAuth()");
+  assert.ok(start > -1, "الدالة الموحدة مفقودة");
+  const fn = appJs.slice(start, appJs.indexOf("async function ensureAdminCloudWorkspace()", start));
+  assert.match(fn, /error\?\.code === "permission-denied" \|\| \/insufficient permissions\/i\.test\(error\?\.message \|\| ""\)/, "لا كشف لخطأ الصلاحيات");
+  assert.match(fn, /storeId = `store_\$\{randomId\(\)\}`;\s*\n\s*await db\.saveSettings\(\{ cloudStoreId: storeId \}\);/, "لا إنشاء مساحة جديدة عند التعارض");
+  // نافذة الربط تستخدم الدالة الموحدة في المسارين (عادي + بريد موجود مسبقًا)
+  const dialog = appJs.slice(appJs.indexOf('function openCloudAuthDialog(initialMode = "signin")'), appJs.indexOf("async function uploadCurrentCloudBackup"));
+  assert.equal((dialog.match(/await linkAdminCloudWorkspaceAfterAuth\(\);/g) || []).length, 2, "النافذة لا تستخدم الدالة الموحدة في المسارين");
+  // رسالة عربية بدل Missing or insufficient permissions
+  assert.match(dialog, /تم إنشاء الحساب لكن تعذر تجهيز مساحة المتجر في السحابة/, "لا رسالة عربية لخطأ الصلاحيات");
+});
