@@ -4,7 +4,8 @@
  *
  * قرار صريح: المُرسِل هو الجهاز الذي نفّذ العملية — لا خادم عندنا في بناء PWA/APK، والجهاز
  * وحده يعلم بالعملية لحظة وقوعها. فشل الإرسال لا يعطّل شيئًا: الإشعار تكميلي.
- * ملاحظة خصوصية: السرّ الخاص لـ VAPID يُقرأ من Firestore في كل إرسال (لا خادم ليخفيه).
+ * ملاحظة خصوصية: السرّ الخاص لـ VAPID يُقرأ من stores/{id}/push/sender المقصور على جهاز
+ * الأدمن/المالك؛ وباقي الأجهزة تقرأ المفتاح العام وحده من push/config للاشتراك.
  */
 import { getCloudDeviceIdentity, getStoreVapidKeys, listStorePushDevices, registerPushDevice, removePushDevicesByEndpoints } from "./firebase-sync.js";
 import { pushSubscriptionIsValid } from "./notifications.js";
@@ -19,10 +20,11 @@ let queueTimer = null;
 let flushing = false;
 let lastResult = { sent: 0, failed: 0, skipped: 0, at: 0, devices: 0 };
 
-async function resolveVapid(storeId, { allowGenerate = true } = {}) {
+/* المفتاح العام وحده — يكفي لتسجيل اشتراك الجهاز، ولا يلمس السرّ الخاص. */
+async function resolveSubscribeVapid(storeId) {
   if (!storeId) return null;
   const fresh = configCache.storeId === storeId && Date.now() - configCache.readAt < CONFIG_TTL_MS;
-  if (fresh && configCache.value) return configCache.value;
+  if (fresh && configCache.value?.publicKey) return configCache.value;
   try {
     const value = await getStoreVapidKeys(storeId, { force: !fresh });
     if (value?.publicKey) {
@@ -30,11 +32,23 @@ async function resolveVapid(storeId, { allowGenerate = true } = {}) {
       return value;
     }
   } catch (error) {
-    if (!allowGenerate) throw error;
     console.warn("[Hesabi push] VAPID", error?.message || error);
   }
   configCache = { storeId, value: null, readAt: Date.now() };
   return null;
+}
+
+/* السرّ الخاص — يُقرأ من push/sender، وجهاز الكاشير لا يملك صلاحية قراءته فيرتدّ null
+   ويُتخطّى الإرسال بصمت بدل أن يفشل. الإرسال الفعلي يبقى من جهاز الأدمن. */
+async function resolveSendVapid(storeId) {
+  if (!storeId) return null;
+  try {
+    const value = await getStoreVapidKeys(storeId, { scope: "send", force: true });
+    return value?.privateKey ? value : null;
+  } catch (error) {
+    console.warn("[Hesabi push] VAPID send", error?.message || error);
+    return null;
+  }
 }
 
 /**
@@ -44,13 +58,13 @@ async function resolveVapid(storeId, { allowGenerate = true } = {}) {
 export async function flushStoreAlerts(alerts, { excludeUid = "" } = {}) {
   const summary = { sent: 0, failed: 0, skipped: 0, devices: 0 };
   if (typeof globalThis.fetch !== "function") {
-    return { ...summary, skipped: alerts.length, reason: "no-fetch" };
+    return { ...summary, skipped: alerts.length, reason: "no-fetch" }
   }
   const identity = await getCloudDeviceIdentity().catch(() => null);
   const storeId = identity?.storeId;
   if (!storeId) return { ...summary, skipped: alerts.length, reason: "no-store" };
-  const vapid = await resolveVapid(storeId);
-  if (!vapid?.publicKey) return { ...summary, skipped: alerts.length, reason: "no-vapid" };
+  const vapid = await resolveSendVapid(storeId);
+  if (!vapid?.privateKey) return { ...summary, skipped: alerts.length, reason: "no-vapid" };
   const devices = await listStorePushDevices(storeId, { excludeUid: excludeUid || identity.uid || "" });
   summary.devices = devices.length;
   if (!devices.length) return { ...summary, skipped: alerts.length, reason: "no-devices" };
@@ -100,12 +114,7 @@ export async function renewAndRegisterPushDevice(registration) {
   const identity = await getCloudDeviceIdentity().catch(() => null);
   const storeId = identity?.storeId;
   if (!storeId) return { registered: false, reason: "no-store" };
-  let vapid = null;
-  try {
-    vapid = await resolveVapid(storeId, { allowGenerate: false });
-  } catch {
-    vapid = null;
-  }
+  const vapid = await resolveSubscribeVapid(storeId);
   if (!vapid?.publicKey) return { registered: false, reason: "no-vapid" };
   const existing = await reg.pushManager.getSubscription();
   const needsNew = !pushSubscriptionIsValid(existing);

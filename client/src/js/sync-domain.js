@@ -58,16 +58,6 @@ export function mergeRemoteChanges(payload, changes, storeNames = SYNCABLE_STORE
   return next;
 }
 
-export function createPairingCode({ now = Date.now(), ttlMs = 10 * 60 * 1000, randomBytes = crypto.getRandomValues.bind(crypto) } = {}) {
-  const bytes = randomBytes(new Uint8Array(6));
-  const code = Array.from(bytes, (byte) => String(byte % 10)).join("");
-  return { code, codeId: `pair_${randomId()}`, createdAt: now, expiresAt: now + ttlMs, usedAt: null };
-}
-
-export function isPairingCodeUsable(pairing, now = Date.now()) {
-  return Boolean(pairing && !pairing.usedAt && Number(pairing.expiresAt) > now);
-}
-
 export function createDeviceIdentity({ deviceId = `device_${randomId()}`, accountId, accountName, role, storeId }) {
   if (!accountId || !storeId) throw new Error("هوية الجهاز تحتاج حساب المستخدم ومعرّف المتجر.");
   return { deviceId, accountId, accountName: String(accountName || ""), role: role === "admin" ? "admin" : "cashier", storeId, createdAt: new Date().toISOString(), revokedAt: null };

@@ -251,7 +251,9 @@ function bindContactPicker(overlay, phoneInputId, nameInputName = "name") {
   picker.addEventListener("click", () => void pickContactPhone(phoneInput, nameInput));
 }
 const paymentChannelLabel = (invoice) => invoice?.paymentType === "آجل" ? "دين" : invoice?.paymentMethod === "تحويل" ? "تحويل" : "كاش";
-const assetBaseUrl = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage";
+/* الأصول محلية داخل الحزمة (client/public/assets) حتى تعمل الواجهة بلا اتصال
+   ولا تعتمد على نطاق استضافة خارجي قد ينتهي. المسار نسبي ليعمل في PWA وCapacitor وTauri. */
+const assetBaseUrl = "assets";
 const emptyImage = `${assetBaseUrl}/hesabi-empty-inventory_96623fe2.png`;
 const markImage = `${assetBaseUrl}/hesabi-mark_5cb0429a.png`;
 const LOCAL_STORE_LOGO_PATTERN = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+={0,2}$/i;

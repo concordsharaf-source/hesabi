@@ -41,6 +41,7 @@ if (outFile) {
   console.log(`VITE_PUSH_VAPID_PUBLIC_KEY=${publicKey}\nHESABI_VAPID_PRIVATE_KEY=${privateKey}`);
 } else {
   console.log(JSON.stringify({ publicKey, privateKey }, null, 2));
-  console.error("\nتنبيه: السرّ الخاص يُخزَّن في stores/<id>/push/config ويقرأه جهاز الأدمن فقط.");
+  console.error("\nتنبيه: السرّ الخاص يُخزَّن في stores/<id>/push/sender ويقرأه جهاز الأدمن فقط،");
+  console.error("بينما يبقى stores/<id>/push/config للمفتاح العام وحده وهو المقروء لبقية الأجهزة.");
   console.error("إن كان الغرض تشغيلًا فعليًا للمتجر، فعّل الإشعارات من التطبيق — سيولّد المفاتيح ويسجّلها بنفسه.");
 }

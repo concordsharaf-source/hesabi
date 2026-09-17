@@ -109,11 +109,26 @@ temp/
 # Webdev artifacts (checkpoint zips, migrations, etc.)
 .webdev/
 
-# Manus version file (auto-generated, not part of source)
-client/public/__manus__/version.json
+# سجلات تصحيح المتصفح (تولّد محليًا ولا ترفع)
+.manus-logs/
 .project-config.json
 
 # Tauri build output
 src-tauri/target/
+
+# Capacitor: أصول الويب المولدة داخل غلاف أندرويد (تُنشأ بـ npx cap sync android)
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/capacitor-cordova-android-plugins/
+
+# مفاتيح وأسرار — لا ترفع أبدًا
+*.pem
+*.keystore
+*.jks
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+.env.push
 android/keystore.properties.secret
 android/app/hesabi-release.keystore
