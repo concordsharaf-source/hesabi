@@ -566,3 +566,17 @@ test("اقتراحات طلب الشراء: الاسم الكامل يظهر د�
   assert.match(css, /\.po-suggest__item strong \{[^}]*overflow-wrap:anywhere/, "اسم الصنف ما زال يُقصّ بثلاث نقاط");
   assert.doesNotMatch(/\.po-suggest__item strong \{[^}]*\}/.exec(css)?.[0] || "", /text-overflow:ellipsis|white-space:nowrap/, "قصّ الاسم ما زال مفعلًا");
 });
+
+/* ===== v56: أصناف المبيعات بلا باركود تتصدر القائمة ===== */
+
+test("قائمة المبيعات: الأصناف بلا باركود (كود داخلي أو بلا رمز) في الأعلى دائمًا", () => {
+  assert.match(appJs, /const productLacksBarcode = \(product\) => !String\(product\?\.barcode \|\| ""\)\.trim\(\);/, "دالة كشف غياب الباركود مفقودة");
+  const fn = appJs.slice(appJs.indexOf("function salesRankedProducts"), appJs.indexOf("function salesMarkup"));
+  // المعيار الأول قبل الأحدث مبيعًا: من بلا باركود يتقدم
+  assert.match(fn, /if \(a\.noBarcode !== b\.noBarcode\) return Number\(b\.noBarcode\) - Number\(a\.noBarcode\);\s*if \(a\.lastSoldAt !== b\.lastSoldAt\)/, "غياب الباركود ليس المعيار الأول قبل الأحدث مبيعًا");
+  assert.match(fn, /noBarcode: productLacksBarcode\(product\)/, "الترتيب لا يحسب حالة الباركود");
+  // حتى بلا سجل مبيعات: القائمة تتصدرها الأصناف بلا باركود
+  assert.match(fn, /return \[\.\.\.products\]\.sort\(\(a, b\) => Number\(productLacksBarcode\(b\)\) - Number\(productLacksBarcode\(a\)\)\);/, "مسار غياب السجل لا يقدم أصناف بلا باركود");
+  // فرز مستقر: الكود الداخلي وحده لا يُعد باركودًا — يعتمد على حقل barcode فقط
+  assert.doesNotMatch(fn, /internalCode/, "الكود الداخلي يجب ألا يؤثر على التصدر");
+});

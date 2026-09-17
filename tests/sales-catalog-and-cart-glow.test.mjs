@@ -22,7 +22,7 @@ test("قائمة المبيعات محدودة بسقف ثابت وترتيبه�
   // الترتيب يقرأ فقط مما هو محمّل أصلًا في state — لا عملية قاعدة بيانات جديدة
   assert.doesNotMatch(appJs.slice(appJs.indexOf("function salesRankedProducts"), appJs.indexOf("function salesMarkup")), /db\.|await /, "الدالة يجب أن تكون نقية بلا I/O");
   // عند غياب سجل المبيعات يجب أن يسقط بأمان لكل المنتجات لا لقائمة فارغة
-  assert.match(appJs, /if \(!Array\.isArray\(key\) \|\| !key\.length\) return products;/, "بدون سجل مبيعات تُعرض كل المنتجات");
+  assert.match(appJs, /if \(!Array\.isArray\(key\) \|\| !key\.length\) return \[\.\.\.products\]\.sort\(\(a, b\) => Number\(productLacksBarcode\(b\)\) - Number\(productLacksBarcode\(a\)\)\);/, "بدون سجل مبيعات تُعرض كل المنتجات مع تصدر أصناف بلا باركود");
 });
 
 test("الصنف المضاف للسلة الحالية يظهر حوله توهج ولا يختفي من القائمة", () => {

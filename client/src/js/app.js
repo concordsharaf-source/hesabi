@@ -1203,10 +1203,12 @@ const SALES_CATALOG_LIMIT = 40;
 /* ترتيب الأصناف المعروضة في صفحة المبيعات: الأحدث بيعًا ثم الأكثر مبيعًا، ثم باقي المتوفر.
    يعتمد على state.saleItems و state.sales المحمّلين أصلًا — لا قراءة جديدة ولا كتابة على القاعدة. */
 const salesRankCache = new WeakMap();
+/* الأصناف بلا باركود (كود داخلي فقط أو بلا رمز) تتصدر قائمة المبيعات — لأنها لا تُلتقط بالماسح وتُختار باليد. */
+const productLacksBarcode = (product) => !String(product?.barcode || "").trim();
 function salesRankedProducts() {
   const key = state.saleItems;
   const products = state.products;
-  if (!Array.isArray(key) || !key.length) return products;
+  if (!Array.isArray(key) || !key.length) return [...products].sort((a, b) => Number(productLacksBarcode(b)) - Number(productLacksBarcode(a)));
   const cached = salesRankCache.get(key);
   if (cached && cached.products === products) return cached.ranked;
   const lastSoldAt = new Map();
@@ -1220,8 +1222,9 @@ function salesRankedProducts() {
     if (at && (!lastSoldAt.has(id) || at > lastSoldAt.get(id))) lastSoldAt.set(id, at);
   }
   const ranked = products
-    .map((product) => ({ product, sold: soldQuantity.get(product.id) || 0, lastSoldAt: lastSoldAt.get(product.id) || "" }))
+    .map((product) => ({ product, noBarcode: productLacksBarcode(product), sold: soldQuantity.get(product.id) || 0, lastSoldAt: lastSoldAt.get(product.id) || "" }))
     .sort((a, b) => {
+      if (a.noBarcode !== b.noBarcode) return Number(b.noBarcode) - Number(a.noBarcode);
       if (a.lastSoldAt !== b.lastSoldAt) return a.lastSoldAt < b.lastSoldAt ? 1 : -1;
       if (a.sold !== b.sold) return b.sold - a.sold;
       return String(a.product.name || "").localeCompare(String(b.product.name || ""), "ar");
