@@ -72,10 +72,53 @@ const secureCrypto = () => {
   return globalThis.crypto;
 };
 const makeSalt = () => Array.from(secureCrypto().getRandomValues(new Uint8Array(16)), (byte) => byte.toString(16).padStart(2, "0")).join("");
+/* ── حماية رمز الدخول ─────────────────────────────────────────────────────────
+   الحسابات الجديدة تُخزَّن بـ PBKDF2-SHA256 (210,000 دورة) لأن SHA-256 بدورة واحدة
+   يُكسر بلا اتصال: أي نسخة احتياطية JSON أو فتح DevTools على IndexedDB يكشف الهاش،
+   ورمز من 4 خانات يُختبر بمليارات المحاولات في ثوانٍ.
+   الحسابات القائمة تبقى مقروءة: نهجها SHA-256 ويُرحَّل تلقائيًا إلى PBKDF2 عند أول
+   دخول ناجح، فلا يُقفل أحد خارج حسابه ولا حاجة لأي ترحيل يدوي. */
+const PIN_PBKDF2_ITERATIONS = 210_000;
+const PIN_PBKDF2_PREFIX = "pbkdf2$210000$";
+const isLegacySha256Hash = (value) => /^[0-9a-f]{64}$/.test(String(value || ""));
+const toHex = (buffer) => Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, "0")).join("");
+/* PBKDF2 يحتاج deriveBits، فنتحقق منه مع digest حتى تبقى رسالة الدعم الموحّدة صحيحة. */
+const secureCryptoForPin = () => {
+  const webCrypto = secureCrypto();
+  if (!webCrypto.subtle?.deriveBits || !webCrypto.subtle?.importKey) throw new Error("هذا الجهاز لا يدعم الحماية المطلوبة لرمز الدخول. افتح حسابي من متصفح حديث أو حدّث التطبيق.");
+  return webCrypto;
+};
 const hashPin = async (pin, salt) => {
+  const webCrypto = secureCryptoForPin();
+  const key = await webCrypto.subtle.importKey("raw", new TextEncoder().encode(String(pin)), "PBKDF2", false, ["deriveBits"]);
+  const bits = await webCrypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: new TextEncoder().encode(String(salt)), iterations: PIN_PBKDF2_ITERATIONS },
+    key,
+    256,
+  );
+  return `${PIN_PBKDF2_PREFIX}${toHex(bits)}`;
+};
+/* نهج التخزين السابق — يبقى للتحقق من الحسابات المُنشأة قبل الترقية فقط. */
+const hashPinLegacySha256 = async (pin, salt) => {
   const bytes = new TextEncoder().encode(`${salt}:${String(pin)}`);
-  const digest = await secureCrypto().subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  return toHex(await secureCrypto().subtle.digest("SHA-256", bytes));
+};
+const matchesStoredPinHash = async (pin, account) => {
+  const stored = String(account?.pinHash || "");
+  if (!stored) return false;
+  if (stored.startsWith(PIN_PBKDF2_PREFIX)) return await hashPin(pin, account.pinSalt) === stored;
+  if (isLegacySha256Hash(stored)) return await hashPinLegacySha256(pin, account.pinSalt) === stored;
+  return false;
+};
+/**
+ * يتحقق من رمز الدخول، ويعيد عند النجاح بيانات التخزين المُرقّاة إن كان الحساب
+ * ما زال على نهج SHA-256 القديم (upgradePin) حتى يحفظها المستدعي فورًا.
+ */
+const verifyAccountCredentials = async (pin, account) => {
+  if (!(await matchesStoredPinHash(pin, account))) return { valid: false, upgradePin: null };
+  if (String(account.pinHash || "").startsWith(PIN_PBKDF2_PREFIX)) return { valid: true, upgradePin: null };
+  const pinSalt = makeSalt();
+  return { valid: true, upgradePin: { pinSalt, pinHash: await hashPin(pin, pinSalt) } };
 };
 const accountRole = (role) => role === "admin" ? "admin" : role === "employee" ? "employee" : "cashier";
 const makeIndexedStore = (database, name, indexes = []) => {
@@ -274,19 +317,27 @@ export const db = {
   async clearPersistentSession() { const database = await this.open(); const transaction = database.transaction("meta", "readwrite"); transaction.objectStore("meta").delete(ACTIVE_SESSION_META_ID); await transactionDone(transaction); try { localStorage.removeItem(ACTIVE_SESSION_STORAGE_KEY); } catch { /* localStorage may be unavailable in private mode */ } },
   async authenticateAccount({ username, pin }) {
     const normalized = normalizeUsername(username); const database = await this.open(); const account = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").index("username").get(normalized));
-    if (!account || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("بيانات الدخول غير صحيحة.");
+    if (!account || !account.isActive || !validatePin(pin)) throw new Error("بيانات الدخول غير صحيحة.");
+    const { valid, upgradePin } = await verifyAccountCredentials(pin, account);
+    if (!valid) throw new Error("بيانات الدخول غير صحيحة.");
+    if (upgradePin) await this.saveUpgradedPinHash(account.id, upgradePin);
     return toPersistentSessionUser(account);
   },
   /* تحقق رمز حساب محدد — يستخدمه قفل الشاشة السريع لفتحها بكلمة مرور صاحب الجلسة فقط. */
   async verifyAccountPin(accountId, pin) {
     const database = await this.open(); const account = await requestAsPromise(database.transaction("accounts", "readonly").objectStore("accounts").get(String(accountId || "")));
-    if (!account || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("رمز الدخول غير صحيح.");
+    if (!account || !account.isActive || !validatePin(pin)) throw new Error("رمز الدخول غير صحيح.");
+    const { valid, upgradePin } = await verifyAccountCredentials(pin, account);
+    if (!valid) throw new Error("رمز الدخول غير صحيح.");
+    if (upgradePin) await this.saveUpgradedPinHash(account.id, upgradePin);
     return true;
   },
   async authenticateBackupAccount(payload, { username, pin }) {
     const normalized = normalizeUsername(username);
     const account = (payload?.stores?.accounts || []).find((item) => item.username === normalized);
-    if (!account || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("بيانات الحساب في النسخة السحابية غير صحيحة.");
+    /* لا ترحيل هنا: الحساب مقروء من حمولة النسخة السحابية وليس من IndexedDB،
+       ويُرحَّل تلقائيًا عند أول دخول محلي ناجح بعد الاستعادة. */
+    if (!account || !account.isActive || !validatePin(pin) || !(await matchesStoredPinHash(pin, account))) throw new Error("بيانات الحساب في النسخة السحابية غير صحيحة.");
     return toPersistentSessionUser(account);
   },
   async createAccount(values) {
@@ -327,6 +378,23 @@ export const db = {
     if (current.role !== "cashier") throw new Error("لا يمكن حذف حساب الأدمن من هنا.");
     accounts.put({ ...current, isActive: false, deletedAt: nowIso(), updatedAt: nowIso() });
     await transactionDone(transaction); return { ...current, isActive: false };
+  },
+  /* حفظ الترحيل الصامت من SHA-256 إلى PBKDF2. لا يُفشل الدخول إن تعذّر:
+     المحاولة التالية ترحّله من جديد. */
+  async saveUpgradedPinHash(accountId, upgradePin) {
+    if (!accountId || !upgradePin?.pinHash) return false;
+    try {
+      const database = await this.open();
+      const transaction = database.transaction("accounts", "readwrite");
+      const accounts = transaction.objectStore("accounts");
+      const current = await requestAsPromise(accounts.get(accountId));
+      if (!current || String(current.pinHash || "").startsWith(PIN_PBKDF2_PREFIX)) { await transactionDone(transaction); return false; }
+      accounts.put({ ...current, ...upgradePin, pinUpgradedAt: nowIso(), updatedAt: nowIso() });
+      await transactionDone(transaction);
+      return true;
+    } catch {
+      return false;
+    }
   },
   async changeAccountPin(accountId, pin) {
     if (!validatePin(pin)) throw new Error("رمز الدخول يجب أن يتكون من 4 إلى 12 رقمًا.");

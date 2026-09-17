@@ -11,6 +11,28 @@ import test from "node:test";
 import { db } from "../client/src/js/database.js";
 
 const appJs = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+
+/* كتابة حقول مباشرة في مخزن الحسابات لمحاكاة بيانات قديمة (اختبارات الترحيل فقط). */
+function writeRawAccountFields(accountId, fields) {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("hesabi-pwa");
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const database = request.result;
+      const transaction = database.transaction("accounts", "readwrite");
+      const store = transaction.objectStore("accounts");
+      const get = store.get(accountId);
+      get.onsuccess = () => {
+        if (!get.result) { reject(new Error("الحساب غير موجود للمحاكاة")); return; }
+        store.put({ ...get.result, ...fields });
+      };
+      get.onerror = () => reject(get.error);
+      transaction.oncomplete = () => { database.close(); resolve(true); };
+      transaction.onerror = () => { database.close(); reject(transaction.error); };
+    };
+  });
+}
+
 const backupJs = await readFile(new URL("../client/src/js/firebase-backup.js", import.meta.url), "utf8");
 const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
 
@@ -432,13 +454,49 @@ test("قفل الشاشة: طبقة مستقلة لا تُغلق بالنقر خ
 test("قفل الشاشة: لا يُفتح إلا برمز صاحب الجلسة نفسه — verifyAccountPin موجودة وتتحقق فعلًا", async () => {
   const dbJs = await readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8");
   assert.match(dbJs, /async verifyAccountPin\(accountId, pin\)/, "الدالة مفقودة من قاعدة البيانات");
-  assert.match(dbJs, /await hashPin\(pin, account\.pinSalt\) !== account\.pinHash\) throw new Error\("رمز الدخول غير صحيح\."\)/, "لا تتحقق من الرمز فعلًا");
+  assert.match(dbJs, /const \{ valid, upgradePin \} = await verifyAccountCredentials\(pin, account\);/, "لا تتحقق من الرمز فعلًا");
+  assert.match(dbJs, /if \(!valid\) throw new Error\("رمز الدخول غير صحيح\."\);/, "الرفض صريح عند خطأ الرمز");
   // سلوكيًا: الرمز الصحيح يفتح والخاطئ يرفض
   await db.resetAllData();
   const account = await db.createAccount({ username: "lock-user", name: "موظف القفل", role: "cashier", pin: "4321" });
   await db.verifyAccountPin(account.id, "4321");
   await assert.rejects(() => db.verifyAccountPin(account.id, "9999"), /رمز الدخول غير صحيح/);
   await assert.rejects(() => db.verifyAccountPin("no-such-account", "4321"), /رمز الدخول غير صحيح/);
+  await db.resetAllData();
+});
+
+test("رمز الدخول يُخزَّن بـ PBKDF2 ويُرحَّل الحساب القديم تلقائيًا عند أول دخول ناجح", async () => {
+  await db.resetAllData();
+
+  /* الحساب الجديد يُخزَّن مباشرةً بالنهج المقوّى — لا SHA-256 بدورة واحدة. */
+  const fresh = await db.createAccount({ username: "pbkdf2-user", name: "حساب جديد", role: "admin", pin: "1234" });
+  assert.match(fresh.pinHash, /^pbkdf2\$210000\$[0-9a-f]{64}$/, "التخزين الجديد ليس PBKDF2 بوسم صريح");
+  assert.doesNotMatch(fresh.pinHash, /^[0-9a-f]{64}$/, "يجب ألا يبقى هاش SHA-256 خام");
+  await db.authenticateAccount({ username: "pbkdf2-user", pin: "1234" });
+  await assert.rejects(() => db.authenticateAccount({ username: "pbkdf2-user", pin: "4321" }), /بيانات الدخول غير صحيحة/);
+
+  /* حساب قديم بهايش SHA-256 (كما كان قبل الترقية) — يُحاكى بكتابة مباشرة في IndexedDB،
+     لأن saveUpgradedPinHash ترفض كتابة هاش غير مقوّى عن قصد. */
+  const legacySalt = "00112233445566778899aabbccddeeff";
+  const legacyDigest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${legacySalt}:5678`));
+  const legacyHash = Array.from(new Uint8Array(legacyDigest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+  const legacy = await db.createAccount({ username: "legacy-user", name: "حساب قديم", role: "cashier", pin: "5678" });
+  await writeRawAccountFields(legacy.id, { pinSalt: legacySalt, pinHash: legacyHash });
+
+  const beforeLogin = (await db.listAccounts()).find((item) => item.id === legacy.id);
+  assert.match(beforeLogin.pinHash, /^[0-9a-f]{64}$/, "المحاكاة نجحت: الحساب على النهج القديم");
+
+  /* الدخول بالرمز الصحيح ينجح ويرحّل الهاش صامتًا. */
+  await db.verifyAccountPin(legacy.id, "5678");
+  const afterLogin = (await db.listAccounts()).find((item) => item.id === legacy.id);
+  assert.match(afterLogin.pinHash, /^pbkdf2\$210000\$[0-9a-f]{64}$/, "لم يُرحَّل الهاش بعد الدخول الناجح");
+  assert.notEqual(afterLogin.pinSalt, legacySalt, "الترحيل يستبدل الملح أيضًا");
+  assert.ok(afterLogin.pinUpgradedAt, "يُسجَّل وقت الترحيل");
+
+  /* الرمز نفسه ما زال يعمل بعد الترحيل، والخاطئ ما زال مرفوضًا. */
+  await db.authenticateAccount({ username: "legacy-user", pin: "5678" });
+  await assert.rejects(() => db.verifyAccountPin(legacy.id, "0000"), /رمز الدخول غير صحيح/);
+
   await db.resetAllData();
 });
 

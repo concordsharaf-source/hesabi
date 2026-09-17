@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ───────────────────────── helpers ───────────────────────── */
+
+    function ownsBackup(userId) { return request.auth != null && request.auth.uid == userId; }
+    function signedIn() { return request.auth != null; }
+
+    function memberDoc(storeId) {
+      return get(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)).data;
+    }
+    function storeDoc(storeId) {
+      return get(/databases/$(database)/documents/stores/$(storeId)).data;
+    }
+    function member(storeId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid))
+        && memberDoc(storeId).status == 'active';
+    }
+    function admin(storeId) {
+      return member(storeId) && memberDoc(storeId).role == 'admin';
+    }
+    function ownsStore(storeId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/stores/$(storeId))
+        && storeDoc(storeId).ownerUid == request.auth.uid;
+    }
+    /* مساحة متجر لم يطالب بها أحد بعد: لا مستند متجر، أو مستند يملكه صاحب الطلب نفسه.
+       هذا هو الشرط الوحيد الذي يسمح بإنشاء عضوية «أدمن» ذاتيًا عند أول ربط للسحابة. */
+    function storeUnclaimed(storeId) {
+      return !exists(/databases/$(database)/documents/stores/$(storeId))
+        || (signedIn() && storeDoc(storeId).ownerUid == request.auth.uid);
+    }
+
+    /* ─────────────────── النسخ الاحتياطي الشخصي ─────────────────── */
+
+    match /backupOwners/{userId} {
+      allow read, write: if ownsBackup(userId);
+      match /backups/{backupId} {
+        allow read, write: if ownsBackup(userId);
+        match /chunks/{chunkId} { allow read, write: if ownsBackup(userId); }
+      }
+    }
+
+    /* ───────────────────────── المتاجر ───────────────────────── */
+
+    match /stores/{storeId} {
+      allow read: if member(storeId);
+      allow create: if signedIn() && request.resource.data.ownerUid == request.auth.uid;
+      allow update: if admin(storeId) || ownsStore(storeId);
+
+      match /members/{uid} {
+        allow read: if (signedIn() && request.auth.uid == uid) || admin(storeId);
+
+        /* إنشاء العضوية محصور بثلاث حالات مغلقة:
+           1) الأدمن يضيف عضوًا.
+           2) المستخدم ينشئ عضوية «كاشير» لنفسه داخل متجر غير مطالب به (لا تصعيد).
+           3) المستخدم ينشئ عضوية «أدمن» لنفسه فقط إذا كان المتجر غير مطالب به
+              وهو مالكه — أي عند أول ربط للسحابة من جهاز الأدمن.
+           الثغرة السابقة: كان أي مستخدم مسجّل دخول يستطيع إنشاء عضوية admin لنفسه
+           في أي متجر يعرف معرّفه، فيصبح عضوًا ويقرأ كل عمليات المتجر. */
+        allow create: if admin(storeId)
+          || (signedIn()
+              && request.auth.uid == uid
+              && request.resource.data.uid == uid
+              && request.resource.data.storeId == storeId
+              && request.resource.data.status == 'active'
+              && storeUnclaimed(storeId)
+              && (request.resource.data.role == 'cashier'
+                  || (request.resource.data.role == 'admin' && ownsStore(storeId))));
+
+        allow update, delete: if admin(storeId)
+          || (signedIn() && request.auth.uid == uid && request.resource.data.status == 'revoked');
+      }
+
+      /* سجلّ التغييرات المتزامن بين أجهزة المتجر نفسه. */
+      match /operations/{operationId} {
+        allow read: if member(storeId);
+        allow create: if member(storeId)
+          && request.resource.data.deviceId == memberDoc(storeId).deviceId;
+        allow update, delete: if admin(storeId);
+      }
+
+      /* ── إشعارات Web Push ──
+         الفصل واجب أمني: المفتاح العام وحده في push/config ليقرأه كل عضو (يحتاجه
+         للاشتراك)، والسرّ الخاص في push/sender لا يقرأه ولا يكتبه إلا الأدمن/المالك.
+         سابقًا كان السرّ الخاص داخل push/config المقروء لكل عضو، فأي كاشير يستطيع
+         انتحال المتجر وإرسال إشعارات مزيّفة لكل الأجهزة. */
+      match /push/config {
+        allow read: if member(storeId);
+        allow write: if admin(storeId) || ownsStore(storeId);
+      }
+      match /push/sender {
+        allow read, write: if admin(storeId) || ownsStore(storeId);
+      }
+
+      match /pushDevices/{uid} {
+        allow read: if member(storeId);
+        allow create, update: if signedIn() && request.auth.uid == uid
+          && request.resource.data.uid == uid
+          && request.resource.data.storeId == storeId;
+        allow delete: if signedIn() && (request.auth.uid == uid || admin(storeId));
+      }
+    }
+
+    /* ─────────────────────── افتراضي: منع ─────────────────────── */
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

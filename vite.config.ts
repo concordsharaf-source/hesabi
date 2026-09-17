@@ -11,6 +11,20 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist", "public"),
     emptyOutDir: true,
+    /* الحزم الثقيلة ثابتة بين الإصدارات، وفصلها عن شيفرة التطبيق يجعل تحديثًا في
+       app.js لا يُبطل كاش المتصفح وعامل الخدمة لها. عامل الخدمة يكتشف هذه الملفات
+       تلقائيًا (نمطه يشمل /assets/) فتبقى متاحة دون اتصال. */
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return undefined;
+          if (/[\\/]node_modules[\\/](xlsx)[\\/]/.test(id)) return "vendor-xlsx";
+          if (/[\\/]node_modules[\\/](jspdf|html2canvas|canvg|dompurify|fflate)[\\/]/.test(id)) return "vendor-pdf";
+          if (/[\\/]@?firebase[\\/]/.test(id) || id.includes("@firebase")) return "vendor-firebase";
+          return "vendor";
+        },
+      },
+    },
   },
   server: {
     host: true,
