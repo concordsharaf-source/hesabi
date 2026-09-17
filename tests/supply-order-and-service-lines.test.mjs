@@ -773,3 +773,28 @@ test("بطاقة النسخ السحابي بعد الربط: زر رفع الن
   assert.match(appJs, /data-action="cloud-signout"/, "زر فصل الحساب اختفى");
   assert.match(appJs, /await uploadCloudBackup\(backup, \{ storeName: storeDisplayName\(\) \}\); await refreshCloudBackups\(\{ quiet: true \}\);/, "التحديث التلقائي بعد الرفع اختفى");
 });
+
+/* ===== v68: تزامن لحظي لجهاز الكاشير عبر البريد نفسه بلا رمز اقتران ===== */
+
+test("جهاز الكاشير بالبريد نفسه ينضم للمتجر ويتزامن لحظيًا مع بقية الأجهزة", async () => {
+  const syncJs = await readFile(new URL("../client/src/js/firebase-sync.js", import.meta.url), "utf8");
+  // انضمام الكاشير لعضوية البريد المشترك بلا رمز اقتران
+  assert.match(syncJs, /export async function adoptStoreMembership\(\{ storeId, accountId, accountName, role = "cashier" \}\)/, "دالة انضمام الكاشير مفقودة");
+  assert.match(syncJs, /deviceId: member\.deviceId/, "الكاشير لا يعيد استخدام deviceId عضوية البريد");
+  assert.match(syncJs, /originId: readDeviceId\(\)/, "لا تمييز محلي للجهاز عبر originId");
+  // كل جهاز يتجاهل عملياته هو فقط ويستقبل عمليات بقية الأجهزة
+  assert.match(syncJs, /const localOrigin = identity\.originId \|\| identity\.deviceId;/, "مرشح المصدر مفقود");
+  assert.match(syncJs, /\(data\.origin \|\| data\.deviceId\) !== localOrigin/, "الجهاز قد يتجاهل عمليات جهاز آخر بنفس البريد");
+  assert.match(syncJs, /origin: identity\.originId \|\| identity\.deviceId/, "الدفع لا يحمل مصدر الجهاز");
+  // الأدمن يعيد استخدام deviceId العضوية القائمة حتى لا تكسر قواعد الأمان دفعاته
+  assert.match(syncJs, /existingMemberDeviceId \|\| deviceId/, "جهاز أدمن ثانٍ سيكسر قاعدة deviceId في العمليات");
+  // app.js: الربط حسب الدور + تشغيل المزامنة بعد الدخول المحلي والاستعادة والربط من الإعدادات
+  assert.match(appJs, /async function linkCloudWorkspaceAfterAuth\(\)/, "دالة الربط الموحدة مفقودة");
+  assert.match(appJs, /state\.cloud\.identity = await adoptStoreMembership\(\{ storeId, accountId: state\.currentUser\.id, accountName: state\.currentUser\.name, role: "cashier" \}\);/, "الكاشير لا ينضم للمتجر");
+  assert.match(appJs, /if \(state\.cloud\.user && !state\.cloud\.identity\) \{ try \{ await linkCloudWorkspaceAfterAuth\(\); await startCloudSync\(\); \}/, "لا ربط بعد تسجيل الدخول المحلي");
+  assert.equal((appJs.match(/await startCloudSync\(\);/g) || []).length, 5, "تشغيل المزامنة ناقص في أحد المسارات");
+  // الاستعادة على شاشة البداية تقبل أي حساب نشط لا الأدمن فقط
+  const dbJs = await readFile(new URL("../client/src/js/database.js", import.meta.url), "utf8");
+  assert.match(dbJs, /if \(!account \|\| !account\.isActive \|\| !validatePin\(pin\)/, "الاستعادة ما زالت حكرًا على الأدمن");
+  assert.match(appJs, /أدمن أو كاشير/, "نص نافذة الاستعادة لم يعد يوضح قبول الكاشير");
+});

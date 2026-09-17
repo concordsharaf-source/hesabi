@@ -286,7 +286,7 @@ export const db = {
   async authenticateBackupAccount(payload, { username, pin }) {
     const normalized = normalizeUsername(username);
     const account = (payload?.stores?.accounts || []).find((item) => item.username === normalized);
-    if (!account || account.role !== "admin" || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("بيانات الأدمن في النسخة السحابية غير صحيحة.");
+    if (!account || !account.isActive || !validatePin(pin) || await hashPin(pin, account.pinSalt) !== account.pinHash) throw new Error("بيانات الحساب في النسخة السحابية غير صحيحة.");
     return toPersistentSessionUser(account);
   },
   async createAccount(values) {

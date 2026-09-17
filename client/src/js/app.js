@@ -4,7 +4,7 @@ import { ACCOUNT_ROLES, BUSINESS_PROFILES, BUSINESS_TYPES, CURRENCIES, DAILY_EXP
 import { db } from "./database.js";
 import { calculateDiscountAmount, calculatePackagePurchase, calculateSaleTotals, calculateTransferCollections, dateKey, expiryProgress, normalizeCashierDiscountLimit, nowIso, roundMoney, stockStatus, toNumber } from "./domain.js";
 import { deleteCloudBackup, getCloudBackupUser, listCloudBackups, readCloudBackup, registerCloudBackupUser, resetCloudBackupPassword, signInCloudBackupUser, signOutCloudBackupUser, uploadCloudBackup } from "./firebase-backup.js";
-import { createStoreWorkspace, getCloudDeviceIdentity } from "./firebase-sync.js";
+import { adoptStoreMembership, createStoreWorkspace, getCloudDeviceIdentity } from "./firebase-sync.js";
 import { installSyncCoordinator } from "./sync-coordinator.js";
 import { DEFAULT_THERMAL_FOOTER, normalizeThermalPrintOptions, renderThermalInvoiceHtml, THERMAL_PAPER_WIDTHS } from "./invoice-print.js";
 import { renderCustomerAccountHtml } from "./customer-account-print.js";
@@ -2028,7 +2028,7 @@ function injectSetupRestoreControl() {
 }
 
 function openCloudRestoreOnSetupDialog() {
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">استعادة من نسخة سحابية</span><h2>افتح متجرك من السحابة</h2><p class="dialog__subtext">أدخل بريد وكلمة مرور النسخ السحابية أولًا. بعدها سيُطلب منك اسم مستخدم الأدمن ورمز دخوله الموجودان داخل النسخة.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="setup-cloud-auth-form" class="form-grid"><label class="form-full">بريد النسخ السحابية<input name="email" type="email" dir="ltr" autocomplete="email" required autofocus /></label><label class="form-full">كلمة مرور النسخ السحابية<input name="password" type="password" dir="ltr" autocomplete="current-password" minlength="6" required /></label><small class="offline-note form-full">هذا الحساب مخصص للوصول إلى النسخ فقط، ولا يغيّر حساب الأدمن المحلي.</small><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">متابعة إلى النسخة</button></div></form>`);
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">استعادة من نسخة سحابية</span><h2>افتح متجرك من السحابة</h2><p class="dialog__subtext">أدخل بريد وكلمة مرور النسخ السحابية أولًا. بعدها ادخل باسم المستخدم ورمز الدخول لحسابك داخل النسخة — أدمن أو كاشير.</p></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><form id="setup-cloud-auth-form" class="form-grid"><label class="form-full">بريد النسخ السحابية<input name="email" type="email" dir="ltr" autocomplete="email" required autofocus /></label><label class="form-full">كلمة مرور النسخ السحابية<input name="password" type="password" dir="ltr" autocomplete="current-password" minlength="6" required /></label><small class="offline-note form-full">هذا الحساب مخصص للوصول إلى النسخ فقط، ولا يغيّر حساب الأدمن المحلي.</small><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">متابعة إلى النسخة</button></div></form>`);
   const form = overlay.querySelector("#setup-cloud-auth-form");
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -2040,7 +2040,7 @@ function openCloudRestoreOnSetupDialog() {
       const latest = backups[0];
       if (!latest) throw new Error("لا توجد نسخة سحابية مكتملة لهذا البريد.");
       const createdAt = latest.createdAtClient ? dateTime(latest.createdAtClient) : "غير معروف";
-      form.outerHTML = `<form id="setup-cloud-admin-form" class="form-grid"><div class="cloud-backup-card__note form-full"><strong>تم العثور على أحدث نسخة</strong><span>${escapeHtml(latest.storeName || "حسابي")} · ${escapeHtml(createdAt)} · ${amount(latest.chunkCount || 0)} جزء</span></div><label class="form-full">اسم مستخدم الأدمن داخل النسخة<input name="username" dir="ltr" autocomplete="username" required minlength="3" maxlength="30" autofocus placeholder="مثال: admin" /></label><label class="form-full">رمز دخول الأدمن<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" required minlength="4" maxlength="12" placeholder="••••" /></label><small class="offline-note form-full">سيتم التحقق من الحساب قبل استبدال أي بيانات على هذا الجهاز.</small><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">استعادة وفتح التطبيق ${icon("restore", 17)}</button></div></form>`;
+      form.outerHTML = `<form id="setup-cloud-admin-form" class="form-grid"><div class="cloud-backup-card__note form-full"><strong>تم العثور على أحدث نسخة</strong><span>${escapeHtml(latest.storeName || "حسابي")} · ${escapeHtml(createdAt)} · ${amount(latest.chunkCount || 0)} جزء</span></div><label class="form-full">اسم المستخدم داخل النسخة<input name="username" dir="ltr" autocomplete="username" required minlength="3" maxlength="30" autofocus placeholder="مثال: admin" /></label><label class="form-full">رمز الدخول<input name="pin" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" required minlength="4" maxlength="12" placeholder="••••" /></label><small class="offline-note form-full">سيتم التحقق من الحساب قبل استبدال أي بيانات على هذا الجهاز.</small><div class="dialog__actions form-full"><button class="button button--secondary" type="button" data-dialog-close>إلغاء</button><button class="button button--primary" type="submit">استعادة وفتح التطبيق ${icon("restore", 17)}</button></div></form>`;
       const adminForm = overlay.querySelector("#setup-cloud-admin-form");
       adminForm.addEventListener("submit", async (adminEvent) => {
         adminEvent.preventDefault();
@@ -2056,6 +2056,7 @@ function openCloudRestoreOnSetupDialog() {
           state.accounts = await db.listAccounts();
           state.currentUser = await db.authenticateAccount(values);
           await db.savePersistentSession(state.currentUser.id);
+          try { await linkCloudWorkspaceAfterAuth(); await startCloudSync(); } catch (linkError) { console.warn("[Hesabi cloud link after restore]", linkError); }
           installAutomaticBackups();
           state.cart = [];
           state.showSetupHome = false;
@@ -2097,6 +2098,21 @@ async function linkAdminCloudWorkspaceAfterAuth() {
 }
 
 async function ensureAdminCloudWorkspace() { await linkAdminCloudWorkspaceAfterAuth(); }
+
+/* يربط الجهاز بمساحة المتجر حسب الدور: الأدمن ينشئ/يصلح المساحة، والكاشير ينضم
+   لعضوية البريد نفسه — فيتزامن لحظيًا مع جهاز الأدمن وبقية الأجهزة بلا رمز اقتران. */
+async function linkCloudWorkspaceAfterAuth() {
+  if (!state.cloud.user || !state.currentUser) return;
+  if (isAdmin(state.currentUser)) { await linkAdminCloudWorkspaceAfterAuth(); return; }
+  const storeId = state.settings?.cloudStoreId;
+  if (!storeId) throw new Error("لا يوجد متجر سحابي على هذا الجهاز بعد. استعد نسخة المتجر من السحابة أولًا.");
+  state.cloud.identity = await adoptStoreMembership({ storeId, accountId: state.currentUser.id, accountName: state.currentUser.name, role: "cashier" });
+}
+
+async function startCloudSync() {
+  try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); }
+  catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); }
+}
 
 function setupMarkup() {
   return `<main class="setup-page"><section class="setup-art"><div class="setup-art__brand"><img src="${storeLogoUrl()}" alt="شعار المتجر" /><span class="brand-wordmark">حسابي</span><small>سجلّ المتجر اليومي</small></div><div class="setup-art__status"><span class="presence-dot"></span><span>نظامك المحلي جاهز للعمل دون اتصال</span></div><div class="setup-art__copy"><p class="eyebrow">سجل تشغيلي · المرحلة الأولى</p><h1>بيانات واضحة<br />لبداية يوم بيع منظّم.</h1><p>ستسجل هنا البيانات التي تظهر على الفواتير وتضبط عرض المخزون والمبيعات اليومية.</p><div class="setup-art__stamps"><span>المنتجات</span><span>المخزون</span><span>الفواتير</span></div></div><div class="setup-art__ledger-card"><span>خط سير اليوم</span><strong>منتج ← مخزون ← فاتورة</strong><i></i><i></i><i></i></div><img class="setup-art__image" src="${assetBaseUrl}/hesabi-setup-ledger_a7b0fae4.png" alt="رسم تعبيري لأدوات تنظيم المتجر" /></section><section class="setup-form-wrap"><div class="setup-sheet"><div class="setup-sheet__brand"><img src="${storeLogoUrl()}" alt="شعار المتجر" /><div><strong>حسابي</strong><span>دفتر التاجر الهادئ</span></div><span class="setup-stamp">خطوة 1 من 1</span></div><div class="setup-form"><section class="setup-welcome" aria-labelledby="setup-welcome-title"><span class="eyebrow">مرحبًا بك في حسابي</span><h2 id="setup-welcome-title">لنبدأ بخطوات بسيطة</h2><p>أنشئ حسابك الأول، أضف بيانات متجرك، ثم ابدأ تسجيل المنتجات والمبيعات بسهولة.</p><div class="setup-welcome__steps"><article><strong>1</strong><div><b>أنشئ حسابك</b><small>اختر اسم المستخدم وكلمة المرور الخاصة بك.</small></div></article><article><strong>2</strong><div><b>أكمل بيانات المتجر</b><small>حدد الاسم والنشاط والعملة التي تظهر في الفواتير.</small></div></article><article><strong>3</strong><div><b>ابدأ العمل</b><small>أضف المنتجات ثم سجّل أول عملية بيع.</small></div></article></div></section><span class="eyebrow">إعداد المتجر</span><h2>بيانات تُستخدم كل يوم</h2><p>أدخل معلومات البداية. يمكنك تعديلها لاحقًا من الإعدادات.</p><button class="button button--primary button--wide setup-register-button" type="button" data-action="open-setup-form">تسجيل جديد ${icon("arrow", 18)}</button><form id="setup-form" hidden><label>اسم المتجر<input name="storeName" dir="rtl" required maxlength="60" placeholder="مثال: بقالة الواحة" autofocus /></label><label>اسم المستخدم<input name="username" dir="ltr" required minlength="3" maxlength="30" autocomplete="username" placeholder="مثال: ahmed" /></label><label>اسم صاحب الحساب<input name="accountName" dir="rtl" required maxlength="60" autocomplete="name" placeholder="مثال: أحمد محمد" /></label><label>كلمة المرور<input name="pin" type="password" dir="ltr" required minlength="4" maxlength="64" autocomplete="new-password" placeholder="4 أحرف أو أرقام على الأقل" /></label><label>تأكيد كلمة المرور<input name="pinConfirm" type="password" dir="ltr" required minlength="4" maxlength="64" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور" /></label><label>نوع النشاط<select name="businessType" required>${BUSINESS_TYPES.map((type) => `<option value="${type}">${type}</option>`).join("")}</select></label><label>العملة<select name="currency" required>${CURRENCIES.map((currency) => `<option value="${currency.code}" ${currency.code === DEFAULT_CURRENCY_CODE ? "selected" : ""}>${currency.label}</option>`).join("")}</select></label><button class="button button--primary button--wide" type="submit">إنشاء الحساب وفتح المتجر ${icon("arrow", 18)}</button></form><a class="button button--secondary button--wide" href="./user-guide.html" target="_blank" rel="noopener">دليل الاستخدام ${icon("arrow", 18)}</a><button class="button button--secondary button--wide" type="button" data-action="cloud-restore-start">استعادة من نسخة سحابية ${icon("restore", 18)}</button><small class="offline-note"><span class="presence-dot"></span>يحفظ محليًا ويظل متاحًا بعد أول تحميل</small></div></div></section></main>`;
@@ -2328,6 +2344,7 @@ async function handleLogin(event) {
   try {
     state.currentUser = await db.authenticateAccount(values);
     await db.savePersistentSession(state.currentUser.id);
+    if (state.cloud.user && !state.cloud.identity) { try { await linkCloudWorkspaceAfterAuth(); await startCloudSync(); } catch (linkError) { console.warn("[Hesabi cloud link after login]", linkError); } }
     installAutomaticBackups();
     applyTheme();
     await refresh();
@@ -3222,14 +3239,14 @@ function openCloudAuthDialog(initialMode = "signin") {
     try {
       state.cloud.user = mode === "register" ? await registerCloudBackupUser(values.email, values.password) : await signInCloudBackupUser(values.email, values.password);
       await linkAdminCloudWorkspaceAfterAuth();
-      state.cloud.backups = []; state.cloud.error = ""; closeDialog(); render(); await refreshCloudBackups({ quiet: true }); showToast("تم ربط حساب النسخ السحابية.");
+      state.cloud.backups = []; state.cloud.error = ""; closeDialog(); render(); await startCloudSync(); await refreshCloudBackups({ quiet: true }); showToast("تم ربط حساب النسخ السحابية.");
     } catch (error) {
       controls.forEach((button) => { button.disabled = false; });
       if (mode === "register" && error.code === "auth/email-already-in-use") {
         try {
           state.cloud.user = await signInCloudBackupUser(values.email, values.password);
           await linkAdminCloudWorkspaceAfterAuth();
-          state.cloud.backups = []; state.cloud.error = ""; closeDialog(); render(); await refreshCloudBackups({ quiet: true }); showToast("هذا البريد مسجل من قبل، فتم تسجيل دخولك وربط الحساب.");
+          state.cloud.backups = []; state.cloud.error = ""; closeDialog(); render(); await startCloudSync(); await refreshCloudBackups({ quiet: true }); showToast("هذا البريد مسجل من قبل، فتم تسجيل دخولك وربط الحساب.");
           return;
         } catch (signinError) {
           mode = "signin"; applyMode();
@@ -4551,5 +4568,5 @@ export async function bootApp(target) {
   installRuntimeGuards();
   installDesktopBarcodeReader();
   installAudioUnlockListener();
-  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && isAdmin(state.currentUser)) { try { await ensureAdminCloudWorkspace(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } try { await installSyncCoordinator(db, { onStatus: (status) => { state.cloud.syncStatus = status; }, onRemoteApplied: () => { void refresh().then(render); } }); } catch (error) { state.cloud.syncStatus = "offline"; console.warn("[Hesabi sync unavailable]", error); } if (state.cloud.identity && state.settings?.cloudStoreId) { try { const { renewAndRegisterPushDevice } = await import("./push-alerts.js"); state.cloud.push = await renewAndRegisterPushDevice(); } catch (error) { console.warn("[Hesabi push renew]", error?.message || error); } } applyTheme(); watchSystemTheme(); installNotificationBridge(); applyDeepLinkView(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); try { if (state.currentUser && localStorage.getItem(SCREEN_LOCK_STORAGE_KEY) === "1") requestAnimationFrame(openScreenLockDialog); } catch { /* التخزين غير متاح */ } installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
+  try { await db.open(); state.settings = await db.getSettings(); state.accounts = await db.listAccounts(); state.currentUser = state.settings?.setupCompleted ? await db.getPersistentSession() : null; try { state.cloud.user = await getCloudBackupUser(); } catch { state.cloud.user = null; } try { state.cloud.identity = await getCloudDeviceIdentity(); } catch { state.cloud.identity = null; } if (!state.cloud.identity && state.cloud.user && state.currentUser) { try { await linkCloudWorkspaceAfterAuth(); } catch (error) { console.warn("[Hesabi cloud workspace unavailable]", error); } } await startCloudSync(); if (state.cloud.identity && state.settings?.cloudStoreId) { try { const { renewAndRegisterPushDevice } = await import("./push-alerts.js"); state.cloud.push = await renewAndRegisterPushDevice(); } catch (error) { console.warn("[Hesabi push renew]", error?.message || error); } } applyTheme(); watchSystemTheme(); installNotificationBridge(); applyDeepLinkView(); if (state.settings?.setupCompleted) await refresh(); render(); if (state.currentUser) installAutomaticBackups(); if (state.currentUser?.role === "cashier" && !state.activeCashierShift) requestAnimationFrame(openCashierShiftStartDialog); try { if (state.currentUser && localStorage.getItem(SCREEN_LOCK_STORAGE_KEY) === "1") requestAnimationFrame(openScreenLockDialog); } catch { /* التخزين غير متاح */ } installExitGuard(); } catch (error) { console.error("[Hesabi boot error]", error); root.innerHTML = `<main class="fatal-state"><img src="${markImage}" alt=""/><h1>تعذر فتح التخزين المحلي</h1><p>لم تُحذف بياناتك المحلية. أعد المحاولة أولًا، واستعد النسخة الاحتياطية فقط عند الحاجة.</p><button class="button button--primary" onclick="location.reload()">إعادة المحاولة</button></main>`; }
 }

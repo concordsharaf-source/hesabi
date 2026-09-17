@@ -65,7 +65,13 @@ export async function createStoreWorkspace({ storeId, storeName, ownerAccount })
   try { const existingStore = await getDoc(storeRef(firestore, storeId)); existingOwnerDeviceId = existingStore.exists() ? existingStore.data().ownerDeviceId : ""; }
   catch (error) { if (error?.code !== "permission-denied") throw error; }
   const isOwnerDevice = !existingOwnerDeviceId || existingOwnerDeviceId === deviceId;
-  const identity = { ...createDeviceIdentity({ deviceId, accountId: ownerAccount.id, accountName: ownerAccount.name, role: "admin", storeId }), isOwnerDevice };
+  /* كل الأجهزة الداخلة بنفس البريد تشترك في مستند عضوية واحد (نفس uid)؛
+     نعيد استخدام deviceId المسجل فيه حتى تقبل قواعد الأمان دفعات كل الأجهزة،
+     ونميز كل جهاز فعليًا بحقل originId المحلي. */
+  let existingMemberDeviceId = "";
+  try { const existingMember = await getDoc(memberRef(firestore, storeId, user.uid)); existingMemberDeviceId = existingMember.exists() ? existingMember.data().deviceId : ""; }
+  catch (error) { if (error?.code !== "permission-denied") throw error; }
+  const identity = { ...createDeviceIdentity({ deviceId: existingMemberDeviceId || deviceId, accountId: ownerAccount.id, accountName: ownerAccount.name, role: "admin", storeId }), isOwnerDevice, originId: deviceId };
   await setDoc(storeRef(firestore, storeId), { id: storeId, ownerUid: user.uid, ownerEmail: user.email || "", name: String(storeName || "حسابي").slice(0, 80), ownerDeviceId: existingOwnerDeviceId || deviceId, updatedAt: serverTimestamp() }, { merge: true });
   if (user.email) await setDoc(directoryRef(firestore, await emailKey(user.email)), { storeId, ownerUid: user.uid, ownerEmail: user.email, updatedAt: serverTimestamp() }, { merge: true });
   await setDoc(memberRef(firestore, storeId, user.uid), { ...identity, uid: user.uid, status: "active", updatedAt: serverTimestamp() }, { merge: true });
@@ -114,11 +120,24 @@ export async function seedWorkspaceBackup(payload) {
   return changes.length;
 }
 
+export async function adoptStoreMembership({ storeId, accountId, accountName, role = "cashier" }) {
+  const { auth, firestore } = await services();
+  const user = auth.currentUser;
+  if (!user || user.isAnonymous) throw new Error("سجل الدخول ببريد وكلمة سر المتجر أولًا من الإعدادات > البيانات.");
+  const snapshot = await getDoc(memberRef(firestore, storeId, user.uid));
+  if (!snapshot.exists()) throw new Error("لم نجد مساحة متجر لهذا البريد. اربط جهاز الأدمن بالبريد نفسه مرة واحدة أولًا.");
+  const member = snapshot.data();
+  if (member.status !== "active") throw new Error("عضوية هذا البريد موقوفة.");
+  const identity = { ...createDeviceIdentity({ deviceId: member.deviceId, accountId, accountName, role, storeId }), isOwnerDevice: false, originId: readDeviceId() };
+  saveIdentity(identity);
+  return identity;
+}
+
 export async function pushSyncOperation(change) {
   const identity = readIdentity();
   if (!identity || identity.revokedAt) throw new Error("هذا الجهاز غير مرتبط بمتجر سحابي.");
   const { firestore } = await services();
-  await setDoc(operationRef(firestore, identity.storeId, change.id), { ...change, deviceId: identity.deviceId, accountId: identity.accountId, createdAt: serverTimestamp() }, { merge: false });
+  await setDoc(operationRef(firestore, identity.storeId, change.id), { ...change, deviceId: identity.deviceId, origin: identity.originId || identity.deviceId, accountId: identity.accountId, createdAt: serverTimestamp() }, { merge: false });
   return change.id;
 }
 
@@ -130,8 +149,10 @@ export async function watchSyncOperations(onChange, onStatus = () => {}) {
   onStatus("connecting");
   return onSnapshot(operations, (snapshot) => {
     onStatus("online");
+    const localOrigin = identity.originId || identity.deviceId;
     snapshot.docChanges().filter((change) => change.type === "added").forEach((change) => {
-      if (change.doc.data().deviceId !== identity.deviceId) onChange({ id: change.doc.id, ...change.doc.data() });
+      const data = change.doc.data();
+      if ((data.origin || data.deviceId) !== localOrigin) onChange({ id: change.doc.id, ...data });
     });
   }, () => onStatus("offline"));
 }
