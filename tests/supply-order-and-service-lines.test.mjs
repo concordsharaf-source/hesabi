@@ -44,7 +44,7 @@ test("نافذة توصيل النواقص: كمية قابلة للتعديل �
 
 test("صفحة المشتريات: بلاطة «طلب شراء» الكبيرة بجوار بطاقة فواتير الشراء وبنفس تصميمها", () => {
   // البلاطة داخل صف الملخص نفسه بجوار بطاقة «فواتير الشراء» الحمراء
-  assert.match(appJs, /<section class="inventory-summary inventory-summary--purchases"><div><span>إجمالي المشتريات<\/span>[\s\S]{0,200}فاتورة<\/strong><\/div><button class="po-order-tile" type="button" data-action="new-purchase-order"/, "بلاطة طلب الشراء ليست بجوار بطاقة فواتير الشراء");
+  assert.match(appJs, /<section class="inventory-summary inventory-summary--purchases"><div><span>إجمالي المشتريات<\/span>[\s\S]{0,400}<button class="po-order-tile" type="button" data-action="new-purchase-order"/, "بلاطة طلب الشراء ليست بجوار بلاطة إضافة فاتورة");
   assert.match(appJs, /<strong>طلب شراء<\/strong><\/button><\/section>/, "نص البلاطة مفقود");
   assert.match(appJs, /if \(action === "new-purchase-order"\) \{ openPurchaseOrderDialog\(\); return; \}/, "إجراء فتح النافذة مفقود");
   // نفس تصميم البطاقة الحمراء: نفس التدرج والحدود والظل ونفس بنية padding/gap/strong
@@ -662,4 +662,15 @@ test("تفاصيل فاتورة الشراء المحفوظة لا تعرض سع
   // البيانات تبقى: التعبئة التلقائية والحفظ في سطر الشراء لم يتغيرا
   assert.match(appJs, /const salePrice = values\.salePrice === undefined \|\| values\.salePrice === "" \? product\.salePrice \?\? product\.defaultSalePrice \?\? product\.price \?\? 0 : values\.salePrice;/, "التعبئة التلقائية لسعر البيع حُذفت");
   assert.match(appJs, /salePrice: toNumber\(salePrice\)/, "سعر البيع لم يعد يُحفظ في بيانات السطر");
+});
+
+/* ===== v61: بلاطة «إضافة فاتورة» الحمراء بدل عداد فواتير الشراء ===== */
+
+test("المشتريات: بلاطة إضافة فاتورة حمراء كبيرة مكان عداد فواتير الشراء", () => {
+  // البلاطة تفتح فاتورة شراء جديدة وتعرض عدد الفواتير كسطر صغير
+  assert.match(appJs, /<button class="po-order-tile" type="button" data-action="new-purchase" aria-label="إضافة فاتورة شراء جديدة"><span>\$\{icon\("plus", 15\)\} \$\{amount\(state\.purchases\.length\)\} فاتورة مسجلة<\/span><strong>إضافة فاتورة<\/strong><\/button><button class="po-order-tile" type="button" data-action="new-purchase-order"/, "بلاطة إضافة فاتورة مفقودة أو ليست قبل بلاطة طلب شراء");
+  // عداد «فواتير الشراء» القديم لم يعد في صفحة المشتريات
+  const start = appJs.indexOf("إجمالي المشتريات");
+  const section = appJs.slice(start, appJs.indexOf("</section>", start));
+  assert.ok(!section.includes("<span>فواتير الشراء</span>"), "عداد فواتير الشراء القديم ما زال موجودًا");
 });
