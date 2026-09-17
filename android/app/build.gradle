@@ -16,10 +16,26 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            def propsFile = file('../keystore.properties.secret')
+            if (propsFile.exists()) {
+                def props = new Properties()
+                propsFile.withInputStream { props.load(it) }
+                storeFile file('hesabi-release.keystore')
+                storePassword props['STOREPASS']
+                keyAlias 'hesabi'
+                keyPassword props['STOREPASS']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (file('../keystore.properties.secret').exists()) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

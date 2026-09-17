@@ -115,3 +115,5 @@ client/public/__manus__/version.json
 
 # Tauri build output
 src-tauri/target/
+android/keystore.properties.secret
+android/app/hesabi-release.keystore
