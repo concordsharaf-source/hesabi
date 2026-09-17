@@ -13,7 +13,8 @@ import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { renderPurchaseInvoiceHtml } from "./purchase-invoice-print.js";
 import { renderOfficialReportHtml } from "./report-template.js";
 
-const PDF_ARABIC_FONT_URL = "https://hesabipwa-2r9mmdzn.manus.space/manus-storage/NotoNaskhArabic-Regular_2c8d8205.ttf";
+/* خط عربي مضمّن محليًا: رابط مطلق لأن مراحل PDF تُحقن في مستند منفصل عن أصل الصفحة. */
+const PDF_ARABIC_FONT_URL = new URL("assets/NotoNaskhArabic-Regular_2c8d8205.ttf", document.baseURI).href;
 const toNumber = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 let canvasArabicFontPromise;
 const waitWithTimeout = (promise, timeout = 3_000) => Promise.race([promise, new Promise((resolve) => window.setTimeout(resolve, timeout))]);

@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: اختبارات وبناء
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          # Capacitor 8 يشترط Node >= 22
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm check
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build web bundle
+        run: pnpm build
+
+      - name: Upload web bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: hesabi-web
+          if-no-files-found: error
+          path: dist/public
+
+  android:
+    name: غلاف أندرويد
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web bundle
+        run: pnpm build
+
+      - name: Sync Capacitor assets
+        run: npx cap sync android
+
+      - name: Full test suite
+        run: pnpm test
+  # القواعد هي خط الدفاع الأخير في المشروع: كود الواجهة يُسرق أو يُعدّل عند
+  # المستخدم، أما قواعد Firestore فتُنفَّذ على سيرفرات جوجل ولا يمكن تجاوزها من
+  # العميل. لذلك تُختبر على محاكي حقيقي عند كل دفع، لا أن تُراجع بالنظر.
+  rules:
+    name: قواعد Firestore على المحاكي
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      # firebase-tools 15 يشترط Java 21 لتشغيل محاكي Firestore
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download Firestore emulator
+        run: npx firebase setup:emulators:firestore
+
+      # emulators:exec يُشغّل المحاكيات ثم الاختبار ثم يُغلقها، فلا حاجة لانتظار منفصل
+      - name: Run rules tests against emulator
+        run: >-
+          npx firebase emulators:exec
+          --only firestore,auth
+          --project hesabi-rules-test
+          "pnpm test:rules"

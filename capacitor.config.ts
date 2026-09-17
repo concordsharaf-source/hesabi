@@ -4,7 +4,6 @@ const config: CapacitorConfig = {
   appId: "com.hesabi.app",
   appName: "حسابي",
   webDir: "dist/public",
-  bundledWebRuntime: false,
   server: {
     androidScheme: "https",
   },

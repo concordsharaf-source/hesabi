@@ -17,25 +17,46 @@
 
 ## التقنيات
 
-التطبيق مبني بملفات واجهة الويب القياسية: **HTML5 وCSS3 وJavaScript ES Modules**. يستخدم Vite للبناء وIndexedDB لجميع بيانات العمل المحاسبية وجلسة التطبيق المحلية. يستخدم Firebase Web SDK فقط لخيار النسخ اليدوي: بريد/كلمة مرور منفصلان للنسخ وCloud Firestore مقيد بقواعد مالك النسخة. لا يعتمد التطبيق على Firebase Storage أو أي خدمة مدفوعة.
+التطبيق مبني بملفات واجهة الويب القياسية: **HTML5 وCSS3 وJavaScript ES Modules**، بلا إطار عمل وبلا خادم. يستخدم Vite للبناء وIndexedDB لجميع بيانات العمل المحاسبية وجلسة التطبيق المحلية. يستخدم Firebase Web SDK فقط للخيار السحابي: Authentication (بريد/كلمة مرور ودخول مجهول) وCloud Firestore مقيد بقواعد `firestore.rules`. لا يعتمد التطبيق على Firebase Storage أو أي خدمة مدفوعة.
+
+التغليف الأصلي من الشيفرة نفسها: **Capacitor** لأندرويد و**Tauri 2** (Rust) لويندوز/لينكس/macOS.
+
+الاعتماديات الفعلية سبع فقط: `firebase` (السحابة)، `xlsx` (استيراد/تصدير Excel)، `jspdf` + `html2canvas` (تصدير PDF وصور)، `@capacitor/*` و`@tauri-apps/api` (الأغلفة الأصلية).
 
 ## التشغيل محليًا
 
+يتطلب **Node 22 أو أحدث** (Capacitor 8 يشترطه) و**pnpm**.
+
 ```bash
 pnpm install
-pnpm dev
+pnpm dev          # خادم تطوير Vite على المنفذ 5173
 ```
 
-لإنتاج نسخة بناء قابلة للنشر:
+أوامر أخرى:
+
+| الأمر | الغرض |
+|---|---|
+| `pnpm build` | إنتاج نسخة الويب في `dist/public` |
+| `pnpm preview` | معاينة نسخة الإنتاج محليًا |
+| `pnpm test` | الاختبارات المنطقية واختبارات الشيفرة (33 ملفًا) |
+| `pnpm check` | فحص أنواع TypeScript لملفات الإعداد |
+| `pnpm verify:critical` | اختبار + بناء + فحص التنقل والمقاسات |
+| `pnpm tauri:dev` / `pnpm tauri:build` | تشغيل/بناء تطبيق سطح المكتب |
+| `pnpm vapid:keys` | توليد زوج مفاتيح VAPID يدويًا (اختياري) |
+| `pnpm push:relay` | الاختبار المرجعي لنواة Web Push مقابل RFC 8188/8291/8292 |
+
+### بناء غلاف أندرويد
 
 ```bash
 pnpm build
+npx cap sync android      # ينسخ dist/public إلى أصول الغلاف
+cd android && ./gradlew assembleRelease
 ```
 
-ولتشغيل الاختبارات المنطقية:
+التوقيع اختياري ومشروط: يقرأ `android/app/build.gradle` الملف `android/keystore.properties.secret` (غير مرفوع في المستودع) ويوقع بحساب `android/app/hesabi-release.keystore` إن وجده، وإلا بُني APK غير موقّع. صيغة الملف:
 
-```bash
-pnpm test
+```properties
+STOREPASS=كلمة_سر_المخزن
 ```
 
 ## الاستخدام
@@ -54,25 +75,125 @@ pnpm test
 
 ```text
 client/
-  index.html
+  index.html              # نقطة الدخول (RTL، سمات قبل أول رسم)
   public/
-    manifest.json
-    service-worker.js
+    manifest.json         # إعداد PWA
+    service-worker.js     # كاش التطبيق + استقبال Push + فحص دوري
+    assets/               # صور وخط PDF العربي (محلية داخل الحزمة)
+    user-guide.html
   src/
-    main.js
+    main.js               # الإقلاع: عامل الخدمة + بوابة التثبيت + التطبيق
     style.css
     js/
-      app.js          # العرض والتفاعلات
-      constants.js    # الخيارات الثابتة
-      database.js     # IndexedDB والمعاملات الذرية
-      domain.js       # منطق المخزون والفواتير
-tests/
-  domain.test.mjs
+      app.js              # العرض والتفاعلات وكل الشاشات
+      constants.js        # الخيارات الثابتة
+      database.js         # IndexedDB والمعاملات الذرية
+      domain.js           # منطق المخزون والفواتير النقي
+      permissions.js      # الأدوار والصلاحيات
+      session.js          # جلسة الدخول المحلية
+      firebase-sync.js    # الهوية السحابية والعضوية وأجهزة المتجر ومفاتيح VAPID
+      firebase-backup.js  # النسخ السحابي اليدوي
+      sync-coordinator.js # اعتراض التغييرات ودفعها واستقبال تغييرات الآخرين
+      sync-domain.js      # فروق ودمج سجلات التزامن
+      push-relay.js       # نواة Web Push (تشفير وتوقيع بلا اعتماديات)
+      push-alerts.js      # تنسيق إرسال التنبيهات لأجهزة المتجر
+      notifications.js    # الإشعارات المحلية وPush
+      pdf-export.js       # PDF وصور
+      report-template.js / report-file.js / apk-report-catalog.js
+      invoice-print.js / purchase-invoice-print.js / customer-account-print.js
+      barcode-file.js / scanner-session.js / report-file.js
+      install-gate.js / navigation-guard.js / desktop.js / ids.js
+android/                   # غلاف Capacitor
+src-tauri/                 # غلاف Tauri (Rust) لسطح المكتب
+scripts/
+  vapid-keys.mjs           # توليد مفاتيح VAPID يدويًا
+  push-relay-reference.test.mjs
+tests/                     # 35 ملف اختبار (node:test) — منها اختبار قواعد Firestore
+firestore.rules            # قواعد أمان Firestore
+.github/workflows/
+  ci.yml                   # فحص + اختبارات + بناء ويب + غلاف أندرويد
+  build-windows.yml        # مُثبِّت ويندوز عند وسم v*
 ```
 
-## نشر GitHub Pages
+## الأمان السحابي
 
-يوجد إعداد GitHub Actions في المستودع الأم لنشر نسخة `web-pwa` تلقائيًا. فعّل GitHub Pages من **Settings → Pages** واختر **GitHub Actions** كمصدر للنشر. عند الدفع إلى فرع `master` بعد تعديل ملفات التطبيق، ستنشئ المهمة نسخة الإنتاج وتنشرها.
+الخيار السحابي كله في Firebase، وحمايته في `firestore.rules` وحدها (مفتاح Firebase Web عام بطبيعته). قاعدتان جوهريتان:
+
+1. **فصل مفاتيح VAPID**: `stores/{id}/push/config` يحوي المفتاح العام وحده وهو مقروء لكل عضو (يلزم لتسجيل اشتراك الجهاز)، بينما `stores/{id}/push/sender` يحوي السرّ الخاص ولا يقرؤه ولا يكتبه إلا الأدمن أو مالك المتجر. بذلك لا يستطيع جهاز كاشير انتحال المتجر وإرسال إشعارات مزيّفة.
+2. **منع تصعيد الصلاحيات**: إنشاء عضوية ذاتية بدور `admin` مشروط بأن يكون المتجر غير مطالب به (`storeUnclaimed`) وأن يكون صاحب الطلب هو `ownerUid` في مستند المتجر. لا يكفي بعدُ معرفة `storeId` للانضمام كأدمن.
+
+كذلك لا توجد في القواعد أي مجموعة `pairings` أو `pairRequests` أو `storeDirectory` — منظومة رمز الاقتران ودليل البريد أُلغيتا من المنتج (v63–v68) وحُذفتا من الشيفرة والقواعد معًا.
+
+> **مستندات الدفع تُنشأ تلقائيًا.** فعّل الإشعارات من جهاز الأدمن مرة واحدة
+> فيُنشئ التطبيق `push/config` و`push/sender` بزوج مفاتيح واحد متناسق، ويرحّل
+> أي تخزين سابق للسرّ داخل `push/config` إلى مكانه الجديد. لا تُدخلها يدويًا:
+> التفصيل ولماذا الإدخال اليدوي ضار في `FIREBASE-RULES-DEPLOY_AR.md`.
+
+### حماية رمز الدخول
+
+رموز الدخول تُخزَّن بـ **PBKDF2-SHA256** بمقدار 210,000 دورة مع ملح عشوائي 16 بايت، والهاش موسوم ببادئة `pbkdf2$210000$` لتمييز النهج. الحسابات المُنشأة قبل هذا الإصلاح (هاش SHA-256 بدورة واحدة) تبقى مقروءة: تُتحقَّق بالنهج القديم ثم **يُعاد هاشها صامتًا إلى PBKDF2 عند أول دخول ناجح** بملح جديد، فلا يُقفل أحد خارج حسابه ولا حاجة لأي ترحيل يدوي.
+
+### اختبار القواعد (على محاكي حقيقي)
+
+القواعد ليست مُعلَنة صحيحة بل **مُختبَرة**: `tests/firestore-rules.test.mjs` فيه
+20 اختبارًا في 5 مجموعات، تُنفَّذ على محاكي Firestore حقيقي لا على محاكاة.
+
+```bash
+npx --yes firebase-tools@15 setup:emulators:firestore   # مرة واحدة (يتطلب Java 21)
+pnpm emulator      # نافذة: تُشغّل محاكيَي Firestore وAuth وتبقى تعمل
+pnpm test:rules    # نافذة أخرى: تُشغّل الاختبارات
+```
+
+أو بأمر واحد ذاتي الإغلاق (كما يفعل CI):
+
+```bash
+npx --yes firebase-tools@15 emulators:exec --only firestore,auth \
+  --project hesabi-rules-test "pnpm test:rules"
+```
+
+**تحققنا من فاعلية الاختبار** بتشغيله ضد القواعد القديمة المكشوفة (`master`):
+سقطت 7 اختبارات من 20، منها صعود الامتيازات وسر VAPID — أي أن الاختبار يكشف
+الثغرة فعلًا لا اسميًا. وسقط أيضًا اختبار الانضمام الشرعي للكاشير، لأن القواعد
+القديمة كانت تشترط `pairingCode` المحذوف من الكود في v67، فكان ذلك المسار مكسورًا أصلًا.
+
+> يجب تطابق معرّف المشروع بين الاختبار و`--project`. عند اختلافه تفشل كل دوال
+> `get()` في القواعد بخطأ تقييم غامض — تفصيلة كلّفَت ساعات تشخيص، ودُوِّنت هنا
+> وفي `SECURITY.md`.
+
+### نشر القواعد
+
+أي تعديل على `firestore.rules` لا يسري إلا بعد نشره. الإعداد في جذر المستودع
+(`firebase.json` يشير إلى `firestore.rules`، و`.firebaserc` يضبط المشروع الافتراضي
+`hesabi-backup`):
+
+```bash
+firebase login           # مرة واحدة — يتطلب حساب جوجل يملك المشروع
+pnpm deploy:rules        # = firebase deploy --only firestore:rules
+```
+
+إن كان مشروعك مختلفًا فبدّل المعرّف في `.firebaserc` أو نفّذ
+`firebase use <معرّف-مشروعك>` قبل النشر.
+
+> **لا تنشر دون اختبار.** أي تعديل قواعد يمرّ بـ`pnpm test:rules` أولًا؛ وظيفة
+> `rules` في CI تمنع دمج تعديل غير مُختبَر.
+
+دليل النشر بخطواته وما يجب فحصه بعده في **`FIREBASE-RULES-DEPLOY_AR.md`**، ونسخة نصية من القواعد في `FIRESTORE-RULES.txt`.
+
+### جدول الضمانات
+
+| المساحة | الأمر | النتيجة |
+| --- | --- | --- |
+| منطق المحاسبة والأذونات | `pnpm test` | 274 اختبارًا ✅ |
+| قواعد Firestore | `pnpm test:rules` (محاكي حقيقي) | 20 اختبارًا ✅ |
+| الأنواع | `pnpm check` | صفر أخطاء ✅ |
+| البناء | `pnpm build` | 521 وحدة / 247.9 KB gzip ✅ |
+| CI | `.github/workflows/ci.yml` | وظيفتان: بناء + قواعد |
+
+## النشر
+
+- **الويب (Vercel)**: `vercel.json` يبني بـ `pnpm build` وينشر `dist/public` كموقع ثابت.
+- **ويندوز**: `build-windows.yml` يُنشئ مُثبِّت NSIS عند دفع وسم `v*` أو يدويًا من تبويب Actions.
+- **أندرويد**: يُبنى محليًا بالخطوات أعلاه؛ مفتاح التوقيع وكلمة سره خارج المستودع.
 
 ## حدود النسخ السحابي
 
