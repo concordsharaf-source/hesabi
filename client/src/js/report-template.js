@@ -6,6 +6,7 @@
    - ترويسة متجر كاملة ومرنة تمنع تقطيع أو اختصار أسماء المتاجر وبياناتها
    - توحيد التصميم عبر جميع شاشات وتقارير وفواتير وكشوفات التطبيق
 ═══════════════════════════════════════════════════════════════════════════════ */
+import { CAIRO_FONT_CSS_URL } from "./font-assets.js";
 
 export const escapeHtml = (value = "") =>
   String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -32,7 +33,7 @@ export function getStoreLogoDataUri(logoDataUrl, storeName = "حسابي") {
 
 export function getReportStyles(isLandscape = false) {
   return `
-    @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap");
+    @import url("${CAIRO_FONT_CSS_URL}");
     @page {
       size: ${isLandscape ? "A4 landscape" : "A4 portrait"};
       margin: ${isLandscape ? "8mm 10mm" : "10mm 12mm"};

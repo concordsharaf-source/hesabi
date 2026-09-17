@@ -12,9 +12,11 @@ import { renderThermalInvoiceHtml } from "./invoice-print.js";
 import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { renderPurchaseInvoiceHtml } from "./purchase-invoice-print.js";
 import { renderOfficialReportHtml } from "./report-template.js";
+import { NOTO_NASKH_ARABIC_FONT_URL } from "./font-assets.js";
 
-/* خط عربي مضمّن محليًا: رابط مطلق لأن مراحل PDF تُحقن في مستند منفصل عن أصل الصفحة. */
-const PDF_ARABIC_FONT_URL = new URL("assets/NotoNaskhArabic-Regular_2c8d8205.ttf", document.baseURI).href;
+/* خط عربي مضمّن محليًا: الرابط المطلق معرّف في font-assets.js لأن مراحل PDF
+   تُحقن في مستند منفصل عن أصل الصفحة (نافذة منبثقة أو iframe srcdoc). */
+const PDF_ARABIC_FONT_URL = NOTO_NASKH_ARABIC_FONT_URL;
 const toNumber = (value) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 let canvasArabicFontPromise;
 const waitWithTimeout = (promise, timeout = 3_000) => Promise.race([promise, new Promise((resolve) => window.setTimeout(resolve, timeout))]);

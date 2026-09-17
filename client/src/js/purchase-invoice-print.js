@@ -4,6 +4,7 @@
 ═══════════════════════════════════════════════════════════════════════════════ */
 
 import { getStoreLogoDataUri } from "./report-template.js";
+import { CAIRO_FONT_CSS_URL } from "./font-assets.js";
 
 export function renderPurchaseInvoiceHtml({
   purchase,
@@ -65,7 +66,7 @@ export function renderPurchaseInvoiceHtml({
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>${escapeHtml(purchase.invoiceNumber || "فاتورة شراء")}</title>
   <style>
-    @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap");
+    @import url("${CAIRO_FONT_CSS_URL}");
     @page { size: A4 portrait; margin: 12mm; }
     *, *::before, *::after { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     body {

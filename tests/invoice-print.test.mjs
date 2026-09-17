@@ -572,7 +572,10 @@ test("يضع كشف حساب العميل بياناته في بطاقة واض�
   assert.match(html, /777123456/);
   assert.match(html, /صنعاء/);
   assert.match(html, /customer-card/);
-  assert.match(html, /family=Cairo/);
+  // الخط مُوطَّن محليًا: كان هذا الموضع يتحقق من family=Cairo أي من رابط
+  // fonts.googleapis.com، وصار يتحقق من ملف الخط المحلي.
+  assert.match(html, /@import url\("[^"]*\/fonts\/cairo\.css"\)/);
+  assert.doesNotMatch(html, /fonts\.googleapis\.com|fonts\.gstatic\.com/);
 });
 
 test("تظهر خدمة التوصيل وخيار تحميلها على العميل أو المحل في مراجعة البيع والفاتورة", async () => {

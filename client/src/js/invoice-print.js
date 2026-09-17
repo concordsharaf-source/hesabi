@@ -2,6 +2,7 @@
    قالب الفاتورة الحرارية 80 مم والفاتورة الرسمية — حسابي
    Official Thermal Receipt & Sales Invoice Template
 ═══════════════════════════════════════════════════════════════════════════════ */
+import { CAIRO_FONT_CSS_URL } from "./font-assets.js";
 
 /* عرض ورق الطابعة الحرارية المدعوم: 80 مم (الافتراضي) أو 58 مم. */
 export const THERMAL_PAPER_WIDTHS = ["80", "58"];
@@ -51,7 +52,7 @@ export function renderThermalInvoiceHtml({
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>${escapeHtml(invoice.invoiceNumber)}</title>
   <style>
-    @import url("https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&display=swap");
+    @import url("${CAIRO_FONT_CSS_URL}");
     @page{size:${paperWidth}mm auto;margin:4mm}
     *, *::before, *::after{box-sizing:border-box;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
     body{
