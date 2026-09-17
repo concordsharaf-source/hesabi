@@ -414,17 +414,15 @@ test("تورث فاتورة الشراء سعر بيع الحبة للمنتج �
   assert.match(css, /\.purchase-line \.purchase-line__total \{ display:grid; grid-column:span 2;/);
 });
 
-test("يعرض حقل سعر البيع المعبأ قيمته داخل الخانة قبل اللمس ويبقيها قابلة للتعديل", async () => {
+test("لا حقل سعر بيع داخل سطر فاتورة الشراء — السعر يُؤخذ من بطاقة المنتج تلقائيًا", async () => {
   const [app, css] = await Promise.all([
     readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8"),
     readFile(new URL("../client/src/style.css", import.meta.url), "utf8"),
   ]);
-  assert.match(app, /class="purchase-sale-price-control"><input data-purchase-sale-price="\$\{index\}"/);
-  assert.match(app, /data-purchase-sale-price-visible="\$\{index\}" aria-live="polite">\$\{escapeHtml\(String\(line\.salePrice \?\? ""\)\)\}/);
-  assert.match(app, /value="\$\{line\.salePrice \?\? ""\}"/);
-  assert.match(css, /\.purchase-sale-price-field__current \{ position:absolute; inset:0 11px; z-index:1; display:flex; align-items:center; pointer-events:none;/);
-  assert.match(css, /\.purchase-sale-price-control:focus-within \.purchase-sale-price-field__current \{ opacity:0; \}/);
-  assert.match(css, /\[data-theme="dark"\] \.purchase-sale-price-field input \{ color:#f2faf5 !important;/);
+  assert.doesNotMatch(app, /data-purchase-sale-price/, "خانة سعر البيع عادت إلى سطر الشراء");
+  assert.doesNotMatch(css, /purchase-sale-price/, "أنماط خانة سعر البيع ما زالت في CSS");
+  // سعر البيع يبقى محفوظًا في بيانات الفاتورة من بطاقة المنتج
+  assert.match(app, /const salePrice = values\.salePrice === undefined \|\| values\.salePrice === "" \? product\.salePrice \?\? product\.defaultSalePrice \?\? product\.price \?\? 0 : values\.salePrice;/, "التعبئة التلقائية لسعر البيع اختفت");
 });
 
 test("تحتوي نوافذ سطح المكتب حقول الشراء والنماذج داخل إطار النافذة", async () => {

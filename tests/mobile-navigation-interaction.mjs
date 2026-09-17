@@ -130,19 +130,19 @@ try {
     }
   }
   assert.ok(purchaseProductSelected, 'تعذر اختيار نتيجة المنتج بعد إعادة عرض البحث.');
-  await waitFor('#purchase-lines .purchase-line [data-purchase-sale-price]');
-  const priorProductPurchaseLine = await evaluate(`(() => { const salePrice = document.querySelector('#purchase-lines .purchase-line [data-purchase-sale-price]'); const row = salePrice?.closest('.purchase-line'); const directPrice = row?.querySelector('[data-purchase-sale-price-visible="0"]'); const expiry = row?.querySelector('[data-purchase-expiry-date="0"]'); if (!salePrice || !row || !directPrice || !expiry) return null; const visibleStyle = getComputedStyle(directPrice); return { salePrice: salePrice.value, visiblePrice: directPrice.textContent.trim(), overlayVisibleBeforeFocus: visibleStyle.display === 'flex' && visibleStyle.opacity === '1' && visibleStyle.pointerEvents === 'none', rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length, expiryType: expiry.type, expiryValue: expiry.value, expiryDirection: getComputedStyle(expiry).direction }; })()`);
+  await waitFor('#purchase-lines .purchase-line [data-purchase-package-cost]');
+  const priorProductPurchaseLine = await evaluate(`(() => { const cost = document.querySelector('#purchase-lines .purchase-line [data-purchase-package-cost="0"]'); const row = cost?.closest('.purchase-line'); const expiry = row?.querySelector('[data-purchase-expiry-date="0"]'); if (!cost || !row || !expiry) return null; return { hasSalePriceField: Boolean(row.querySelector('[data-purchase-sale-price]')), rowDisplay: getComputedStyle(row).display, fieldCount: row.querySelectorAll('label').length, expiryType: expiry.type, expiryValue: expiry.value, expiryDirection: getComputedStyle(expiry).direction }; })()`);
   assert.ok(priorProductPurchaseLine, 'لم يستقر سطر شراء المنتج السابق بعد إعادة العرض.');
-  assert.deepEqual(priorProductPurchaseLine, { salePrice: '50', visiblePrice: '50', overlayVisibleBeforeFocus: true, rowDisplay: 'grid', fieldCount: 8, expiryType: 'date', expiryValue: '', expiryDirection: 'ltr' });
+  assert.deepEqual(priorProductPurchaseLine, { hasSalePriceField: false, rowDisplay: 'grid', fieldCount: 7, expiryType: 'date', expiryValue: '', expiryDirection: 'ltr' });
   await command('Emulation.setDeviceMetricsOverride', { width: 1280, height: 900, deviceScaleFactor: 1, mobile: false });
   await sleep(120);
   const desktopDialogBounds = await evaluate(`(() => { const dialog = document.querySelector('.dialog'); const purchaseLine = document.querySelector('.purchase-line--pack'); const dialogBox = dialog.getBoundingClientRect(); const lineBox = purchaseLine.getBoundingClientRect(); return { dialogScrollFits: dialog.scrollWidth <= dialog.clientWidth, lineFitsDialog: lineBox.left >= dialogBox.left && lineBox.right <= dialogBox.right, formFitsDialog: document.querySelector('#purchase-form').scrollWidth <= dialog.clientWidth }; })()`);
   assert.deepEqual(desktopDialogBounds, { dialogScrollFits: true, lineFitsDialog: true, formFitsDialog: true });
   await command('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
   const purchaseInputsReady = await evaluate(`(() => ({ packageUnit: Boolean(document.querySelector('[data-purchase-package-unit="0"]')), packageQuantity: Boolean(document.querySelector('[data-purchase-package-quantity="0"]')), units: Boolean(document.querySelector('[data-purchase-units-per-package="0"]')), cost: Boolean(document.querySelector('[data-purchase-package-cost="0"]')), sale: Boolean(document.querySelector('[data-purchase-sale-price="0"]')) }))()`);
-  assert.deepEqual(purchaseInputsReady, { packageUnit: true, packageQuantity: true, units: true, cost: true, sale: true });
+  assert.deepEqual(purchaseInputsReady, { packageUnit: true, packageQuantity: true, units: true, cost: true, sale: false });
   await evaluate(`(() => { const change = (selector, value, eventName = 'change') => { const input = document.querySelector(selector); input.value = value; input.dispatchEvent(new Event(eventName, { bubbles: true })); }; change('[data-purchase-package-unit="0"]', 'كرتون'); change('[data-purchase-package-quantity="0"]', '1'); change('[data-purchase-units-per-package="0"]', '12'); change('[data-purchase-package-cost="0"]', '360'); })()`);
-  await evaluate(`(() => { const input = document.querySelector('[data-purchase-sale-price="0"]'); input.value = '50'; input.dispatchEvent(new Event('input', { bubbles: true })); document.querySelector('#purchase-form').requestSubmit(); })()`);
+  await evaluate(`(() => { document.querySelector('#purchase-form').requestSubmit(); })()`);
   await waitForGone('#purchase-form');
   await waitFor('[data-action="new-purchase"]');
   await evaluate(`document.querySelector('[data-bottom-nav] [data-view="products"]').click()`);

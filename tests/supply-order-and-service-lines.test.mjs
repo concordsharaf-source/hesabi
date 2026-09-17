@@ -618,3 +618,14 @@ test("بوابة التثبيت: beforeinstallprompt للزر وخطوات iOS �
   // CSS: الشاشة فوق كل شيء
   assert.match(css, /#install-screen \{ position:fixed; inset:0; z-index:4000/, "شاشة التثبيت ليست طبقة عليا مثبتة");
 });
+
+/* ===== v58: حذف خانة سعر البيع من نموذج فاتورة الشراء ===== */
+
+test("فاتورة الشراء: لا خانة سعر بيع في السطر والسعر يتعبأ تلقائيًا من بطاقة المنتج", () => {
+  const dialog = appJs.slice(appJs.indexOf("async function openPurchaseDialog"), appJs.indexOf("function normalizePurchaseSalePrices"));
+  assert.ok(!dialog.includes("data-purchase-sale-price"), "خانة سعر البيع ما زالت في نموذج الشراء");
+  assert.ok(!dialog.includes("purchase-sale-price-field"), "غلاف خانة سعر البيع ما زال في القالب");
+  // السعر يظل جزءًا من بيانات السطر (يُقرأ من المنتج) حتى تبقى الفواتير القديمة والتقارير سليمة
+  assert.match(dialog, /const salePrice = values\.salePrice === undefined \|\| values\.salePrice === "" \? product\.salePrice \?\? product\.defaultSalePrice \?\? product\.price \?\? 0 : values\.salePrice;/, "تعبئة سعر البيع التلقائية من المنتج مفقودة");
+  assert.match(dialog, /salePrice: toNumber\(salePrice\)/, "سعر البيع لم يعد يُحفظ في سطر الفاتورة");
+});
