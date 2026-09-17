@@ -192,8 +192,35 @@ pnpm deploy:rules        # = firebase deploy --only firestore:rules
 ## النشر
 
 - **الويب (Vercel)**: `vercel.json` يبني بـ `pnpm build` وينشر `dist/public` كموقع ثابت.
+  الإنتاج: **https://sha-hsabi.vercel.app** — يُنشر تلقائيًا من `master`، وهو الرابط
+  المعلَن في مستودع GitHub. أي نطاق آخر (مثل `hesab-tau.vercel.app` أو
+  `hesabipwa-*.manus.space`) نسخة قديمة مهجورة لا تصلها التحديثات ولا الإصلاحات
+  الأمنية، ويجب إيقافها من لوحة مزوّد الاستضافة.
 - **ويندوز**: `build-windows.yml` يُنشئ مُثبِّت NSIS عند دفع وسم `v*` أو يدويًا من تبويب Actions.
 - **أندرويد**: يُبنى محليًا بالخطوات أعلاه؛ مفتاح التوقيع وكلمة سره خارج المستودع.
+
+### التحقق من أن النشر تم
+
+اسم الحزمة **حتمي**: `vite.config.ts` يمنع نسخ متغيرات Vercel (ومنها رسالة
+الالتزام) إلى الحزمة، فلا يتغير الاسم إلا إذا تغيرت الشيفرة فعلًا. لذلك تكفي
+المقارنة:
+
+```bash
+pnpm build
+grep -o 'assets/index-[A-Za-z0-9_-]*\.js' dist/public/index.html
+curl -s https://sha-hsabi.vercel.app/ | grep -o 'assets/index-[A-Za-z0-9_-]*\.js'
+```
+
+تطابق الاسمين يعني أن المنشور هو ما بنيتَه. وللتأكد من عامل الخدمة:
+
+```bash
+curl -s https://sha-hsabi.vercel.app/service-worker.js | grep -o 'hesabi-pwa-v[0-9]*'
+```
+
+> لا تُضف `envPrefix: []` إلى `vite.config.ts` ظنًّا أنه يمنع التسريب: هو يمنع
+> تحميل `.env` أصلًا فيُسقط `VITE_FIREBASE_CONFIG_JSON` و
+> `VITE_PUSH_VAPID_PUBLIC_KEY` من الحزمة صامتًا. التفصيل في
+> `tests/build-env-hygiene.test.mjs`.
 
 ## حدود النسخ السحابي
 
