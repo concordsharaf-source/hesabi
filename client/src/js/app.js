@@ -3195,23 +3195,63 @@ async function refreshCloudBackups({ quiet = false } = {}) {
   finally { state.cloud.loading = false; if (state.view === "settings") render(); }
 }
 
-function openCloudAuthDialog() {
-  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">استعادة عبر البريد الإلكتروني</span><h2>حساب النسخ السحابية</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><p class="dialog__subtext">أدخل بريد حساب النسخ السحابية لإرسال رابط استعادة كلمة المرور. هذه الاستعادة تخص النسخ السحابية فقط ولا تغيّر كلمة مرور الدخول المحلية. إذا نسيت كلمة المرور المحلية فاستخدم استرداد رقم الجوال أو اطلب مساعدة الأدمن.</p><form id="cloud-auth-form" class="form-grid"><label class="form-full">البريد الإلكتروني<input name="email" type="email" dir="ltr" autocomplete="email" required autofocus /></label><label class="form-full">كلمة مرور النسخ السحابية<input name="password" type="password" dir="ltr" autocomplete="current-password" minlength="6" required /></label><div class="cloud-backup-card__note form-full"><strong>تنبيه</strong><span>لا تحفظ كلمة المرور في حسابي. يحتفظ بها Firebase Authentication وفقًا لجلسة المتصفح فقط.</span></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button type="button" class="text-button" data-action="cloud-reset-password">نسيت كلمة المرور؟</button><button class="button button--secondary" type="submit" data-cloud-auth-mode="signin">دخول</button><button class="button button--primary" type="submit" data-cloud-auth-mode="register">إنشاء وربط</button></div></form>`);
+function openCloudAuthDialog(initialMode = "signin") {
+  const overlay = openDialog(`<div class="dialog__head"><div><span class="eyebrow">حساب النسخ السحابية</span><h2>ربط المتجر بالبريد الإلكتروني</h2></div><button class="icon-button" data-dialog-close aria-label="إغلاق">${icon("close", 20)}</button></div><div class="cloud-auth-tabs" role="tablist"><button type="button" class="cloud-auth-tab" data-cloud-tab="signin" role="tab">تسجيل دخول</button><button type="button" class="cloud-auth-tab" data-cloud-tab="register" role="tab">إنشاء جديد</button></div><p class="dialog__subtext" data-cloud-auth-hint></p><form id="cloud-auth-form" class="form-grid"><label class="form-full">البريد الإلكتروني<input name="email" type="email" dir="ltr" autocomplete="email" required autofocus /></label><label class="form-full">كلمة السر<input name="password" type="password" dir="ltr" minlength="6" required /></label><label class="form-full" data-cloud-confirm-field hidden>تأكيد كلمة السر<input name="passwordConfirm" type="password" dir="ltr" minlength="6" /></label><div class="form-error form-full" data-cloud-auth-error hidden></div><div class="dialog__actions form-full"><button type="button" class="button button--secondary" data-dialog-close>إلغاء</button><button type="button" class="text-button" data-action="cloud-reset-password" data-cloud-signin-only>نسيت كلمة السر؟</button><button class="button button--primary" type="submit" data-cloud-auth-submit>دخول وربط</button></div></form>`);
   overlay.querySelectorAll("[data-dialog-close]").forEach((button) => button.addEventListener("click", closeDialog));
-  overlay.querySelector("[data-action=cloud-reset-password]")?.addEventListener("click", async () => { const email = overlay.querySelector("input[name=email]")?.value?.trim(); if (!email) { showToast("أدخل البريد أولًا ثم اضغط استعادة كلمة المرور.", "error"); return; } try { await resetCloudBackupPassword(email); showToast("أرسل Firebase رابط استعادة كلمة المرور إلى البريد."); } catch (error) { showToast(error.message || "تعذر إرسال رابط الاستعادة.", "error"); } });
-  overlay.querySelector("#cloud-auth-form").addEventListener("submit", async (event) => {
+  const form = overlay.querySelector("#cloud-auth-form");
+  const tabs = [...overlay.querySelectorAll("[data-cloud-tab]")];
+  const hint = overlay.querySelector("[data-cloud-auth-hint]");
+  const confirmField = overlay.querySelector("[data-cloud-confirm-field]");
+  const errorBox = overlay.querySelector("[data-cloud-auth-error]");
+  const submitButton = overlay.querySelector("[data-cloud-auth-submit]");
+  const resetButton = overlay.querySelector("[data-cloud-signin-only]");
+  let mode = initialMode === "register" ? "register" : "signin";
+  const showError = (message) => { errorBox.textContent = message || ""; errorBox.hidden = !message; };
+  const applyMode = () => {
+    tabs.forEach((tab) => tab.classList.toggle("is-active", tab.dataset.cloudTab === mode));
+    const isRegister = mode === "register";
+    confirmField.hidden = !isRegister;
+    form.passwordConfirm.required = isRegister;
+    form.password.autocomplete = isRegister ? "new-password" : "current-password";
+    resetButton.hidden = isRegister;
+    submitButton.textContent = isRegister ? "إنشاء وربط" : "دخول وربط";
+    hint.textContent = isRegister ? "سجّل بريدًا جديدًا لهذا المتجر مع كلمة سر لا تقل عن 6 أحرف، وتأكيدها." : "أدخل البريد وكلمة السر اللذين سجلت بهما سابقًا لربط هذا الجهاز.";
+    showError("");
+  };
+  tabs.forEach((tab) => tab.addEventListener("click", () => { mode = tab.dataset.cloudTab; applyMode(); }));
+  applyMode();
+  resetButton.addEventListener("click", async () => { const email = form.email.value.trim(); if (!email) { showError("أدخل البريد أولًا ثم اضغط نسيت كلمة السر."); return; } try { await resetCloudBackupPassword(email); showToast("أُرسل رابط استعادة كلمة السر إلى بريدك."); showError(""); } catch (error) { showError(error.message || "تعذر إرسال رابط الاستعادة."); } });
+  form.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const values = Object.fromEntries(new FormData(event.currentTarget));
-    const submitter = event.submitter;
-    const controls = [...event.currentTarget.querySelectorAll("button")]; controls.forEach((button) => { button.disabled = true; });
+    showError("");
+    const values = Object.fromEntries(new FormData(form));
+    if (mode === "register" && values.password !== values.passwordConfirm) { showError("كلمة السر وتأكيدها غير متطابقين."); form.passwordConfirm.focus(); return; }
+    const controls = [...form.querySelectorAll("button")]; controls.forEach((button) => { button.disabled = true; });
     try {
-      state.cloud.user = submitter?.dataset.cloudAuthMode === "register" ? await registerCloudBackupUser(values.email, values.password) : await signInCloudBackupUser(values.email, values.password);
+      state.cloud.user = mode === "register" ? await registerCloudBackupUser(values.email, values.password) : await signInCloudBackupUser(values.email, values.password);
       if (isAdmin(state.currentUser)) { const storeId = state.settings?.cloudStoreId || `store_${randomId()}`; if (!state.settings?.cloudStoreId) { await db.saveSettings({ cloudStoreId: storeId }); state.settings = await db.getSettings(); } state.cloud.identity = await createStoreWorkspace({ storeId, storeName: storeDisplayName(), ownerAccount: state.currentUser }); try { await watchAssistantRequests(storeId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (error) { console.warn("[Hesabi pairing requests unavailable]", error); } }
       state.cloud.backups = []; state.cloud.error = ""; closeDialog(); render(); await refreshCloudBackups({ quiet: true }); showToast("تم ربط حساب النسخ السحابية.");
-    } catch (error) { controls.forEach((button) => { button.disabled = false; }); showToast(error.message || "تعذر ربط حساب النسخ السحابية.", "error"); }
+    } catch (error) {
+      controls.forEach((button) => { button.disabled = false; });
+      if (mode === "register" && error.code === "auth/email-already-in-use") {
+        try {
+          state.cloud.user = await signInCloudBackupUser(values.email, values.password);
+          if (isAdmin(state.currentUser)) { const storeId = state.settings?.cloudStoreId || `store_${randomId()}`; if (!state.settings?.cloudStoreId) { await db.saveSettings({ cloudStoreId: storeId }); state.settings = await db.getSettings(); } state.cloud.identity = await createStoreWorkspace({ storeId, storeName: storeDisplayName(), ownerAccount: state.currentUser }); try { await watchAssistantRequests(storeId, (requests) => { state.cloud.pairRequests = requests; if (state.view === "data-management") render(); }); } catch (watchError) { console.warn("[Hesabi pairing requests unavailable]", watchError); } }
+          state.cloud.backups = []; state.cloud.error = ""; closeDialog(); render(); await refreshCloudBackups({ quiet: true }); showToast("هذا البريد مسجل من قبل، فتم تسجيل دخولك وربط الحساب.");
+          return;
+        } catch (signinError) {
+          mode = "signin"; applyMode();
+          form.email.value = values.email;
+          showError(signinError.code === "auth/wrong-password" || signinError.code === "auth/invalid-credential" ? "هذا البريد مسجل مسبقًا لكن كلمة السر غير صحيحة. أدخل كلمة السر الصحيحة أو اضغط «نسيت كلمة السر؟»." : signinError.message || "هذا البريد مسجل مسبقًا. سجّل الدخول به.");
+          form.password.value = ""; form.password.focus();
+          return;
+        }
+      }
+      if (mode === "signin" && (error.code === "auth/user-not-found")) { mode = "register"; applyMode(); form.email.value = values.email; showError("لا يوجد حساب بهذا البريد. أنشئه الآن من تبويب «إنشاء جديد»."); return; }
+      showError(error.message || "تعذر ربط حساب النسخ السحابية.");
+    }
   });
 }
-
 async function uploadCurrentCloudBackup() {
   if (!window.confirm("سيُرفع وضع بيانات هذا الجهاز الحالي فقط إلى السحابة. لا توجد مزامنة لحظية. هل تريد إنشاء النسخة؟")) return;
   state.cloud.busy = "upload"; state.cloud.error = ""; render();

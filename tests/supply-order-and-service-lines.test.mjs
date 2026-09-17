@@ -11,6 +11,7 @@ import test from "node:test";
 import { db } from "../client/src/js/database.js";
 
 const appJs = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+const backupJs = await readFile(new URL("../client/src/js/firebase-backup.js", import.meta.url), "utf8");
 const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
 
 test("واتساب المورد بالرقم كما هو مسجل تمامًا: أرقام فقط بلا + وبلا 00", () => {
@@ -704,4 +705,33 @@ test("بطاقة النسخ السحابي: شرح واضح بلا ذكر رمز
   assert.ok(!appJs.includes("حتى اكتمال طبقة المزامنة"), "عبارة طبقة المزامنة ما زالت موجودة");
   assert.match(appJs, /<p>اربط حسابك مرة واحدة لتحفظ نسخة من بياناتك في السحابة، وتستعيدها متى احتجت على هذا الجهاز أو أي جهاز آخر\.<\/p>/, "الشرح الجديد مفقود");
   assert.match(appJs, /<strong>بياناتك بأمان<\/strong><span>يعمل التطبيق دون إنترنت وتبقى بياناتك على جهازك، والنسخة السحابية احتياط إضافي ترفعه وتستعيده وقت ما تشاء\.<\/span>/, "ملاحظة بياناتك بأمان مفقودة");
+});
+
+/* ===== v65: نافذة ربط النسخ السحابية بتبويبي تسجيل دخول / إنشاء جديد ===== */
+
+test("نافذة الربط السحابي: تبويبان وتأكيد كلمة السر ومعالجة «البريد موجود مسبقًا» بدخول تلقائي", () => {
+  const start = appJs.indexOf('function openCloudAuthDialog(initialMode = "signin")');
+  assert.ok(start > -1, "الدالة الجديدة مفقودة");
+  const dialog = appJs.slice(start, appJs.indexOf("async function uploadCurrentCloudBackup", start));
+  // تبويبا تسجيل دخول وإنشاء جديد
+  assert.match(dialog, /data-cloud-tab="signin" role="tab">تسجيل دخول<\/button>/, "تبويب تسجيل دخول مفقود");
+  assert.match(dialog, /data-cloud-tab="register" role="tab">إنشاء جديد<\/button>/, "تبويب إنشاء جديد مفقود");
+  // إنشاء جديد: بريد + كلمة سر + تأكيدها، والتأكيد إلزامي في وضع الإنشاء فقط
+  assert.match(dialog, /data-cloud-confirm-field hidden>تأكيد كلمة السر<input name="passwordConfirm" type="password"/, "خانة تأكيد كلمة السر مفقودة");
+  assert.match(dialog, /form\.passwordConfirm\.required = isRegister;/, "تأكيد كلمة السر ليس إلزاميًا عند الإنشاء");
+  assert.match(dialog, /if \(mode === "register" && values\.password !== values\.passwordConfirm\) \{ showError\("كلمة السر وتأكيدها غير متطابقين\."\);/, "لا تحقق من تطابق كلمتي السر");
+  // الحالة التي اشتكى منها المستخدم: بريد موجود مسبقًا -> دخول تلقائي بنفس البيانات
+  assert.match(dialog, /error\.code === "auth\/email-already-in-use"/, "لا معالجة خاصة للبريد الموجود مسبقًا");
+  assert.match(dialog, /هذا البريد مسجل من قبل، فتم تسجيل دخولك وربط الحساب\./, "لا دخول تلقائي عند وجود البريد");
+  assert.match(dialog, /هذا البريد مسجل مسبقًا لكن كلمة السر غير صحيحة/, "لا توجيه لكلمة السر الخاطئة");
+  // والعكس: دخول ببريد غير موجود -> تحويل لتبويب الإنشاء
+  assert.match(dialog, /mode === "signin" && \(error\.code === "auth\/user-not-found"\)/, "لا تحويل لتبويب الإنشاء عند بريد غير مسجل");
+  // زر واحد يتبدل نصه حسب التبويب
+  assert.match(dialog, /submitButton\.textContent = isRegister \? "إنشاء وربط" : "دخول وربط";/, "نص زر الإرسال لا يتبدل");
+  // الخطأ يظهر داخل النافذة لا Toast فقط
+  assert.match(dialog, /data-cloud-auth-error hidden/, "صندوق الخطأ داخل النافذة مفقود");
+  // firebase-backup: كود الخطأ يمر مع الرسالة العربية
+  assert.match(backupJs, /friendly\.code = error\?\.code \|\| "";/, "كود الخطأ لا يمر إلى الواجهة");
+  assert.match(backupJs, /استخدم تبويب «تسجيل دخول» بدلًا من إنشاء حساب جديد/, "رسالة البريد المستخدم لم تُحدث");
+  assert.match(css, /\.cloud-auth-tab\.is-active \{ color:#fff; background:var\(--green\)/, "تمييز التبويب النشط مفقود");
 });

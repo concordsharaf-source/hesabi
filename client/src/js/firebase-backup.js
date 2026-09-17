@@ -38,13 +38,13 @@ async function getServices() {
 
 function readableAuthError(error) {
   const messages = {
-    "auth/email-already-in-use": "هذا البريد مستخدم مسبقًا لحساب نسخ سحابية.",
+    "auth/email-already-in-use": "هذا البريد مسجل مسبقًا. استخدم تبويب «تسجيل دخول» بدلًا من إنشاء حساب جديد.",
     "auth/invalid-credential": "البريد أو كلمة المرور غير صحيحين.",
     "auth/invalid-email": "أدخل بريدًا إلكترونيًا صحيحًا.",
     "auth/weak-password": "كلمة المرور ضعيفة؛ استخدم 6 أحرف على الأقل.",
     "auth/network-request-failed": "تعذر الاتصال بالإنترنت. تبقى بيانات جهازك المحلية متاحة.",
     "auth/operation-not-allowed": "فعّل Email/Password من Firebase Authentication ثم أعد المحاولة.",
-    "auth/user-not-found": "لا يوجد حساب نسخ سحابية بهذا البريد. استخدم إنشاء وربط مرة واحدة.",
+    "auth/user-not-found": "لا يوجد حساب بهذا البريد. استخدم تبويب «إنشاء جديد» لتسجيله أول مرة.",
     "auth/wrong-password": "كلمة مرور النسخ السحابية غير صحيحة. استخدم استعادة كلمة المرور.",
     "auth/too-many-requests": "تكررت المحاولات؛ انتظر قليلًا ثم أعد المحاولة.",
   };
@@ -67,19 +67,25 @@ export async function getCloudBackupUser() {
   return user ? { uid: user.uid, email: user.email || "" } : null;
 }
 
+function friendlyAuthError(error) {
+  const friendly = new Error(readableAuthError(error));
+  friendly.code = error?.code || "";
+  return friendly;
+}
+
 export async function registerCloudBackupUser(email, password) {
   try {
     const { auth } = await getServices();
     const result = await createUserWithEmailAndPassword(auth, email.trim(), password);
     return { uid: result.user.uid, email: result.user.email || "" };
-  } catch (error) { throw new Error(readableAuthError(error)); }
+  } catch (error) { throw friendlyAuthError(error); }
 }
 
 export async function resetCloudBackupPassword(email) {
   try {
     const { auth } = await getServices();
     await sendPasswordResetEmail(auth, email.trim());
-  } catch (error) { throw new Error(readableAuthError(error)); }
+  } catch (error) { throw friendlyAuthError(error); }
 }
 
 export async function signInCloudBackupUser(email, password) {
@@ -87,7 +93,7 @@ export async function signInCloudBackupUser(email, password) {
     const { auth } = await getServices();
     const result = await signInWithEmailAndPassword(auth, email.trim(), password);
     return { uid: result.user.uid, email: result.user.email || "" };
-  } catch (error) { throw new Error(readableAuthError(error)); }
+  } catch (error) { throw friendlyAuthError(error); }
 }
 
 export async function signOutCloudBackupUser() {
