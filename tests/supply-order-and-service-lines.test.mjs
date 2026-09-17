@@ -695,7 +695,7 @@ test("لا زر ربط هذا الجهاز ولا نافذة إدخال رمز �
   assert.ok(!appJs.includes("openPairingRedeemDialog"), "نافذة إدخال رمز الاقتران ما زالت في الكود");
   // زر ربط النسخ السحابية باقٍ، وتدفق «دخول جهاز مساعد» لم يُمس
   assert.match(appJs, /data-action="open-cloud-auth">ربط النسخ السحابية<\/button><\/div><\/section>/, "زر ربط النسخ السحابية اختفى أو بقي بجواره زر الاقتران");
-  assert.match(appJs, /redeemPairingInvite/, "تدفق دخول الجهاز المساعد حُذف بالخطأ");
+  assert.doesNotMatch(appJs, /redeemPairingInvite/, "بقايا رمز الاقتران عادت إلى app.js");
 });
 
 /* ===== v64: شرح مبسط لبطاقة النسخ السحابي قبل الربط ===== */
@@ -753,4 +753,23 @@ test("الربط السحابي لبريد جديد لا يسقط في خطأ ا
   assert.equal((dialog.match(/await linkAdminCloudWorkspaceAfterAuth\(\);/g) || []).length, 2, "النافذة لا تستخدم الدالة الموحدة في المسارين");
   // رسالة عربية بدل Missing or insufficient permissions
   assert.match(dialog, /تم إنشاء الحساب لكن تعذر تجهيز مساحة المتجر في السحابة/, "لا رسالة عربية لخطأ الصلاحيات");
+});
+
+/* ===== v67: تنظيف بقايا رمز الاقتران من بطاقة النسخ السحابي ===== */
+
+test("بطاقة النسخ السحابي بعد الربط: زر رفع النسخة فقط بلا إصلاح المتجر ولا رمز اقتران ولا تحديث", () => {
+  assert.ok(!appJs.includes("إنشاء رمز اقتران"), "زر إنشاء رمز اقتران ما زال موجودًا");
+  assert.ok(!appJs.includes("إصلاح ربط المتجر"), "زر إصلاح ربط المتجر ما زال موجودًا");
+  assert.ok(!appJs.includes("تحديث القائمة"), "زر تحديث القائمة ما زال موجودًا");
+  assert.ok(!appJs.includes("موافقة وإصدار الرمز"), "طلبات الأجهزة المساعدة ما زالت تُعرض");
+  assert.ok(!appJs.includes('data-action="pairing-invite"'), "معالج رمز الاقتران باقٍ");
+  assert.ok(!appJs.includes('data-action="repair-cloud-workspace"'), "معالج إصلاح المتجر باقٍ");
+  assert.ok(!appJs.includes('data-action="cloud-refresh-backups"'), "معالج تحديث القائمة باقٍ");
+  assert.ok(!appJs.includes("openAssistantEntryDialog"), "نافذة دخول الجهاز المساعد باقية");
+  // الوظائف الأساسية بقيت: رفع نسخة، استعادة، حذف، فصل الحساب، والتحديث التلقائي بعد الرفع/الحذف
+  assert.match(appJs, /data-action="cloud-upload-backup"/, "زر رفع النسخة اختفى");
+  assert.match(appJs, /data-action="cloud-restore-backup"/, "زر الاستعادة اختفى");
+  assert.match(appJs, /data-action="cloud-delete-backup"/, "زر الحذف اختفى");
+  assert.match(appJs, /data-action="cloud-signout"/, "زر فصل الحساب اختفى");
+  assert.match(appJs, /await uploadCloudBackup\(backup, \{ storeName: storeDisplayName\(\) \}\); await refreshCloudBackups\(\{ quiet: true \}\);/, "التحديث التلقائي بعد الرفع اختفى");
 });

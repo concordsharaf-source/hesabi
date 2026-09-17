@@ -7,20 +7,19 @@ const rules = await readFile(new URL("../firestore.rules", import.meta.url), "ut
 const backup = await readFile(new URL("../client/src/js/firebase-backup.js", import.meta.url), "utf8");
 const sync = await readFile(new URL("../client/src/js/firebase-sync.js", import.meta.url), "utf8");
 
-test("شاشة البداية تفصل دخول الجهاز المساعد عن فتح متجر جديد", () => {
-  assert.match(app, /data-action="assistant-login"/);
-  assert.match(app, /function openAssistantEntryDialog/);
-  assert.match(app, /requestAssistantDevice/);
-  assert.doesNotMatch(app, /crypto\.randomUUID/);
-  assert.match(app, /normalizeAccountName/);
-  assert.match(app, /const matches = state\.accounts\.filter/);
+test("منظومة رمز الاقتران أُزيلت من الواجهة وبقيت أساسات النسخ السحابي", () => {
+  assert.doesNotMatch(app, /openAssistantEntryDialog/);
+  assert.doesNotMatch(app, /openPairingInviteDialog/);
+  assert.doesNotMatch(app, /approvePairingRequestFromUi/);
+  assert.doesNotMatch(app, /repairCloudWorkspace/);
+  assert.doesNotMatch(app, /data-action="pairing-invite"/);
+  assert.doesNotMatch(app, /إنشاء رمز اقتران/);
+  assert.doesNotMatch(app, /إصلاح ربط المتجر/);
+  assert.doesNotMatch(app, /redeemPairingInvite/);
   assert.match(backup, /from \"firebase\/app\"/);
   assert.match(backup, /getAuth/);
   assert.match(sync, /from \"firebase\/app\"/);
-  assert.match(sync, /signInAnonymously/);
   assert.match(sync, /import \{ getApp, getApps, initializeApp \} from "firebase\/app"/);
-  assert.match(app, /applySyncChanges\(state\.cloud\.identity\.bootstrapChanges\)/);
-  assert.doesNotMatch(app, /restoreBackup\(mergeRemoteChanges\(current, state\.cloud\.identity\.bootstrapChanges\)\)/);
 });
 
 test("قواعد Firestore تحافظ على النسخ وتضيف حماية المتجر", () => {
