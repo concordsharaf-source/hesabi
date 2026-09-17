@@ -7,30 +7,34 @@ service cloud.firestore {
     function ownsBackup(userId) { return request.auth != null && request.auth.uid == userId; }
     function signedIn() { return request.auth != null; }
 
+    /* كل قراءة مستند محروسة بـ exists() أولًا: في قواعد Firestore يستدعي get() على
+       مستند غير موجود «خطأ تقييم» يُبطل الطلب كله بدل رفضه رفضًا نظيفًا، والحرسة تجعل
+       الدوال الآتية آمنة من أي فرع يُستدعى فيه قبل التأكد من وجود الوثيقة. */
+    function memberPath(storeId) {
+      return /databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid);
+    }
+    function storePath(storeId) {
+      return /databases/$(database)/documents/stores/$(storeId);
+    }
     function memberDoc(storeId) {
-      return get(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid)).data;
+      return exists(memberPath(storeId)) ? get(memberPath(storeId)).data : null;
     }
     function storeDoc(storeId) {
-      return get(/databases/$(database)/documents/stores/$(storeId)).data;
+      return exists(storePath(storeId)) ? get(storePath(storeId)).data : null;
     }
     function member(storeId) {
-      return signedIn()
-        && exists(/databases/$(database)/documents/stores/$(storeId)/members/$(request.auth.uid))
-        && memberDoc(storeId).status == 'active';
+      return signedIn() && exists(memberPath(storeId)) && memberDoc(storeId).status == 'active';
     }
     function admin(storeId) {
       return member(storeId) && memberDoc(storeId).role == 'admin';
     }
     function ownsStore(storeId) {
-      return signedIn()
-        && exists(/databases/$(database)/documents/stores/$(storeId))
-        && storeDoc(storeId).ownerUid == request.auth.uid;
+      return signedIn() && exists(storePath(storeId)) && storeDoc(storeId).ownerUid == request.auth.uid;
     }
     /* مساحة متجر لم يطالب بها أحد بعد: لا مستند متجر، أو مستند يملكه صاحب الطلب نفسه.
        هذا هو الشرط الوحيد الذي يسمح بإنشاء عضوية «أدمن» ذاتيًا عند أول ربط للسحابة. */
     function storeUnclaimed(storeId) {
-      return !exists(/databases/$(database)/documents/stores/$(storeId))
-        || (signedIn() && storeDoc(storeId).ownerUid == request.auth.uid);
+      return !exists(storePath(storeId)) || ownsStore(storeId);
     }
 
     /* ─────────────────── النسخ الاحتياطي الشخصي ─────────────────── */
