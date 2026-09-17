@@ -338,19 +338,19 @@ test("محاسبة التوزيع الساعي: analytics يوزع المبيع�
   await db.resetAllData();
 });
 
-/* ===== v47: وحدة الكمية (حبة/عبوة) في طلبات الشراء + تاريخ يوم/شهر/سنة + لوحات الداكن تتبع الخلفية المختارة ===== */
+/* ===== v47: وحدة الكمية (حبة/كرتون...) في طلبات الشراء + تاريخ يوم/شهر/سنة + لوحات الداكن تتبع الخلفية المختارة ===== */
 
-test("طلب الشراء: خانة بالحبة أو بالعبوة (كرتون كيس صندوق...) لكل سطر وتدخل في نص الطلب وPDF", () => {
+test("طلب الشراء: خانة بالحبة أو بنوع الكمية (كرتون كيس صندوق...) لكل سطر وتدخل في نص الطلب وPDF", () => {
   const dialog = appJs.slice(appJs.indexOf("function openPurchaseOrderDialog"), appJs.indexOf("function currentMonthDateRange"));
-  assert.match(dialog, /<select class="po-line__unit"[^>]*>\$\{PACKAGE_UNITS\.map/, "قائمة العبوات مفقودة من سطر الطلب");
+  assert.match(dialog, /<select class="po-line__unit"[^>]*>\$\{PACKAGE_UNITS\.map/, "قائمة وحدات الكمية مفقودة من سطر الطلب");
   assert.match(dialog, /unit: row\.querySelector\("\.po-line__unit"\)\?\.value \|\| "حبة"/, "collectLines لا يجمع الوحدة");
   assert.match(dialog, /line\.unit === "حبة" \? \(unitOf\(line\.name\) \|\| "حبة"\) : line\.unit/, "نص الطلب لا يستخدم الوحدة المختارة");
   assert.match(css, /\.po-line__unit \{ height:44px/, "CSS خانة الوحدة مفقود");
 });
 
-test("طلب توريد المنتج الناقص: خانة بالحبة أو بالعبوة وتدخل في نص الرسالة", () => {
+test("طلب توريد المنتج الناقص: خانة بالحبة أو بنوع الكمية وتدخل في نص الرسالة", () => {
   const dialog = appJs.slice(appJs.indexOf("function openProductSupplyRequestDialog"), appJs.indexOf("function openReorderDialog"));
-  assert.match(dialog, /<select id="psr-unit">/, "قائمة العبوات مفقودة");
+  assert.match(dialog, /<select id="psr-unit">/, "قائمة وحدات الكمية مفقودة");
   assert.match(dialog, /\[product\.unit, \.\.\.PACKAGE_UNITS\.filter/, "وحدة المنتج ليست الخيار الأول");
   assert.match(dialog, /unit: overlay\.querySelector\("#psr-unit"\)\?\.value \|\| product\.unit/, "الوحدة لا تُجمع عند الإرسال");
   assert.match(dialog, /\$\{amount\(quantity\)\} \$\{unit \|\| product\.unit\}/, "نص الطلب لا يستخدم الوحدة المختارة");

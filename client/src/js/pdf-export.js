@@ -13,6 +13,7 @@ import { renderCustomerAccountHtml } from "./customer-account-print.js";
 import { renderPurchaseInvoiceHtml } from "./purchase-invoice-print.js";
 import { renderOfficialReportHtml } from "./report-template.js";
 import { NOTO_NASKH_ARABIC_FONT_URL } from "./font-assets.js";
+import { PDF_SIDE_MARGIN_MM, PDF_RENDER_CHUNK_PX, pdfContentWidthMm, pdfPageKind, choosePdfScale } from "./pdf-layout.js";
 
 /* خط عربي مضمّن محليًا: الرابط المطلق معرّف في font-assets.js لأن مراحل PDF
    تُحقن في مستند منفصل عن أصل الصفحة (نافذة منبثقة أو iframe srcdoc). */
@@ -36,12 +37,17 @@ function createPdfStage(html, page) {
   const parsed = new DOMParser().parseFromString(html, "text/html");
   const isThermal = page === "thermal";
   const isLandscape = !isThermal && /@page\s*\{[^}]*size\s*:\s*A4\s+landscape/i.test(html);
+  const pageKind = pdfPageKind(page, isLandscape);
+  const sideMarginMm = PDF_SIDE_MARGIN_MM[pageKind];
+  const contentWidthMm = pdfContentWidthMm(page, isLandscape);
   const stage = document.createElement("article");
   stage.dir = parsed.documentElement.dir || "rtl";
   stage.lang = parsed.documentElement.lang || "ar";
   stage.dataset.pdfStage = "true";
   stage.dataset.pdfOrientation = isLandscape ? "landscape" : "portrait";
-  stage.style.cssText = `position:fixed;top:0;left:0;width:${isThermal ? "80mm" : isLandscape ? "297mm" : "210mm"};min-height:20mm;padding:0;margin:0;background:#fff;color:#172e27;z-index:2147483647;pointer-events:none;overflow:visible;direction:rtl;text-align:right;font-family:"HesabiArabicPdf","Noto Naskh Arabic","Cairo","Noto Sans Arabic",Tahoma,Arial,sans-serif;`;
+  stage.dataset.pdfSideMarginMm = String(sideMarginMm);
+  stage.dataset.pdfContentWidthMm = String(contentWidthMm);
+  stage.style.cssText = `position:fixed;top:0;left:0;width:${contentWidthMm}mm;min-height:20mm;padding:0;margin:0;background:#fff;color:#172e27;z-index:2147483647;pointer-events:none;overflow:visible;direction:rtl;text-align:right;font-family:"HesabiArabicPdf","Noto Naskh Arabic","Cairo","Noto Sans Arabic",Tahoma,Arial,sans-serif;`;
   const printStyles = [...parsed.head.querySelectorAll("style")].map((style) => style.outerHTML).join("");
   const headLinks = [...parsed.head.querySelectorAll("link")].map((link) => link.outerHTML).join("");
   const pdfSafetyStyles = `<style data-pdf-safety>
@@ -69,6 +75,67 @@ function createPdfStage(html, page) {
   stage.innerHTML = `${headLinks}${printStyles}${pdfSafetyStyles}${parsed.body.innerHTML}`;
   document.body.appendChild(stage);
   return stage;
+}
+
+/* html2canvas لا يرسم محتوى <img> داخل بعض تركيبات CSS المستخدمة للشعار
+   (inline-flex + border-radius + object-fit + أبعاد نسبية) فيظهر إطار دائري فارغ.
+   الحل: rasterize محتوى الصورة مسبقًا إلى PNG بسيط بأبعاد بكسل صريحة،
+   فيصبح رسمها مضمونًا بأي مقاس مصدر (PNG/JPEG/WebP/SVG أو شعار الموقع). */
+async function rasterizeStageLogoImages(stage) {
+  const images = [...stage.querySelectorAll("img")];
+  for (const img of images) {
+    const src = img.getAttribute("src") || "";
+    if (!src) continue;
+    const computed = window.getComputedStyle(img);
+    const radiusValue = parseFloat(computed.borderRadius) || 0;
+    const isCircular = /%/.test(computed.borderRadius) || radiusValue > 0;
+    const looksLikeLogo = isCircular || computed.objectFit !== "fill" || String(img.className || "").includes("logo");
+    if (!looksLikeLogo) continue;
+    const rect = img.getBoundingClientRect();
+    if (rect.width < 4 || rect.height < 4) continue;
+    const source = await new Promise((resolve) => {
+      const probe = new Image();
+      const timer = window.setTimeout(() => resolve(null), 1500);
+      probe.onload = () => { window.clearTimeout(timer); resolve(probe); };
+      probe.onerror = () => { window.clearTimeout(timer); resolve(null); };
+      probe.src = src;
+    });
+    const sw = source?.naturalWidth || source?.width || 0;
+    const sh = source?.naturalHeight || source?.height || 0;
+    if (!source || !sw || !sh) continue;
+    const ratio = 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(8, Math.round(rect.width * ratio));
+    canvas.height = Math.max(8, Math.round(rect.height * ratio));
+    const ctx = canvas.getContext("2d");
+    if (isCircular) {
+      ctx.beginPath();
+      ctx.arc(canvas.width / 2, canvas.height / 2, Math.min(canvas.width, canvas.height) / 2, 0, Math.PI * 2);
+      ctx.clip();
+    }
+    const fit = Math.min(canvas.width / sw, canvas.height / sh);
+    const dw = sw * fit;
+    const dh = sh * fit;
+    ctx.drawImage(source, (canvas.width - dw) / 2, (canvas.height - dh) / 2, dw, dh);
+    img.setAttribute("src", canvas.toDataURL("image/png"));
+    img.style.width = `${Math.round(rect.width)}px`;
+    img.style.height = `${Math.round(rect.height)}px`;
+    img.style.objectFit = "fill";
+    img.style.borderRadius = "0";
+    /* html2canvas لا يرسم العناصر المستبدلة داخل حاويات flex بشكل موثوق:
+       نحوّل الحاوية إلى block مع توسيط نصي حتى تبقى الصورة مرئية في الملف. */
+    const parent = img.parentElement;
+    if (parent) {
+      const parentDisplay = window.getComputedStyle(parent).display || "";
+      if (parentDisplay.includes("flex")) {
+        parent.style.display = "block";
+        parent.style.textAlign = "center";
+      }
+    }
+    img.style.display = "block";
+    img.style.margin = "0 auto";
+    img.style.background = "transparent";
+  }
 }
 
 async function waitForPdfStage(stage) {
@@ -510,9 +577,9 @@ function drawPurchaseInvoiceCanvas({ purchase, supplier, storeName, storeInfo, l
 
     let detailY = y + (itemNameRows > 1 ? 20 : 16) * mm;
     const purchaseDetails = [
-      item.packageQuantity ? `العبوات: ${formatAmount(item.packageQuantity)} ${item.packageUnit || "عبوة"}` : "",
-      item.unitsPerPackage ? `الوحدات/العبوة: ${formatAmount(item.unitsPerPackage)}` : "",
-      item.packageCost !== undefined ? `سعر العبوة: ${formatMoney(item.packageCost)}` : "",
+      item.packageQuantity ? `نوع الكمية: ${formatAmount(item.packageQuantity)}${item.packageUnit ? ` ${item.packageUnit}` : ""}` : "",
+      item.unitsPerPackage ? `الوحدات/نوع الكمية: ${formatAmount(item.unitsPerPackage)}` : "",
+      item.packageCost !== undefined ? `سعر نوع الكمية: ${formatMoney(item.packageCost)}` : "",
       item.batchNumber ? `التشغيلة: ${item.batchNumber}` : "",
       item.productionDate ? `الإنتاج: ${item.productionDate}` : "",
       item.expiryDate ? `الانتهاء: ${item.expiryDate}` : "",
@@ -904,56 +971,93 @@ export async function createPdfFileFromHtml({ html, filename, page = "a4" }) {
   const stage = createPdfStage(html, page);
   try {
     await waitForPdfStage(stage);
-    const canvas = await html2canvas(stage, { scale: Math.max(3, window.devicePixelRatio || 1), useCORS: true, backgroundColor: "#ffffff", logging: false, windowWidth: stage.scrollWidth, windowHeight: stage.scrollHeight });
-    if (canvas.width < 2 || canvas.height < 2) throw new Error("تعذر رسم محتوى الفاتورة لملف PDF.");
+    await rasterizeStageLogoImages(stage);
+    await waitForPdfStage(stage);
+    const preferredScale = Math.max(3, window.devicePixelRatio || 1);
+    const stageWidthPx = Math.max(1, stage.scrollWidth);
+    const stageHeightPx = Math.max(1, stage.scrollHeight);
+    /* رسم المحتوى دفعاتٍ بارتفاع محدود: لوحات المتصفحات لها سقف للضلع والمساحة،
+       وتجاوزه (تقارير طويلة × تكبير عالي) كان ينتهي بلوحة بيضاء = PDF فارغ. */
+    const chunkHeightPx = Math.min(PDF_RENDER_CHUNK_PX, stageHeightPx);
+    const scale = choosePdfScale(stageWidthPx, chunkHeightPx, preferredScale);
+    const renderOptions = { scale, useCORS: true, backgroundColor: "#ffffff", logging: false, windowWidth: stageWidthPx, windowHeight: stageHeightPx };
+    const sources = [];
+    let totalHeightPx = 0;
+    for (let offsetY = 0; offsetY < stageHeightPx; offsetY += PDF_RENDER_CHUNK_PX) {
+      const partHeight = Math.min(PDF_RENDER_CHUNK_PX, stageHeightPx - offsetY);
+      const part = await html2canvas(stage, { ...renderOptions, x: 0, y: offsetY, width: stageWidthPx, height: partHeight });
+      if (part.width < 2 || part.height < 2) throw new Error("تعذر رسم محتوى الفاتورة لملف PDF.");
+      sources.push({ canvas: part, yStart: totalHeightPx });
+      totalHeightPx += part.height;
+    }
+    const canvasWidthPx = sources[0]?.canvas.width || 0;
+    if (canvasWidthPx < 2 || totalHeightPx < 2) throw new Error("تعذر رسم محتوى الفاتورة لملف PDF.");
     const isThermal = page === "thermal";
     const isLandscape = stage.dataset.pdfOrientation === "landscape";
     const thermalWidth = 80;
-    const thermalHeight = Math.max(40, (canvas.height * thermalWidth) / canvas.width);
+    const thermalHeight = Math.max(40, (totalHeightPx * thermalWidth) / canvasWidthPx);
     const pdf = new jsPDF({ unit: "mm", format: isThermal ? [thermalWidth, thermalHeight] : "a4", orientation: isLandscape ? "landscape" : "portrait", compress: true });
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
-    const pixelsPerMm = canvas.width / pageWidth;
+    const sideMarginMm = Number(stage.dataset.pdfSideMarginMm || 0);
+    const contentWidthMm = Number(stage.dataset.pdfContentWidthMm || pageWidth);
+    const pixelsPerMm = canvasWidthPx / contentWidthMm;
 
     if (isThermal) {
-      const slice = document.createElement("canvas");
-      slice.width = canvas.width;
-      slice.height = canvas.height;
-      slice.getContext("2d").drawImage(canvas, 0, 0);
-      pdf.addImage(slice.toDataURL("image/png"), "PNG", 0, 0, pageWidth, (canvas.height / pixelsPerMm), undefined, "FAST");
+      let cursorMm = 0;
+      for (const source of sources) {
+        const partHeightMm = source.canvas.height / pixelsPerMm;
+        pdf.addImage(source.canvas.toDataURL("image/png"), "PNG", sideMarginMm, cursorMm, contentWidthMm, partHeightMm, undefined, "FAST");
+        cursorMm += partHeightMm;
+      }
     } else {
       // هوامش علوية وسفلية تمنع تلاصق الصفحات وتضمن عدم ضياع البيانات عند الطباعة
       const topMarginMm = isLandscape ? 10 : 12;
       const bottomMarginMm = isLandscape ? 12 : 14;
       const usableHeightMm = pageHeight - topMarginMm - bottomMarginMm;
       const usableHeightPx = Math.max(1, Math.floor(usableHeightMm * pixelsPerMm));
-      const safeBreakPoints = getSafeStageBreakPoints(stage, canvas);
+      const safeBreakPoints = getSafeStageBreakPoints(stage, { width: canvasWidthPx, height: totalHeightPx });
 
       let currentOffsetY = 0;
       let pageIndex = 0;
 
-      while (currentOffsetY < canvas.height) {
+      while (currentOffsetY < totalHeightPx) {
         if (pageIndex > 0) {
           pdf.addPage();
         }
 
-        const sliceHeightPx = findBestSliceHeight(currentOffsetY, usableHeightPx, canvas.height, safeBreakPoints);
+        const sliceHeightPx = findBestSliceHeight(currentOffsetY, usableHeightPx, totalHeightPx, safeBreakPoints);
+        if (sliceHeightPx < 1) break;
         const sliceHeightMm = sliceHeightPx / pixelsPerMm;
 
         const sliceCanvas = document.createElement("canvas");
-        sliceCanvas.width = canvas.width;
+        sliceCanvas.width = canvasWidthPx;
         sliceCanvas.height = sliceHeightPx;
         const sliceCtx = sliceCanvas.getContext("2d");
         sliceCtx.fillStyle = "#ffffff";
         sliceCtx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-        sliceCtx.drawImage(canvas, 0, currentOffsetY, canvas.width, sliceHeightPx, 0, 0, sliceCanvas.width, sliceHeightPx);
+        /* تجميع الشريحة من دفعات الرسم: قد تمتد الشريحة عبر حدود دفعتين */
+        let remaining = sliceHeightPx;
+        let sourceY = currentOffsetY;
+        let destY = 0;
+        for (const source of sources) {
+          if (remaining <= 0) break;
+          const sourceEnd = source.yStart + source.canvas.height;
+          if (sourceY >= sourceEnd) continue;
+          const from = Math.max(sourceY, source.yStart);
+          const take = Math.min(remaining, sourceEnd - from);
+          sliceCtx.drawImage(source.canvas, 0, from - source.yStart, source.canvas.width, take, 0, destY, source.canvas.width, take);
+          destY += take;
+          remaining -= take;
+          sourceY += take;
+        }
 
         pdf.addImage(
           sliceCanvas.toDataURL("image/png"),
           "PNG",
-          0,
+          sideMarginMm,
           topMarginMm,
-          pageWidth,
+          contentWidthMm,
           sliceHeightMm,
           undefined,
           "FAST"

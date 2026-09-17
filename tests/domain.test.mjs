@@ -80,7 +80,7 @@ test("يلخص التحويلات دون خلطها بالصندوق النقد�
   assert.deepEqual(result, { salesAmount: 100, debtPaymentsAmount: 40, total: 140, count: 3 });
 });
 
-test("يحوّل الكرتون إلى حبات ويحسب سعر الحبة وإجمالي الشراء من سعر العبوة", () => {
+test("يحوّل الكرتون إلى حبات ويحسب سعر الحبة وإجمالي الشراء من سعر نوع الكمية", () => {
   const carton = calculatePackagePurchase({ packageQuantity: 3, unitsPerPackage: 24, packageCost: 1200 });
   assert.deepEqual(carton, { packageQuantity: 3, unitsPerPackage: 24, packageCost: 1200, quantity: 72, unitCost: 50, total: 3600 });
   assert.equal(calculatePurchaseTotals([carton]), 3600);

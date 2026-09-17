@@ -275,7 +275,7 @@ test("تتيح صفحة دفعات الموردين اختيار المورد ا
   assert.match(permissions, /"new-supplier-payment"/);
 });
 
-test("اختيار منتج في فاتورة الشراء يهيئ حقول العبوة مرة واحدة دون مراقب DOM يعيد الرسم بلا نهاية", async () => {
+test("اختيار منتج في فاتورة الشراء يهيئ حقول نوع الكمية مرة واحدة دون مراقب DOM يعيد الرسم بلا نهاية", async () => {
   const app = await readFile(new URL("../client/src/js/app.js", import.meta.url), "utf8");
   assert.doesNotMatch(app, /new MutationObserver\(hydrateBusinessPurchaseFields\)/);
   assert.match(app, /linesHost\.innerHTML = lines\.length[\s\S]*?hydrateBusinessPurchaseFields\(\);[\s\S]*?syncPurchase\(\);/);
@@ -723,7 +723,9 @@ test("يحوّل PDF الفاتورة من قالب الطباعة الحرار�
   assert.match(pdfExport, /renderThermalInvoiceHtml\(\{ invoice, customer, storeName, logoDataUrl/);
   assert.match(pdfExport, /return createPdfFileFromHtml\(\{ html, filename, page: "thermal" \}\)/);
   assert.match(pdfExport, /dataset\.pdfOrientation = isLandscape \? "landscape" : "portrait"/);
-  assert.match(pdfExport, /width:\$\{isThermal \? "80mm" : isLandscape \? "297mm" : "210mm"\}/);
+  assert.match(pdfExport, /width:\$\{contentWidthMm\}mm/, "عرض المسرح يجب أن يُشتق من عرض المحتوى بعد الهوامش الجانبية");
+  assert.match(pdfExport, /import \{ PDF_SIDE_MARGIN_MM, PDF_RENDER_CHUNK_PX, pdfContentWidthMm, pdfPageKind, choosePdfScale \} from "\.\/pdf-layout\.js"/);
+  assert.match(pdfExport, /sideMarginMm,\n\s*topMarginMm,\n\s*contentWidthMm/, "موضع صورة الصفحة يجب أن يحترم الهامش الجانبي");
   assert.match(pdfExport, /orientation: isLandscape \? "landscape" : "portrait"/);
   assert.match(app, /font-family:\"HesabiArabicPdf\",\"Noto Naskh Arabic\",Tahoma,Arial,sans-serif/);
   assert.match(app, /grid-template-columns:minmax\(0,1fr\) 74px/);

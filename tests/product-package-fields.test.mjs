@@ -4,14 +4,14 @@ import assert from "node:assert/strict";
 import { db } from "../client/src/js/database.js";
 import { calculatePackagePurchase } from "../client/src/js/domain.js";
 
-test("حساب العبوة: 5 كراتين × 24 حبة بسعر 240 للكرتون", () => {
+test("حساب نوع الكمية: 5 كراتين × 24 حبة بسعر 240 للكرتون", () => {
   const m = calculatePackagePurchase({ packageQuantity: 5, unitsPerPackage: 24, packageCost: 240 });
   assert.equal(m.quantity, 120, "الكمية = 5×24");
   assert.equal(m.unitCost, 10, "سعر الحبة = 240/24");
   assert.equal(m.total, 1200, "الإجمالي = 5×240");
 });
 
-test("إضافة منتج بحقول الكراتين يحفظ سعر الحبة والكمية والعبوة", async () => {
+test("إضافة منتج بحقول الكراتين يحفظ سعر الحبة والكمية ونوع الكمية", async () => {
   await db.resetAllData();
   const m = calculatePackagePurchase({ packageQuantity: 3, unitsPerPackage: 12, packageCost: 120 });
   const product = await db.createProduct({
@@ -28,14 +28,14 @@ test("إضافة منتج بحقول الكراتين يحفظ سعر الحبة
   await db.resetAllData();
 });
 
-test("تعديل المنتج يحفظ نوع العبوة وسعرها", async () => {
+test("تعديل المنتج يحفظ نوع الكمية وسعرها", async () => {
   await db.resetAllData();
   const p = await db.createProduct({ name: "ماء", unit: "حبة", purchasePrice: 5, salePrice: 8, quantity: 10 });
   const updated = await db.updateProduct(p.id, {
     name: "ماء", unit: "حبة", purchasePrice: 4, salePrice: 8, minimumStock: 2,
     packageUnit: "صندوق", unitsPerPackage: 20, packageCost: 80,
   });
-  assert.equal(updated.purchasePackageUnit, "صندوق", "نوع العبوة يُحفظ عند التعديل");
+  assert.equal(updated.purchasePackageUnit, "صندوق", "نوع الكمية يُحفظ عند التعديل");
   assert.equal(updated.unitsPerPackage, 20);
   assert.equal(updated.lastPackageCost, 80);
   await db.resetAllData();

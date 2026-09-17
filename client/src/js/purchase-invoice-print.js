@@ -20,7 +20,8 @@ export function renderPurchaseInvoiceHtml({
   const effectiveLogo = getStoreLogoDataUri(logoDataUrl, storeName);
   const items = purchase.items || [];
   const rows = items.map((item) => {
-    const packageSummary = item.packageQuantity ? `${escapeHtml(String(formatAmount(item.packageQuantity)))} ${escapeHtml(item.packageUnit || "عبوة")} × ${escapeHtml(String(formatMoney(item.packageCost)))}` : "";
+    const packageUnitText = item.packageUnit ? ` ${escapeHtml(item.packageUnit)}` : "";
+    const packageSummary = item.packageQuantity ? `${escapeHtml(String(formatAmount(item.packageQuantity)))}${packageUnitText} × ${escapeHtml(String(formatMoney(item.packageCost)))}` : "";
     const extras = [
       item.batchNumber ? `التشغيلة: ${escapeHtml(item.batchNumber)}` : "",
       item.productionDate ? `الإنتاج: ${escapeHtml(item.productionDate)}` : "",

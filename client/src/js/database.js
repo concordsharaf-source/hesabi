@@ -571,7 +571,7 @@ export const db = {
       const unitsPerPackage = line.unitsPerPackage === undefined ? 1 : toNumber(line.unitsPerPackage);
       const packageCost = line.packageCost === undefined ? toNumber(line.unitCost) : toNumber(line.packageCost);
       const packaging = calculatePackagePurchase({ packageQuantity, unitsPerPackage, packageCost });
-      if (packaging.packageQuantity <= 0 || packaging.unitsPerPackage <= 0 || packaging.packageCost < 0) throw new Error("أدخل عدد العبوات والحبات وسعر العبوة بصورة صحيحة.");
+      if (packaging.packageQuantity <= 0 || packaging.unitsPerPackage <= 0 || packaging.packageCost < 0) throw new Error("أدخل عدد الكميات والحبات وسعر نوع الكمية بصورة صحيحة.");
       const batchNumber = normalize(line.batchNumber); const productionDate = normalize(line.productionDate); const expiryDate = normalize(line.expiryDate);
       if (pharmacyMode && !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) throw new Error(`أدخل تاريخ انتهاء صالحًا للمنتج: ${product.name}`);
       if (expiryDate && !/^\d{4}-\d{2}-\d{2}$/.test(expiryDate)) throw new Error(`أدخل تاريخ انتهاء صالحًا للمنتج: ${product.name}`);
