@@ -26,7 +26,17 @@ test("لا بقايا من الورقة السفلية القديمة: السل�
 test("شريط الإجمالي الثابت: يظهر في صفحة المبيعات فقط ويعرض الإجمالي بالخط الرقمي", () => {
   assert.match(salesMarkup, /class="sales-total-bar" role="group"/, "لا شريط إجمالي في قالب المبيعات");
   assert.match(salesMarkup, /sales-total-bar__jump" type="button" data-action="scroll-to-cart"/, "زر الانتقال إلى السلة مفقود من الشريط");
-  assert.match(salesMarkup, /data-sales-total-bar dir="ltr">\$\{money\(totals\.subtotal\)\}/, "الشريط لا يعرض إجمالي السلة");
+  // الشريط يعرض الرقم وحده بلا رمز العملة: مساحته ضيقة والخط رقمي كبير، والعملة
+  // واضحة من السياق وتبقى ظاهرة في «إجمالي السلة» ونافذة إتمام البيع والفواتير.
+  assert.match(salesMarkup, /data-sales-total-bar dir="ltr">\$\{barTotal\}/, "الشريط لا يعرض إجمالي السلة");
+  assert.match(salesMarkup, /const barTotal = money\(totals\.subtotal, \{ symbol: false \}\);/, "بارتوتال لا تُشتق من money بلا رمز العملة");
+  assert.match(appJs, /return symbol \? `\$\{formatted\} \$\{currency\.symbol\}` : formatted;/, "money() فقدت خيار إخفاء الرمز");
+  const barBlock2 = salesMarkup.slice(salesMarkup.indexOf('class="sales-total-bar"'), salesMarkup.indexOf('<section class="sales-bottom-action"'));
+  assert.ok(barBlock2.length > 200, "تعذّر استخراج بلوك الشريط السفلي من القالب");
+  assert.match(barBlock2, />\$\{barTotal\}</, "قيمة الشريط لا تستخدم barTotal");
+  assert.doesNotMatch(barBlock2, />\$\{money\(/, "قيمة الشريط ما زالت تعرض رمز العملة");
+  // وصف قارئ الشاشة يحتفظ بالعملة كاملة لأن السياق الصوتي لا يوضحها
+  assert.match(barBlock2, /aria-label="إجمالي الفاتورة \$\{money\(totals\.subtotal\)\}/, "aria-label فقد رمز العملة — قارئ الشاشة لن ينطقها");
   // مخفي افتراضيًا ويُفعّل فقط حين تكون صفحة المبيعات هي المعروضة
   assert.match(css, /\.sales-total-bar \{ display: none; \}/, "الشريط ليس مخفيًا افتراضيًا خارج صفحة المبيعات");
   assert.match(barBlock, /html\.is-sales-page \.sales-total-bar \{\n  position: fixed;/, "الشريط ليس مثبّتًا أسفل الشاشة");

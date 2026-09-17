@@ -115,6 +115,10 @@ const DEFAULT_MOBILE_NAVIGATION_ORDER = ["dashboard", "sales", "purchases", ...N
 const RECOVERY_REQUEST_ENDPOINT = "https://formsubmit.co/ajax/fc46f51ed31eb26af7d65edd8a313358";
 const businessProfile = () => BUSINESS_PROFILES[state.settings?.businessType] || BUSINESS_PROFILES["متجر عام"];
 const isPharmacy = () => state.settings?.businessType === "صيدلية";
+/* خدمتا «شحن فوري» و«نقد مقابل تحويل» خاصتان بنشاط البقالة والسوبرماركت: هما النشاطان
+   اللذان يبيعان رصيد اتصالات ويصرّفان الحوالات نقدًا للزبائن. باقي الأنشطة
+   (صيدلية، ملابس، جوالات…) لا تستفيد منهما فتُخفيان لتبقى شاشة البيع أخف. */
+const isGrocery = () => state.settings?.businessType === "بقالة" || state.settings?.businessType === "سوبرماركت";
 const profileOptions = (kind, current = "") => [...new Set([...(businessProfile()[kind] || []), current].filter(Boolean))];
 const categoryOptions = (current = "") => [...new Set([...(businessProfile().categories || []), ...state.products.map((product) => product.category), current].filter(Boolean))];
 const categoryButtons = (selected, action) => [`الكل`, ...categoryOptions()].map((category) => `<button type="button" class="category-chip ${selected === category ? "is-active" : ""}" data-category-action="${action}" data-category="${escapeHtml(category)}">${escapeHtml(category)}</button>`).join("");
@@ -137,10 +141,12 @@ const desktopBarcodeReader = { code: "", startedAt: 0, lastKeyAt: 0, resetTimer:
 const roleLabel = (role) => ACCOUNT_ROLES.find((item) => item.id === role)?.label || "كاشير";
 const adminOnlyMessage = () => showToast("هذه العملية متاحة لحساب الأدمن فقط.", "error");
 
-const money = (value) => {
+/* `symbol: false` تعطّل رمز العملة في المواضع التي يوضح السياق فيها العملة أصلًا
+   (مثل الشريط السفلي في شاشة البيع)، فتبقى الدالة مصدر التنسيق الوحيد بلا تكرار. */
+const money = (value, { symbol = true } = {}) => {
   const currency = CURRENCIES.find((item) => item.code === (state.settings?.currency || DEFAULT_CURRENCY_CODE)) || CURRENCIES[0];
   const formatted = new Intl.NumberFormat("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(roundMoney(value));
-  return `${formatted} ${currency.symbol}`;
+  return symbol ? `${formatted} ${currency.symbol}` : formatted;
 };
 const signedMoney = (value) => `<strong class="${toNumber(value) < 0 ? "is-negative" : ""}">${money(value)}</strong>`;
 const amount = (value) => new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(toNumber(value));
@@ -1244,10 +1250,13 @@ function salesMarkup() {
   const matches = ranked.slice(0, SALES_CATALOG_LIMIT);
   const totals = calculateSaleTotals(state.cart);
   const heldCount = state.heldInvoices?.length || 0;
+  /* الشريط السفلي الثابت يعرض الرقم وحده بلا رمز العملة: مساحته ضيقة والخط رقمي
+     كبير، والرمز يتكرر في «إجمالي السلة» ونافذة إتمام البيع والفواتير. */
+  const barTotal = money(totals.subtotal, { symbol: false });
   const topbarActions = `<div class="sales-topbar-actions">${heldCount ? `<button class="button button--secondary button--compact held-topbar-btn" data-action="open-held-invoices" title="الفواتير المعلقة">${icon("clock", 16)}<span>معلقة (${heldCount})</span></button>` : ""}<button class="button button--secondary" data-action="navigate" data-view="invoices">${icon("receipt", 17)}<span>الفواتير</span></button></div>`;
   return `${topbarMarkup("بيع جديد", "أضف المنتجات إلى السلة ثم ثبّت الفاتورة في عملية واحدة.", topbarActions)}
   <section class="sales-layout"><div class="sales-catalog"><div class="toolbar toolbar--sales"><label class="search-field">${icon("search", 19)}<input id="sale-search" dir="rtl" lang="ar" autocomplete="off" placeholder="ابحث أو أدخل باركود..." value="${escapeHtml(state.saleQuery)}" /></label><button class="button button--secondary button--scan" data-action="open-scanner" data-mode="sale" aria-label="مسح الباركود">${icon("scan", 19)}</button></div><p class="desktop-barcode-reader-note">${icon("scan", 15)} قارئ الباركود المتصل بالكمبيوتر يعمل مباشرةً في صفحة المبيعات؛ امسح الرمز ثم Enter أو Tab.</p>
-  <div class="sales-service-tiles">${isPharmacy() ? `<button class="sales-service-tile sales-service-tile--pharmacy" type="button" data-action="open-pharmacy-service">${icon("medical", 20)}<span>خدمات</span><small>مجارحة · ضرب إبر · قياسات وغيرها</small></button>` : ""}<button class="sales-service-tile sales-service-tile--topup" type="button" data-action="add-service-line" data-service="instant-topup">${icon("phone", 20)}<span>شحن فوري</span><small>رصيد اتصالات للزبون</small></button><button class="sales-service-tile sales-service-tile--exchange" type="button" data-action="add-service-line" data-service="cash-transfer">${icon("transfer", 20)}<span>نقد مقابل تحويل</span><small>الزبون يحوّل وتسلمه نقدًا</small></button></div><div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => {
+  ${isPharmacy() || isGrocery() ? `<div class="sales-service-tiles">${isPharmacy() ? `<button class="sales-service-tile sales-service-tile--pharmacy" type="button" data-action="open-pharmacy-service">${icon("medical", 20)}<span>خدمات</span><small>مجارحة · ضرب إبر · قياسات وغيرها</small></button>` : ""}${isGrocery() ? `<button class="sales-service-tile sales-service-tile--topup" type="button" data-action="add-service-line" data-service="instant-topup">${icon("phone", 20)}<span>شحن فوري</span><small>رصيد اتصالات للزبون</small></button><button class="sales-service-tile sales-service-tile--exchange" type="button" data-action="add-service-line" data-service="cash-transfer">${icon("transfer", 20)}<span>نقد مقابل تحويل</span><small>الزبون يحوّل وتسلمه نقدًا</small></button>` : ""}</div>` : ""}<div class="sale-matches">${state.products.length === 0 ? emptyState("أضف منتجاتك أولًا", "تحتاج المبيعات إلى منتجات محفوظة في المخزون.") : matches.length ? matches.map((product) => {
     const isFlash = state.lastAddedProductId === product.id;
     const inCart = cartProductIds.has(product.id);
     const cartQty = inCart ? state.cart.reduce((sum, line) => (line.productId === product.id ? sum + toNumber(line.quantity) : sum), 0) : 0;
@@ -1255,7 +1264,7 @@ function salesMarkup() {
   }).join("") : `<div class="no-match"><strong>لا توجد نتيجة</strong><span>تحقق من الاسم أو الباركود أو أضف منتجًا جديدًا.</span><button class="text-button" data-action="new-product">إنشاء منتج</button></div>`}</div></div>
   <aside class="cart-panel" id="sales-cart" data-cart-empty="${state.cart.length ? "0" : "1"}"><div class="cart-panel__head"><div><span class="eyebrow">سلة البيع</span><h2>${state.cart.length ? `${state.cart.length} أصناف` : "فارغة الآن"}</h2></div><div class="cart-head-actions">${heldCount ? `<button class="button button--secondary button--compact held-badge-btn" data-action="open-held-invoices" title="عرض الفواتير المعلقة">${icon("clock", 15)}<span>معلقة (${heldCount})</span></button>` : ""}${state.cart.length ? `<button class="button button--secondary button--compact" data-action="hold-cart" title="تعليق الفاتورة الحالية">${icon("pause", 15)}<span>تعليق</span></button><button class="text-button text-button--danger" data-action="clear-cart">إفراغ</button>` : ""}</div></div>
   <div class="cart-lines">${state.cart.length ? state.cart.map(cartLine).join("") : `<div class="cart-empty">${icon("cart", 30)}<p>اختر منتجًا من القائمة لتبدأ البيع.</p></div>`}</div>
-  <div class="cart-total"><div class="cart-total__summary"><div><span>إجمالي السلة</span><strong data-cart-subtotal>${money(totals.subtotal)}</strong></div></div><div class="cart-actions-grid">${state.cart.length ? `<button class="button button--secondary button--hold" data-action="hold-cart" title="تعليق الفاتورة مؤقتًا">${icon("pause", 17)}<span>تعليق</span></button>` : ""}<button class="button button--primary ${state.cart.length ? "checkout-launch" : "button--wide"}" data-action="checkout" ${state.cart.length ? "" : "disabled"}>إتمام البيع ${icon("arrow", 18)}</button></div></div></aside></section><div class="sales-total-bar" role="group" aria-label="شريط إجمالي الفاتورة"><button class="sales-total-bar__jump" type="button" data-action="scroll-to-cart" aria-label="الانتقال إلى السلة أسفل الصفحة"><span class="sales-total-bar__label">${icon("cart", 18)} الإجمالي</span></button><button class="sales-total-bar__hold" type="button" data-action="hold-cart" ${state.cart.length ? "" : "disabled"} aria-label="إيقاف مؤقت — تعليق عملية البيع الحالية" title="تعليق الفاتورة الحالية">${icon("pause", 22)}</button><button class="sales-total-bar__jump" type="button" data-action="scroll-to-cart" aria-label="إجمالي الفاتورة ${money(totals.subtotal)} — اضغط للانتقال إلى السلة"><strong class="sales-total-bar__value" data-sales-total-bar dir="ltr">${money(totals.subtotal)}</strong></button></div><section class="sales-bottom-action"><div><span class="eyebrow">سجل المبيعات</span><strong>فواتير المبيعات</strong><small>اعرض الفواتير المحفوظة وابحث عنها وراجع تفاصيل كل فاتورة.</small></div><button class="button button--primary" data-action="navigate" data-view="invoices">${icon("receipt", 22)}<span>الانتقال إلى فواتير المبيعات</span></button></section>`;
+  <div class="cart-total"><div class="cart-total__summary"><div><span>إجمالي السلة</span><strong data-cart-subtotal>${money(totals.subtotal)}</strong></div></div><div class="cart-actions-grid">${state.cart.length ? `<button class="button button--secondary button--hold" data-action="hold-cart" title="تعليق الفاتورة مؤقتًا">${icon("pause", 17)}<span>تعليق</span></button>` : ""}<button class="button button--primary ${state.cart.length ? "checkout-launch" : "button--wide"}" data-action="checkout" ${state.cart.length ? "" : "disabled"}>إتمام البيع ${icon("arrow", 18)}</button></div></div></aside></section><div class="sales-total-bar" role="group" aria-label="شريط إجمالي الفاتورة"><button class="sales-total-bar__jump" type="button" data-action="scroll-to-cart" aria-label="الانتقال إلى السلة أسفل الصفحة"><span class="sales-total-bar__label">${icon("cart", 18)} الإجمالي</span></button><button class="sales-total-bar__hold" type="button" data-action="hold-cart" ${state.cart.length ? "" : "disabled"} aria-label="إيقاف مؤقت — تعليق عملية البيع الحالية" title="تعليق الفاتورة الحالية">${icon("pause", 22)}</button><button class="sales-total-bar__jump" type="button" data-action="scroll-to-cart" aria-label="إجمالي الفاتورة ${money(totals.subtotal)} — اضغط للانتقال إلى السلة"><strong class="sales-total-bar__value" data-sales-total-bar dir="ltr">${barTotal}</strong></button></div><section class="sales-bottom-action"><div><span class="eyebrow">سجل المبيعات</span><strong>فواتير المبيعات</strong><small>اعرض الفواتير المحفوظة وابحث عنها وراجع تفاصيل كل فاتورة.</small></div><button class="button button--primary" data-action="navigate" data-view="invoices">${icon("receipt", 22)}<span>الانتقال إلى فواتير المبيعات</span></button></section>`;
 }
 
 const SALE_SERVICE_TYPES = {
@@ -1283,6 +1292,10 @@ function openPharmacyServiceDialog() {
 function addServiceLine(serviceType) {
   const service = SALE_SERVICE_TYPES[serviceType];
   if (!service) return;
+  /* حارس من جهة المنطق لا من جهة العرض وحدها: خدمتا الشحن والحوالة للبقالة والسوبرماركت
+     فقط، فلو وصل الحدث من مسار آخر (اختصار لوحة مفاتيح، سلة معلّقة قديمة، حالة محفوظة
+     قبل تغيير نوع النشاط) لا تُضاف السلة. */
+  if (!isGrocery()) { showToast("خدمتا الشحن الفوري ونقد مقابل تحويل متاحتان لنشاط البقالة والسوبرماركت فقط.", "error"); return; }
   state.cart.push({ productId: `${service.prefix}-${Date.now()}`, isService: true, serviceType, name: service.label, unitPrice: "", quantity: 1, discount: "" });
   renderKeepingScroll();
   requestAnimationFrame(() => { const input = root.querySelector(`[data-service-amount]:last-of-type`) || [...root.querySelectorAll("[data-service-amount]")].pop(); input?.focus(); });
