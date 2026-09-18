@@ -806,7 +806,7 @@ function themeToggleMarkup() {
   const glyph = preference === "system" ? "monitor" : preference === "light" ? "sun" : "moon";
   return `<button class="icon-button theme-toggle ${preference === "system" ? "theme-toggle--system" : ""}" data-action="toggle-theme" aria-label="${label}" title="${label}">${icon(glyph, 19)}</button>`;
 }
-function salesScannerFabMarkup() { return `<button class="sales-scanner-fab" data-action="open-sales-scanner" data-mode="sale" aria-label="فتح المبيعات ومسح الباركود" title="بيع ومسح باركود">${icon("cart", 22)}<span>بيع</span></button>`; }
+function salesScannerFabMarkup() { return `<button class="sales-scanner-fab" data-action="open-sales-scanner" data-mode="sale" aria-label="مسح الباركود لإضافة الأصناف" title="مسح باركود">${icon("scan", 22)}<span>باركود</span></button>`; }
 
 function topbarMarkup(title, description, action = "", modifierClass = "") {
   return `<header class="topbar${modifierClass ? ` ${modifierClass}` : ""}"><div><p class="eyebrow topbar__store"><img src="${storeLogoUrl()}" alt="" />${escapeHtml(storeDisplayName())}</p><h1>${title}</h1>${description ? `<p class="topbar__description">${description}</p>` : ""}</div><div class="topbar__actions"><span class="account-badge account-badge--${state.currentUser?.role || "cashier"}">${roleLabel(state.currentUser?.role)}</span>${action}${themeToggleMarkup()}<button class="icon-button lock-screen-btn" data-action="quick-lock" aria-label="قفل الشاشة السريع" title="قفل الشاشة السريع">${icon("lock", 18)}</button><button class="icon-button" data-action="account-session" aria-label="تبديل المستخدمين أو تسجيل الخروج" title="تبديل المستخدمين أو تسجيل الخروج">${icon("users", 18)}</button></div></header>`;

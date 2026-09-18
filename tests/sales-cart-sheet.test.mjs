@@ -56,7 +56,8 @@ test("هندسة الشريط: فوق شريط التنقّل، تحت أزرا�
   assert.match(barBlock, /@media \(min-width: 600px\) \{ html\.is-sales-page \.sales-total-bar \{ display: none; \} \}/, "الشريط يظهر على الحاسوب حيث السلة لاصقة جانبًا");
   // متّسع أسفل الصفحة كي لا يغطي الشريطُ آخرَ الأقسام، والزر العائم «بيع» يُخفى داخل صفحته
   assert.match(barBlock, /html\.is-sales-page \.workspace \{ padding-bottom: calc\(\d+px \+ env\(safe-area-inset-bottom\)\); \}/, "لا متّسع أسفل الصفحة — الشريط يغطي زر إتمام البيع");
-  assert.match(barBlock, /html\.is-sales-page \.sales-scanner-fab \{ display: none; \}/, "الزر العائم «بيع» يزاحم الشريط داخل صفحة المبيعات");
+  assert.match(barBlock, /html\.is-sales-page \.sales-scanner-fab \{ bottom: calc\(146px \+ env\(safe-area-inset-bottom\)\); \}/, "زر الباركود العائم لا يُرفع فوق الشريط في الهاتف");
+  assert.match(css, /html:not\(\.is-sales-page\) \.sales-scanner-fab \{ display: none; \}/, "زر الباركود العائم يجب أن يُحصر في صفحة المبيعات");
   // مدخل الماسح في شريط بحث المبيعات يبقى (الإخفاء يخصّ الزر العائم وحده)
   assert.match(salesMarkup, /data-action="open-scanner" data-mode="sale"/, "لا مدخل مسح في صفحة المبيعات بعد إخفاء الزر العائم");
 });

@@ -1540,9 +1540,11 @@ html.is-sales-page .sales-total-bar {
 .sales-total-bar:active .sales-total-bar__value { text-shadow: 0 0 14px rgba(243, 207, 112, .55); }
 /* الشريط للهاتف فقط: من 600px تظهر السلة عمودًا جانبيًا لاصقًا ولا حاجة له */
 @media (min-width: 600px) { html.is-sales-page .sales-total-bar { display: none; } }
+/* الزر العائم صار زر الباركود: يظهر داخل صفحة المبيعات فقط لأنها موضع المسح */
+html:not(.is-sales-page) .sales-scanner-fab { display: none; }
 @media (max-width: 599px) {
-  /* الزر العائم «بيع» لا لزوم له داخل صفحة المبيعات نفسها ويزاحم شريط الإجمالي */
-  html.is-sales-page .sales-scanner-fab { display: none; }
+  /* في الهاتف يُرفع الزر فوق شريط الإجمالي الثابت (74px + ارتفاع الشريط) كي لا يغطيه */
+  html.is-sales-page .sales-scanner-fab { bottom: calc(146px + env(safe-area-inset-bottom)); }
   /* متّسع أسفل الصفحة كي لا يغطي الشريطُ الثابت آخرَ أقسام الصفحة */
   html.is-sales-page .workspace { padding-bottom: calc(214px + env(safe-area-inset-bottom)); }
   /* سلة فارغة: لا مساحة ميتة نصف شاشة في نهاية الصفحة */
