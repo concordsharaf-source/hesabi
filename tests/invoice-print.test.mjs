@@ -443,7 +443,8 @@ test("تستخدم تواريخ الانتهاء اختيار تقويم أصل�
   assert.match(app, /input\.type !== "number" \|\| input\.disabled \|\| input\.readOnly \|\| !input\.value/);
   assert.match(app, /document\.addEventListener\("focusin", selectNumericFieldValue, true\)/);
   assert.match(app, /document\.addEventListener\("pointerup", selectNumericFieldValue, true\)/);
-  assert.match(css, /input\[type="date"\] \{ direction:ltr; text-align:left; unicode-bidi:plaintext; \}/);
+  assert.match(css, /input\[type="date"\] \{ direction:ltr; text-align:right; padding-left:38px; padding-right:12px; \}/);
+  assert.match(css, /input\[type="date"\]::-webkit-calendar-picker-indicator \{ display:none; \}/);
   assert.match(app, /تاريخ الانتهاء<input class="native-date-input" data-purchase-expiry-date="\$\{index\}" type="date" dir="ltr"/);
   assert.match(app, /name="expiryDate" type="date" dir="ltr"/);
   assert.match(app, /input\("nearestExpiryDate", "تاريخ الانتهاء", "date"/);

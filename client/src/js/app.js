@@ -2217,17 +2217,19 @@ function decorateDateInput(input) {
   if (!wrap) return;
   const display = formatDateInputDisplay(input.value);
   let node = wrap.querySelector(".date-field-display");
-  if (!display) {
-    wrap.classList.remove("is-overlaid");
-    node?.remove();
-    return;
-  }
   if (!node) {
     node = document.createElement("span");
     node.className = "date-field-display";
     input.insertAdjacentElement("afterend", node);
   }
-  node.textContent = display;
+  if (display) {
+    node.textContent = display;
+    node.classList.remove("is-placeholder");
+  } else {
+    // ترتيب عربي صحيح (يوم/شهر/سنة) بدل placeholder المتصفح الذي يظهر معكوسًا
+    node.textContent = "يوم/شهر/سنة";
+    node.classList.add("is-placeholder");
+  }
   wrap.classList.add("is-overlaid");
 }
 
@@ -2241,6 +2243,14 @@ function bindDateInputDisplays() {
     }
     if (!input.title) input.title = "الصيغة: يوم/شهر/سنة";
     decorateDateInput(input);
+    if (!input.dataset.pickerBound) {
+      input.dataset.pickerBound = "1";
+      // في الديسكتوب: نقرة على الحقل تفتح منتقي التاريخ بعدما أخفينا أيقونة المتصفح
+      input.addEventListener("click", () => {
+        if (!window.matchMedia("(pointer: fine)").matches) return;
+        try { input.showPicker?.(); } catch { /* بعض المتصفحات ترفض فتح المنتقي برمجيًا */ }
+      });
+    }
     if (input.dataset.displayBound) return;
     input.dataset.displayBound = "1";
     input.addEventListener("input", () => decorateDateInput(input));

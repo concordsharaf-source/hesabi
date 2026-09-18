@@ -16,7 +16,8 @@ button:disabled { cursor:not-allowed; opacity:.48; }
 input, select, textarea { width:100%; max-width:100%; border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:11px; outline:none; direction:rtl; text-align:right; transition:border-color .16s var(--ease-out), box-shadow .16s var(--ease-out); }
 input:focus, select:focus, textarea:focus { border-color:var(--green); box-shadow:0 0 0 4px rgba(31,107,89,.11); }
 input { height:45px; padding:0 13px; }
-input[type="date"] { direction:ltr; text-align:left; unicode-bidi:plaintext; }
+input[type="date"] { direction:ltr; text-align:right; padding-left:38px; padding-right:12px; }
+input[type="date"]::-webkit-calendar-picker-indicator { display:none; }
 .iso-date-input { direction:ltr !important; text-align:left !important; unicode-bidi:plaintext; font-variant-numeric:tabular-nums; letter-spacing:.04em; }
 select { height:45px; padding:0 13px; }
 textarea { min-height:92px; padding:11px 13px; resize:vertical; }
@@ -1347,6 +1348,21 @@ label { font-size:15px; }
 .date-field-wrap { position: relative; display: block; min-width: 0; }
 .date-filter .date-field-wrap { flex: 1; }
 
+/* أيقونة تقويم ثابتة في الجانب الفارغ (يسار الحقل) بدل أيقونة المتصفح التي كانت تغطي النص */
+.date-field-wrap::before {
+  content: "";
+  position: absolute;
+  inset-inline-end: 11px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 17px;
+  height: 17px;
+  pointer-events: none;
+  opacity: .75;
+  background: center / contain no-repeat url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2355606a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><rect x='3' y='5' width='18' height='16' rx='2'/><path d='M8 3v4M16 3v4M3 10h18'/></svg>");
+}
+[data-theme="dark"] .date-field-wrap::before { filter: invert(.85); }
+
 /* نُخفي نص الحقل الأصلي بالكامل (كل أجزائه) ونُبقي أيقونة التقويم تعمل */
 .date-field-wrap > input[type="date"] { width: 100%; }
 .date-field-wrap.is-overlaid > input[type="date"]::-webkit-datetime-edit { opacity: 0; }
@@ -1360,14 +1376,16 @@ label { font-size:15px; }
   inset-inline-start: 12px;
   top: 50%;
   transform: translateY(-50%);
-  direction: ltr;
   color: var(--ink);
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
   pointer-events: none;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
+/* عند عدم وجود تاريخ: تلميح بصيغة يوم/شهر/سنة بترتيب عربي صحيح بدل placeholder المتصفح المعكوس */
+.date-field-display.is-placeholder { color: var(--muted, #66707a); font-weight: 500; }
 [data-theme="dark"] .date-field-display { color: var(--ink); }
 
 /* ===== موافقة المدير على فائض وردية الكاشير ===== */
