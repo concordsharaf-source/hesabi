@@ -1965,3 +1965,142 @@ html.is-install-gated, html.is-install-gated body { height:100%; overflow:hidden
 .install-steps__icon { display:inline-grid; place-items:center; min-width:22px; height:22px; padding:0 4px; background:rgba(255,255,255,.14); border-radius:6px; font-size:13px; }
 .install-card__note { margin:0; font-size:11.5px; line-height:1.8; color:#bfe8da; }
 .install-card__note--done { color:#9df3c4; font-weight:800; }
+
+/* =============================================================================
+   جِلد برامج سطح المكتب (ديسكتوب فقط ≥960px)
+   الهدف: إحساس برنامج مثبّت (نوافذ وقوائم وخانات بنظام بصري رسمي) لا موقع ويب:
+   زوايا مربّعة صغيرة، حدود رمادية واضحة، ظلال ضيقة، ارتفاعات موحدة 30px،
+   قوائم منسدلة بأسهم مرسومة، وترويسات مسطحة — والخط الرسمي Cairo في كل عنصر.
+   المتغيرات لها قيم موازية للثيم الداكن داخل نفس النقطة.
+============================================================================= */
+@media (min-width: 960px) {
+  :root {
+    --desk-face: #f2f4f6;          /* وجه النوافذ والقوائم */
+    --desk-paper: #ffffff;         /* خلفية الخانات والجداول */
+    --desk-line: #c8cdd3;          /* حدود اللوحات */
+    --desk-line-strong: #8b939b;   /* حدود الخانات والأزرار */
+    --desk-head: #e8ecef;          /* ترويسات النوافذ والجداول */
+    --desk-hover: #dfe4e9;         /* تمرير القوائم */
+    --desk-ink: #1c2620;
+    --desk-muted: #55606a;
+    --desk-focus: #0f6b5c;         /* حلقة التركيز الرسمية */
+    --desk-rad: 3px;
+    --desk-h: 30px;
+    --desk-fs: 13px;
+  }
+  :root[data-theme="dark"] {
+    --desk-face: #20262a;
+    --desk-paper: #171c1f;
+    --desk-line: #3a4147;
+    --desk-line-strong: #5b656d;
+    --desk-head: #262d31;
+    --desk-hover: #2c3439;
+    --desk-ink: #e6ede9;
+    --desk-muted: #9aa7ae;
+    --desk-focus: #4cc3a5;
+  }
+
+  /* الخط الرسمي صراحةً في كل عناصر التحكم (لا افتراضات المتصفح) */
+  body, button, input, select, textarea, .button, .icon-button, .nav-item {
+    font-family: "Cairo", "Noto Sans Arabic", Tahoma, sans-serif;
+  }
+  body { font-size: var(--desk-fs); color: var(--desk-ink); }
+  h1, .topbar h1 { font-size: 20px; font-weight: 800; letter-spacing: 0; }
+  h2 { font-size: 16px; font-weight: 800; }
+  label, .form-grid > label { font-size: 12px; font-weight: 700; color: var(--desk-muted); }
+
+  /* النوافذ واللوحات: إطارات مسطحة وظل ضيق بدل البطاقات العائمة */
+  .panel, .metric-card, .report-card, .product-table-panel, .cart-panel,
+  .purchase-picker, .inline-empty, .account-summary > div, .credit-summary {
+    background: var(--desk-paper);
+    border: 1px solid var(--desk-line);
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(15, 25, 20, .10);
+  }
+  .metric-card { min-height: 96px; padding: 12px 14px; }
+  .metric-card strong { font-size: 19px; }
+
+  /* القائمة الجانبية: شجرة برامج كلاسيكية */
+  .sidebar { background: var(--desk-face); border-left: 1px solid var(--desk-line); padding: 14px 10px; }
+  .brand { padding: 6px 8px 14px; }
+  .brand strong { font-size: 15px; }
+  .sidebar__label { padding: 8px 10px 4px; color: var(--desk-muted); font-size: 10px; font-weight: 800; }
+  .sidebar nav { gap: 2px; }
+  .sidebar .nav-item { min-height: var(--desk-h); padding: 5px 10px; border-radius: var(--desk-rad); color: var(--desk-ink); font-size: 12.5px; font-weight: 700; }
+  .sidebar .nav-item:hover { background: var(--desk-hover); color: var(--desk-ink); }
+  .sidebar .nav-item.is-active { color: #fff; background: var(--green-deep); }
+  :root[data-theme="dark"] .sidebar .nav-item.is-active { color: #10251d; background: #f3cf70; }
+
+  /* شريط العنوان: مسطح بحد سفلي مثل أشرطة أدوات البرامج */
+  .workspace { padding: 20px 26px 40px; background: var(--desk-face); }
+  .topbar { padding-bottom: 10px; border-bottom: 1px solid var(--desk-line); margin-bottom: 16px; }
+  .topbar__description { font-size: 12px; color: var(--desk-muted); }
+
+  /* الخانات البيضاء: إطار رمادي واضح، زاوية 3px، ارتفاع 30 وظل داخلي خفيف */
+  input, select, textarea {
+    height: var(--desk-h);
+    padding: 4px 8px;
+    color: var(--desk-ink);
+    background: var(--desk-paper);
+    border: 1px solid var(--desk-line-strong);
+    border-radius: var(--desk-rad);
+    box-shadow: inset 0 1px 2px rgba(15, 25, 20, .07);
+    font-size: var(--desk-fs);
+  }
+  textarea { height: auto; min-height: 84px; padding: 7px 8px; }
+  input:focus, select:focus, textarea:focus {
+    border-color: var(--desk-focus);
+    box-shadow: inset 0 0 0 1px var(--desk-focus);
+  }
+  input::placeholder, textarea::placeholder { color: var(--desk-muted); font-size: 12px; }
+
+  /* القوائم المنسدلة: شكل ComboBox رسمي — سهم مرسوم ومنطقة زر مسطحة */
+  select {
+    appearance: none;
+    -webkit-appearance: none;
+    padding-left: 26px;
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%2355606a' stroke-width='1.6'/></svg>"),
+      linear-gradient(var(--desk-head), var(--desk-head));
+    background-repeat: no-repeat, no-repeat;
+    background-position: left 5px center, left 1px center;
+    background-size: 10px 6px, 20px calc(100% - 2px);
+  }
+  select:hover { border-color: #5c666e; }
+  :root[data-theme="dark"] select {
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%239aa7ae' stroke-width='1.6'/></svg>"),
+      linear-gradient(var(--desk-head), var(--desk-head));
+  }
+
+  /* الأزرار: مسطحة بحدود واضحة مثل أزرار الحوارات الرسمية */
+  .button { min-height: var(--desk-h); padding: 4px 14px; border: 1px solid var(--desk-line-strong); border-radius: var(--desk-rad); background: linear-gradient(#fdfefe, #e7ebee); color: var(--desk-ink); font-size: 12.5px; font-weight: 800; box-shadow: 0 1px 1px rgba(15, 25, 20, .12); }
+  .button:hover { background: var(--desk-hover); color: var(--desk-ink); }
+  .button--primary { background: linear-gradient(#217a63, #175a49); border-color: #11443a; color: #fff; }
+  .button--primary:hover { background: linear-gradient(#268a70, #1a6552); color: #fff; }
+  .button--secondary { background: linear-gradient(#fdfefe, #e7ebee); }
+  .icon-button { width: 28px; height: 28px; border: 1px solid var(--desk-line); border-radius: var(--desk-rad); background: var(--desk-paper); }
+  .icon-button:hover { background: var(--desk-hover); }
+
+  /* الحوارات = نوافذ برنامج: ترويسة مسطحة وزوايا مربّعة وظل نافذة */
+  .dialog { border: 1px solid var(--desk-line-strong); border-radius: 6px; box-shadow: 0 12px 34px rgba(10, 18, 14, .30); background: var(--desk-paper); }
+  .dialog__head { padding: 8px 12px; background: var(--desk-head); border-bottom: 1px solid var(--desk-line); border-radius: 5px 5px 0 0; }
+  .dialog__head h2 { font-size: 14px; }
+  .dialog__subtext { font-size: 11.5px; color: var(--desk-muted); }
+  .dialog__actions { padding-top: 10px; border-top: 1px solid var(--desk-line); }
+
+  /* الجداول: ترويسة مسطحة وصفوف بحدود رفيعة كبرامج المحاسبة */
+  table { border-radius: 0; }
+  thead th { background: var(--desk-head); color: var(--desk-ink); font-size: 12px; font-weight: 800; border: 1px solid var(--desk-line); padding: 6px 10px; }
+  tbody td { border: 1px solid var(--desk-line); padding: 6px 10px; font-size: 12.5px; }
+  tbody tr:hover td { background: var(--desk-hover); }
+
+  /* أشرطة تمرير بأسلوب سطح المكتب */
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: var(--desk-face); }
+  *::-webkit-scrollbar-thumb { background: #b6bcc3; border: 2px solid var(--desk-face); border-radius: 6px; }
+  :root[data-theme="dark"] *::-webkit-scrollbar-thumb { background: #4a545b; border-color: var(--desk-face); }
+
+  /* التنبيهات مربّعة صغيرة كإشعارات نظام */
+  .toast { border-radius: 4px; font-size: 12.5px; }
+}
