@@ -130,7 +130,7 @@ test("سكربت الرأس يطبق لون الخلفية المحفوظ قبل
 test("سلة البيع على الشاشات الواسعة لاصقة والإجمالي لا يغيب مع التمرير", async () => {
   const css = await readFile(new URL("../client/src/style.css", import.meta.url), "utf8");
   assert.match(css, /\.cart-panel \{ position:sticky/);
-  assert.match(css, /\.cart-panel \.cart-lines \{ flex:1 1 auto; min-height:0; overflow-y:auto/);
+  assert.match(css, /\.cart-panel \.cart-lines \{ flex:1 1 auto; min-height:0; max-height:250px; overflow-y:auto/);
   // الجوال: السلة داخل تدفّق الصفحة وشريط الإجمالي الثابت أسفل الشاشة
   assert.match(css, /html\.is-sales-page \.sales-total-bar \{/);
 });

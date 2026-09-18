@@ -699,7 +699,7 @@ test("الصيدلية: بلاطة خدمات ثابتة بلون مميز أع�
   // النافذة: نوع الخدمة (مجارحة، ضرب إبر...) + خيار مخصص + السعر
   assert.match(appJs, /const PHARMACY_SERVICE_OPTIONS = \["مجارحة", "ضرب إبر", "قياس ضغط", "قياس سكر", "تضميد جرح", "استشارة"\];/, "قائمة أنواع الخدمة ناقصة");
   assert.match(appJs, /<option value="__custom__">خدمة أخرى\.\.\.<\/option>/, "خيار الخدمة المخصصة مفقود");
-  assert.match(appJs, /<label>السعر<input name="servicePrice" type="number" inputmode="decimal" min="0" step="1" required/, "خانة السعر مفقودة");
+  assert.match(appJs, /<label>السعر<input name="servicePrice" type="number" lang="en" inputmode="decimal" min="0" step="1" required/, "خانة السعر مفقودة");
   // الإضافة كسطر خدمة في السلة بسعر إلزامي واسم النوع
   assert.match(appJs, /state\.cart\.push\(\{ productId: `svc-pharmacy-\$\{Date\.now\(\)\}`, isService: true, serviceType: "pharmacy-service", name: kind, unitPrice: price, quantity: 1, discount: "" \}\);/, "الخدمة لا تُضاف للسلة");
   assert.match(appJs, /if \(price <= 0\) \{ showToast\("أدخل سعر الخدمة\.", "error"\); return; \}/, "السعر الصفري يمر");

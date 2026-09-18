@@ -28,6 +28,19 @@ test("كثافة الديسكتوب: أيقونات وأزرار أصغر ونص
   assert.ok(css.includes(".sidebar .nav-item { min-height: 27px; padding: 3px 9px;"));
 });
 
+test("السلة تعرض صنفين فقط والإجمالي ظاهر دون تمرير صفحة", () => {
+  assert.ok(css.includes(".cart-lines { max-height: 360px; overflow-y: auto;"), "حد صفين في الهاتف");
+  assert.ok(css.includes(".cart-panel .cart-lines { flex:1 1 auto; min-height:0; max-height:250px;"), "حد صفين في الواسع");
+  assert.ok(css.includes(".cart-panel { max-height: calc(100vh - 24px);"), "لوحة السلة لا تتجاوز النافذة");
+});
+
+test("الأرقام بأرقام إنجليزية في حقول الأرقام عبر lang=en", () => {
+  const app = readFileSync(new URL("../client/src/js/app.js", import.meta.url), "utf8");
+  assert.ok(app.includes('type="number" lang="en"'), "حقول الأرقام تحمل lang=en");
+  assert.ok(app.includes('${type === "number" ? \'lang="en" \' : ""}'), "دالة input تضيف lang=en للأرقام");
+  assert.equal(/type="number"(?! lang="en")/.test(app), false, "لا حقل رقم بدون lang=en");
+});
+
 test("السلة على الديسكتوب: نص داكن وتحكم كمية مضغوط", () => {
   assert.ok(css.includes(".cart-panel { color: var(--desk-ink); --cart-total-color: #c62828;"));
   assert.ok(css.includes(".quantity-control { height: 30px; min-width: 112px;"));

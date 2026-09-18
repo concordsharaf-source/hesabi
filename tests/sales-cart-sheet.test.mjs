@@ -92,5 +92,5 @@ test("أرقام السلة بالخط الرقمي كما كانت: الإجم�
 
 test("سلة البيع على الشاشات الواسعة لاصقة والإجمالي لا يغيب مع التمرير", () => {
   assert.match(css, /\.cart-panel \{ position:sticky/, "السلة لم تعد لاصقة على الشاشات الواسعة");
-  assert.match(css, /\.cart-panel \.cart-lines \{ flex:1 1 auto; min-height:0; overflow-y:auto/, "قائمة الأسطر لا تتمرّر داخل السلة اللاصقة");
+  assert.match(css, /\.cart-panel \.cart-lines \{ flex:1 1 auto; min-height:0; max-height:250px; overflow-y:auto/, "قائمة الأسطر لا تتمرّر داخل السلة اللاصقة");
 });

@@ -1824,10 +1824,16 @@ html.is-sales-page .direct-sale-fab { display: none; }
 [data-theme="dark"] .bg-theme-option { background:var(--paper); border-color:var(--line); }
 [data-theme="dark"] .bg-theme-option.is-active { border-color:var(--green); }
 
+/* ═══ السلة تعرض صنفين فقط والباقي بتمرير داخلي: الإجمالي ظاهر في الشاشة دائمًا ═══ */
+.cart-panel { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow: hidden; }
+.cart-lines { max-height: 360px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.cart-panel .cart-total,
+.cart-panel .cart-actions-grid { flex: 0 0 auto; }
+
 /* ═══ سلة البيع على الشاشات الواسعة: عمود جانبي لاصق والإجمالي مثبّت لا يغيب مع التمرير ═══ */
 @media (min-width:600px) {
   .cart-panel { position:sticky; top:14px; max-height:calc(100vh - 28px); min-height:0; overflow:hidden; }
-  .cart-panel .cart-lines { flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+  .cart-panel .cart-lines { flex:1 1 auto; min-height:0; max-height:250px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
   .cart-panel .cart-total,
   .cart-panel .cart-actions-grid { flex:0 0 auto; }
 }
