@@ -278,6 +278,10 @@ export const db = {
     if (!normalized || normalized.length < 3 || normalized.length > 30) throw new Error("اسم المستخدم يجب أن يتكون من 3 إلى 30 حرفًا أو رقمًا.");
     if (!accountName) throw new Error("اسم صاحب الحساب مطلوب.");
     if (!validatePin(pin)) throw new Error("كلمة المرور يجب أن تتكون من 4 إلى 64 حرفًا أو رقمًا دون مسافات.");
+    /* تجزئة PIN تُحسب قبل فتح المعاملة: انتظار PBKDF2 داخل معاملة IndexedDB
+       يُنهي المعاملة تلقائيًا فيفشل put لاحقًا («The transaction has finished»). */
+    const pinSalt = makeSalt();
+    const pinHash = await hashPin(pin, pinSalt);
     const database = await this.open();
     const transaction = database.transaction("accounts", "readwrite");
     const accounts = transaction.objectStore("accounts");
@@ -286,8 +290,6 @@ export const db = {
     if (!current) throw new Error("تعذر العثور على حساب المدير الأول.");
     const duplicate = await requestAsPromise(accounts.index("username").get(normalized));
     if (duplicate && duplicate.id !== current.id) throw new Error("اسم المستخدم مستخدم بالفعل.");
-    const pinSalt = makeSalt();
-    const pinHash = await hashPin(pin, pinSalt);
     accounts.put({ ...current, username: normalized, name: accountName, pinSalt, pinHash, mustChangePin: false, isActive: true, updatedAt: nowIso() });
     await transactionDone(transaction);
   },
