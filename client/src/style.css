@@ -2045,10 +2045,8 @@ html.is-install-gated, html.is-install-gated body { height:100%; overflow:hidden
   :root[data-theme="dark"] .cart-panel { --cart-total-color: #ff8a80; --cart-total-glow: 0 0 9px rgba(255, 109, 97, .35); }
   .cart-panel__head { border-bottom-color: var(--desk-line); }
   .cart-panel .eyebrow { color: var(--desk-muted); }
-  .cart-line { color: var(--desk-ink); border-bottom-color: var(--desk-line); }
-  .cart-line__detail small, .cart-total span, .cart-empty, .cart-empty p,
-  .cart-line__discount-wrap .cart-line__discount-note { color: var(--desk-muted); }
-  .remove-line { color: var(--desk-muted); }
+  /* نصوص منطقة الإجمالي الفاتحة فقط — بطاقة السطر تحتفظ بألوانها الداكنة المقروءة */
+  .cart-total span, .cart-empty, .cart-empty p { color: var(--desk-muted); }
   .cart-total { border-top-color: var(--desk-line); }
   .cart-total strong, [data-cart-subtotal] { font-size: 30px; }
   .quantity-control { height: 30px; min-width: 112px; grid-template-columns: 28px minmax(46px, 1fr) 28px; border-radius: var(--desk-rad); }
