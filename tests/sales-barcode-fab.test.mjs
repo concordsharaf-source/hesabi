@@ -15,6 +15,16 @@ test("الزر العائم يحمل كلمة باركود ورمز البارك
   assert.ok(!fab.includes("<span>بيع</span>"), "لا تبقى كلمة بيع القديمة");
 });
 
+test("زر البيع المباشر عاد كما كان: في كل الصفحات عدا المبيعات", () => {
+  const fab = app.match(/function directSaleFabMarkup\(\)[^\n]*/)?.[0] || "";
+  assert.ok(fab.includes("<span>بيع</span>"), "كلمة بيع على الزر المباشر");
+  assert.ok(fab.includes('icon("cart"'), "أيقونة السلة على الزر المباشر");
+  assert.ok(fab.includes("direct-sale-fab"), "صنف مستقل للزر المباشر");
+  assert.match(css, /html\.is-sales-page \.direct-sale-fab \{ display: none; \}/, "يُخفى داخل المبيعات حيث يحل زر الباركود");
+  assert.ok(!/html:not\(\.is-sales-page\) \.direct-sale-fab \{ display: none; \}/.test(css), "لا يُخفى خارج المبيعات");
+  assert.match(app, /\$\{salesScannerFabMarkup\(\)\}\$\{directSaleFabMarkup\(\)\}/, "الزران يُركبان معًا في الغلاف");
+});
+
 test("الزر العائم يظهر في صفحة المبيعات فقط ولا يختفي منها", () => {
   assert.match(css, /html:not\(\.is-sales-page\) \.sales-scanner-fab \{ display: none; \}/, "مخفي خارج صفحة المبيعات");
   assert.ok(!/html\.is-sales-page \.sales-scanner-fab \{ display: none; \}/.test(css), "لا يُخفى داخل صفحة المبيعات");
