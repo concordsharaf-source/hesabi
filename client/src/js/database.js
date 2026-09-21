@@ -55,6 +55,11 @@ const transactionDone = (transaction) => new Promise((resolve, reject) => {
   transaction.onabort = () => reject(transaction.error || new Error("تم إلغاء العملية المحلية: تعارض أو بيانات غير صالحة."));
 });
 const normalize = (value) => String(value || "").trim();
+const normalizeBarcode = (value) => {
+  let text = String(value ?? "").replace(/[\u200e\u200f\u2066-\u2069]/g, "").trim().replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit))).replace(/\s+/g, "");
+  if (/^\d+\.0+$/.test(text)) text = text.slice(0, text.indexOf("."));
+  return text;
+};
 const PRODUCT_UNITS = new Set(["حبة", "علبة", "كرتون", "كيس", "حزمة", "كيلو", "جرام", "لتر", "قطعة", "جهاز", "شريط", "عبوة", "طقم", "دزينة", "صندوق"]);
 const normalizeProductCategory = (value, unit = "") => { const category = normalize(value); return !category || category === normalize(unit) || PRODUCT_UNITS.has(category) ? "أخرى" : category; };
 const LOCAL_STORE_LOGO_PATTERN = /^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/]+={0,2}$/i;
@@ -424,10 +429,12 @@ export const db = {
   async listProductBatches(productId = "") { const database = await this.open(); const items = await requestAsPromise(database.transaction("productBatches", "readonly").objectStore("productBatches").getAll()); return items.filter((item) => !productId || item.productId === productId).sort((a, b) => String(a.expiryDate || "9999-12-31").localeCompare(String(b.expiryDate || "9999-12-31"))); },
   async getProduct(productId) { const database = await this.open(); return requestAsPromise(database.transaction("products", "readonly").objectStore("products").get(productId)); },
   async findProductByBarcode(barcode, excludeProductId = null) {
-    const normalized = normalize(barcode); if (!normalized) return null;
+    const normalized = normalizeBarcode(barcode); if (!normalized) return null;
     const database = await this.open();
-    const matches = await requestAsPromise(database.transaction("products", "readonly").objectStore("products").index("barcode").getAll(normalized));
-    return matches.find((item) => !item.isDeleted && item.id !== excludeProductId) || null;
+    const store = database.transaction("products", "readonly").objectStore("products");
+    const indexed = await requestAsPromise(store.index("barcode").getAll(normalized));
+    const matches = indexed.length ? indexed : await requestAsPromise(store.getAll());
+    return matches.find((item) => !item.isDeleted && item.id !== excludeProductId && normalizeBarcode(item.barcode) === normalized) || null;
   },
   async findProductByInternalCode(internalCode) {
     const normalized = normalize(internalCode); if (!normalized) return null;
@@ -437,8 +444,8 @@ export const db = {
   },
   async createProduct(values) {
     const database = await this.open(); const transaction = database.transaction(["products", "stockMovements"], "readwrite");
-    const products = transaction.objectStore("products"); const createdAt = nowIso(); const quantity = Math.max(0, toNumber(values.quantity)); const barcode = normalize(values.barcode);
-    const duplicate = barcode ? (await requestAsPromise(products.index("barcode").getAll(barcode))).find((item) => !item.isDeleted) : null;
+    const products = transaction.objectStore("products"); const createdAt = nowIso(); const quantity = Math.max(0, toNumber(values.quantity)); const barcode = normalizeBarcode(values.barcode);
+    const duplicate = barcode ? (await requestAsPromise(products.getAll())).find((item) => !item.isDeleted && normalizeBarcode(item.barcode) === barcode) : null;
     if (duplicate) throw new Error(`هذا الباركود مستخدم بالفعل للمنتج: ${duplicate.name}`);
     const unitsPerPackage = Math.max(1, toNumber(values.unitsPerPackage) || 1); const nearestProductionDate = normalize(values.nearestProductionDate); const nearestExpiryDate = normalize(values.nearestExpiryDate);
     if (nearestProductionDate && !/^\d{4}-\d{2}-\d{2}$/.test(nearestProductionDate)) throw new Error("أدخل تاريخ إنتاج صالحًا أو اترك الحقل فارغًا.");
@@ -454,7 +461,7 @@ export const db = {
   async updateProduct(productId, values) {
     const database = await this.open(); const transaction = database.transaction("products", "readwrite"); const store = transaction.objectStore("products"); const current = await requestAsPromise(store.get(productId));
     if (!current || current.isDeleted) throw new Error("المنتج غير متاح للتعديل.");
-    const barcode = normalize(values.barcode); const duplicate = barcode ? (await requestAsPromise(store.index("barcode").getAll(barcode))).find((item) => !item.isDeleted && item.id !== productId) : null;
+    const barcode = normalizeBarcode(values.barcode); const duplicate = barcode ? (await requestAsPromise(store.getAll())).find((item) => !item.isDeleted && item.id !== productId && normalizeBarcode(item.barcode) === barcode) : null;
     if (duplicate) throw new Error(`هذا الباركود مستخدم بالفعل للمنتج: ${duplicate.name}`);
     const nearestProductionDate = normalize(values.nearestProductionDate ?? current.nearestProductionDate); const nearestExpiryDate = normalize(values.nearestExpiryDate ?? current.nearestExpiryDate);
     if (nearestProductionDate && !/^\d{4}-\d{2}-\d{2}$/.test(nearestProductionDate)) throw new Error("أدخل تاريخ إنتاج صالحًا أو اترك الحقل فارغًا.");

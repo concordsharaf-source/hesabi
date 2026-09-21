@@ -20,7 +20,7 @@ const numberValue = (value) => {
   const result = Number(normalized);
   return Number.isFinite(result) ? result : 0;
 };
-const barcodeValue = (value) => { const text = String(value ?? "").trim(); return /^\d+\.0+$/.test(text) ? text.slice(0, text.indexOf(".")) : text; };
+const barcodeValue = (value) => { let text = String(value ?? "").replace(/[\u200e\u200f\u2066-\u2069]/g, "").trim().replace(/[٠-٩]/g, (digit) => String("٠١٢٣٤٥٦٧٨٩".indexOf(digit))).replace(/\s+/g, ""); return /^\d+\.0+$/.test(text) ? text.slice(0, text.indexOf(".")) : text; };
 
 export async function parseBarcodeFile(file) {
   const data = await file.arrayBuffer();
