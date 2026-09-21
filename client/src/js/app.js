@@ -3479,8 +3479,9 @@ async function resetAllData() { if (!window.confirm("سيُمسح كل السج�
 
 async function toggleTheme() {
   try {
-    const order = ["system", "light", "dark"];
-    const theme = order[(order.indexOf(themePreference()) + 1) % order.length];
+    // زر التبديل السريع يجب أن يغيّر المظهر المرئي فورًا؛ لا ينتقل إلى
+    // «حسب النظام» لأن ذلك قد يُبقي الشاشة داكنة إذا كان الجهاز داكنًا.
+    const theme = resolvedTheme() === "dark" ? "light" : "dark";
     await db.saveSettings({ ...state.settings, theme });
     state.settings = await db.getSettings();
     applyTheme();
